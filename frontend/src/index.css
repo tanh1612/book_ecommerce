@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@theme {
+  /* Khai báo màu đỏ đặc trưng của Fahasa để dùng lại nhiều lần */
+  --color-primary: #157a2c; 
+}
