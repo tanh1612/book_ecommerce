@@ -13,7 +13,7 @@ class LatestOrders extends BaseWidget
 
     protected int | string | array $columnSpan = 'full';
 
-    protected static ?string $heading = 'Recent Orders';
+    protected static ?string $heading = 'Đơn hàng gần đây';
 
     public function table(Table $table): Table
     {
@@ -43,13 +43,13 @@ class LatestOrders extends BaseWidget
                         default => 'secondary',
                     })
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'pending' => 'Pending',
-                        'confirmed' => 'Confirmed',
-                        'processing' => 'Processing',
-                        'shipping' => 'Shipping',
-                        'delivered' => 'Delivered',
-                        'cancelled' => 'Cancelled',
-                        'returned' => 'Returned',
+                        'pending' => 'Chờ xử lý',
+                        'confirmed' => 'Đã xác nhận',
+                        'processing' => 'Đang xử lý',
+                        'shipping' => 'Đang giao hàng',
+                        'delivered' => 'Đã giao hàng',
+                        'cancelled' => 'Đã hủy',
+                        'returned' => 'Trả hàng',
                         default => $state ?? '—',
                     }),
                 Tables\Columns\TextColumn::make('created_at')

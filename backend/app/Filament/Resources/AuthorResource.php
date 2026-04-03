@@ -16,11 +16,11 @@ class AuthorResource extends Resource
 {
     protected static ?string $model = Author::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-users';
-    protected static \UnitEnum|string|null $navigationGroup = 'Catalog';
+    protected static \UnitEnum|string|null $navigationGroup = 'Danh mục';
     protected static ?int $navigationSort = 3;
-    protected static ?string $navigationLabel = 'Authors';
-    protected static ?string $modelLabel = 'Author';
-    protected static ?string $pluralModelLabel = 'Authors';
+    protected static ?string $navigationLabel = 'Tác giả';
+    protected static ?string $modelLabel = 'Tác giả';
+    protected static ?string $pluralModelLabel = 'Tác giả';
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
@@ -30,8 +30,15 @@ class AuthorResource extends Resource
                 Field\TextInput::make('name')
                     ->label('Author Name')
                     ->required()
-                    ->maxLength(255),
-            ]),
+                    ->maxLength(255)
+                    ->columnSpanFull(),
+                Field\TextInput::make('email')
+                    ->label('Email')
+                    ->email()
+                    ->required()
+                    ->maxLength(255)
+                    ->columnSpanFull(),
+            ])->columnSpanFull(),
         ]);
     }
 
@@ -40,7 +47,7 @@ class AuthorResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')->label('Name')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('books_count')->label('Books Count')->counts('books')->sortable(),
+                Tables\Columns\TextColumn::make('email')->label('Email')->searchable(),
                 Tables\Columns\TextColumn::make('created_at')->label('Created At')->dateTime()->sortable()->toggleable(),
             ])
             ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])

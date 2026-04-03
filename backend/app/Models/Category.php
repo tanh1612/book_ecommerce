@@ -37,4 +37,46 @@ class Category extends Model
     {
         return $this->belongsToMany(Book::class, 'book_categories');
     }
+
+    /**
+     * Lấy toàn bộ ID con cháu (để chặn circular reference).
+     * Dùng iterative BFS thay vì đệ quy để tránh stack overflow.
+     */
+    public function getDescendantIds(): array
+    {
+        $descendantIds = [];
+        $queue = [$this->id];
+
+        while (!empty($queue)) {
+            $currentIds = $queue;
+            $queue = [];
+            $children = static::whereIn('parent_id', $currentIds)->pluck('id')->toArray();
+            foreach ($children as $childId) {
+                if (!in_array($childId, $descendantIds)) {
+                    $descendantIds[] = $childId;
+                    $queue[] = $childId;
+                }
+            }
+        }
+        return $descendantIds;
+    }
+
+    /**
+     * Tính độ sâu của danh mục này trong cây (root = 0).
+     */
+    public function getDepth(): int
+    {
+        $depth = 0;
+        $current = $this;
+        $visited = [$this->id];
+
+        while ($current->parent_id !== null) {
+            if (in_array($current->parent_id, $visited)) break;
+            $visited[] = $current->parent_id;
+            $current = $current->parent;
+            if (!$current) break;
+            $depth++;
+        }
+        return $depth;
+    }
 }

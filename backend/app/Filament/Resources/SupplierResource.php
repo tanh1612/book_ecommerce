@@ -16,11 +16,11 @@ class SupplierResource extends Resource
 {
     protected static ?string $model = Supplier::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-truck';
-    protected static \UnitEnum|string|null $navigationGroup = 'Catalog';
+    protected static \UnitEnum|string|null $navigationGroup = 'Danh mục';
     protected static ?int $navigationSort = 5;
-    protected static ?string $navigationLabel = 'Suppliers';
-    protected static ?string $modelLabel = 'Supplier';
-    protected static ?string $pluralModelLabel = 'Suppliers';
+    protected static ?string $navigationLabel = 'Nhà cung cấp';
+    protected static ?string $modelLabel = 'Nhà cung cấp';
+    protected static ?string $pluralModelLabel = 'Nhà cung cấp';
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
@@ -30,22 +30,20 @@ class SupplierResource extends Resource
                 Field\TextInput::make('name')
                     ->label('Supplier Name')
                     ->required()
-                    ->maxLength(255),
-                Field\TextInput::make('contact_name')
-                    ->label('Contact Person')
-                    ->maxLength(255),
-                Field\TextInput::make('phone')
-                    ->label('Phone')
-                    ->tel()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->columnSpanFull(),
+                Field\TextInput::make('slug')
+                    ->label('Slug')
+                    ->required()
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255)
+                    ->columnSpanFull(),
                 Field\TextInput::make('email')
                     ->label('Email')
                     ->email()
-                    ->maxLength(255),
-                Field\Textarea::make('address')
-                    ->label('Address')
+                    ->maxLength(255)
                     ->columnSpanFull(),
-            ])->columns(2),
+            ])->columnSpanFull(),
         ]);
     }
 
@@ -54,8 +52,9 @@ class SupplierResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')->label('Name')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('contact_name')->label('Contact Person')->searchable(),
-                Tables\Columns\TextColumn::make('phone')->label('Phone')->searchable(),
+                Tables\Columns\TextColumn::make('slug')->label('Slug')->searchable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('email')->label('Email')->searchable(),
+                Tables\Columns\TextColumn::make('created_at')->label('Created At')->dateTime()->sortable()->toggleable(),
             ])
             ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])
             ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);

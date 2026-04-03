@@ -19,15 +19,11 @@ class BookResource extends Resource
 
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-book-open';
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Catalog';
-
+    protected static \UnitEnum|string|null $navigationGroup = 'Danh mục';
     protected static ?int $navigationSort = 1;
-
-    protected static ?string $navigationLabel = 'Books';
-
-    protected static ?string $modelLabel = 'Book';
-
-    protected static ?string $pluralModelLabel = 'Books';
+    protected static ?string $navigationLabel = 'Sách';
+    protected static ?string $modelLabel = 'Sách';
+    protected static ?string $pluralModelLabel = 'Sách';
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -35,7 +31,7 @@ class BookResource extends Resource
     {
         return $schema->components([
             Layout\Tabs::make('Tabs')->tabs([
-                Layout\Tabs\Tab::make('General Information')->components([
+                Layout\Tabs\Tab::make('Thông tin chung')->components([
                     Field\TextInput::make('name')
                         ->label('Book Name')
                         ->required()
@@ -61,11 +57,12 @@ class BookResource extends Resource
                             ->numeric()
                             ->required(),
                         Field\Toggle::make('is_active')
-                            ->label('Is Active')
+                            ->label('Active')
+                            ->inline(false)
                             ->default(true),
                     ]),
                 ]),
-                Layout\Tabs\Tab::make('Classification')->components([
+                Layout\Tabs\Tab::make('Phân loại')->components([
                     Field\Select::make('supplier_id')
                         ->relationship('supplier', 'name')
                         ->label('Supplier')->searchable()->preload(),
@@ -83,7 +80,7 @@ class BookResource extends Resource
                         ->multiple()
                         ->preload(),
                 ]),
-                Layout\Tabs\Tab::make('Images')->components([
+                Layout\Tabs\Tab::make('Hình ảnh')->components([
                     Field\Repeater::make('images')
                         ->relationship('images')
                         ->schema([
@@ -98,9 +95,9 @@ class BookResource extends Resource
                         ])
                         ->grid(4)
                         ->reorderable('sort_order')
-                        ->itemLabel(fn (array $state): ?string => $state['image_url'] ?? 'New Image')
+                        ->itemLabel(fn (array $state): ?string => $state['image_url'] ?? 'Ảnh mới')
                         ->columnSpanFull()
-                        ->helperText('The first image in the sequence will be used as the thumbnail.'),
+                        ->helperText('Ảnh đầu tiên sẽ được dùng làm ảnh đại diện (thumbnail).'),
                 ]),
             ])->columnSpanFull(),
         ]);
@@ -117,7 +114,7 @@ class BookResource extends Resource
                 Tables\Columns\TextColumn::make('name')->label('Book Name')->searchable()->limit(40),
                 Tables\Columns\TextColumn::make('selling_price')->label('Selling Price')->money('VND')->sortable(),
                 Tables\Columns\TextColumn::make('sku')->label('SKU')->searchable()->toggleable(),
-                Tables\Columns\IconColumn::make('is_active')->label('Is Active')->boolean(),
+                Tables\Columns\IconColumn::make('is_active')->label('Active')->boolean(),
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')->label('Status'),

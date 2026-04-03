@@ -17,11 +17,11 @@ class CategoryResource extends Resource
 {
     protected static ?string $model = Category::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-tag';
-    protected static \UnitEnum|string|null $navigationGroup = 'Catalog';
+    protected static \UnitEnum|string|null $navigationGroup = 'Danh mục';
     protected static ?int $navigationSort = 2;
-    protected static ?string $navigationLabel = 'Categories';
-    protected static ?string $modelLabel = 'Category';
-    protected static ?string $pluralModelLabel = 'Categories';
+    protected static ?string $navigationLabel = 'Danh mục';
+    protected static ?string $modelLabel = 'Danh mục';
+    protected static ?string $pluralModelLabel = 'Danh mục';
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
@@ -33,23 +33,35 @@ class CategoryResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->live(onBlur: true)
+                    ->columnSpanFull()
                     ->afterStateUpdated(fn (string $operation, $state, \Filament\Schemas\Components\Utilities\Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
                 Field\TextInput::make('slug')
                     ->label('Slug')
                     ->required()
                     ->maxLength(255)
+                    ->columnSpanFull()
                     ->unique(Category::class, 'slug', ignoreRecord: true),
                 Field\Select::make('parent_id')
                     ->label('Parent Category')
-                    ->relationship('parent', 'name')
+                    ->relationship('parent', 'name', modifyQueryUsing: fn (\Illuminate\Database\Eloquent\Builder $query, ?Category $record) => $record ? $query->whereNotIn('id', [...$record->getDescendantIds(), $record->id]) : $query)
+                    ->rules([
+                        fn () => function (string $attribute, $value, \Closure $fail) {
+                            if (!$value) return; // Không chọn cha → OK
+                            $parent = Category::find($value);
+                            if ($parent && $parent->getDepth() >= 2) {
+                                $fail('Chỉ cho phép tối đa 3 cấp danh mục (cha → con → cháu).');
+                            }
+                        }
+                    ])
                     ->searchable()
-                    ->preload(),
-                Field\Textarea::make('description')
-                    ->label('Description'),
+                    ->preload()
+                    ->columnSpanFull()
+                    ->placeholder('— Không có (Danh mục gốc) —'),
                 Field\Toggle::make('is_active')
-                    ->label('Is Active')
+                    ->label('Active')
+                    ->inline(false)
                     ->default(true),
-            ]),
+            ])->columnSpanFull(),
         ]);
     }
 
@@ -67,11 +79,33 @@ class CategoryResource extends Resource
             ])
             ->actions([
                 Actions\EditAction::make(),
-                Actions\DeleteAction::make(),
+                Actions\DeleteAction::make()
+                    ->before(function (Category $record, Actions\DeleteAction $action) {
+                        if ($record->children()->exists()) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Không thể xóa')
+                                ->body("Danh mục \"{$record->name}\" đang có " . $record->children()->count() . " danh mục con. Hãy xóa hoặc chuyển các danh mục con trước.")
+                                ->danger()
+                                ->send();
+                            $action->halt();
+                        }
+                    }),
             ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
-                    Actions\DeleteBulkAction::make(),
+                    Actions\DeleteBulkAction::make()
+                        ->before(function (\Illuminate\Database\Eloquent\Collection $records, Actions\DeleteBulkAction $action) {
+                            foreach ($records as $record) {
+                                if ($record->children()->exists()) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Không thể xóa')
+                                        ->body("Có danh mục được chọn đang chứa danh mục con. Hãy xử lý các danh mục con trước.")
+                                        ->danger()
+                                        ->send();
+                                    $action->halt();
+                                }
+                            }
+                        }),
                 ]),
             ]);
     }

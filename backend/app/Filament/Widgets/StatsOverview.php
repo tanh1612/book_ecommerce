@@ -15,20 +15,20 @@ class StatsOverview extends BaseWidget
     protected function getStats(): array
     {
         return [
-            Stat::make('Total Orders', Order::count())
-                ->description('All orders placed')
+            Stat::make('Tổng đơn hàng', Order::count())
+                ->description('Tất cả đơn hàng đã đặt')
                 ->descriptionIcon('heroicon-m-shopping-bag')
                 ->color('primary'),
-            Stat::make('Revenue', number_format(Order::where('current_status', 'delivered')->sum('final_amount'), 0, ',', '.') . '₫')
-                ->description('Delivered orders')
+            Stat::make('Doanh thu', number_format(Order::where('current_status', 'delivered')->sum('final_amount'), 0, ',', '.') . '₫')
+                ->description('Đơn hàng đã giao thành công')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),
-            Stat::make('Books', Book::where('is_active', true)->count())
-                ->description('Active books for sale')
+            Stat::make('Sách', Book::where('is_active', true)->count())
+                ->description('Sách đang hoạt động')
                 ->descriptionIcon('heroicon-m-book-open')
                 ->color('info'),
-            Stat::make('Customers', Account::where('role', 'customer')->count())
-                ->description('Total customer accounts')
+            Stat::make('Khách hàng', Account::where('role', 'customer')->count())
+                ->description('Tổng số tài khoản khách hàng')
                 ->descriptionIcon('heroicon-m-users')
                 ->color('warning'),
         ];

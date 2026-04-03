@@ -19,21 +19,17 @@ class AccountResource extends Resource
 
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-users';
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Users';
-
+    protected static \UnitEnum|string|null $navigationGroup = 'Người dùng';
     protected static ?int $navigationSort = 1;
-
-    protected static ?string $navigationLabel = 'Accounts';
-
-    protected static ?string $modelLabel = 'Account';
-
-    protected static ?string $pluralModelLabel = 'Accounts';
+    protected static ?string $navigationLabel = 'Tài khoản';
+    protected static ?string $modelLabel = 'Tài khoản';
+    protected static ?string $pluralModelLabel = 'Tài khoản';
 
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Layout\Section::make('Account Details')
-                ->description('Manage login information and permissions')
+            Layout\Section::make('Chi tiết tài khoản')
+                ->description('Quản lý thông tin đăng nhập và quyền hạn')
                 ->components([
                     Field\TextInput::make('email')
                         ->label('Email')
@@ -51,14 +47,15 @@ class AccountResource extends Resource
                     Field\Select::make('role')
                         ->label('Role')
                         ->options([
-                            'admin' => 'Admin',
-                            'customer' => 'Customer',
+                            'admin' => 'Quản trị viên',
+                            'customer' => 'Khách hàng',
                         ])
                         ->default('customer')
                         ->required(),
 
                     Field\Toggle::make('is_active')
-                        ->label('Is Active')
+                        ->label('Active')
+                        ->inline(false)
                         ->default(true),
                 ]),
         ]);
@@ -83,7 +80,7 @@ class AccountResource extends Resource
                     }),
 
                 Columns\IconColumn::make('is_active')
-                    ->label('Is Active')
+                    ->label('Active')
                     ->boolean(),
 
                 Columns\TextColumn::make('created_at')

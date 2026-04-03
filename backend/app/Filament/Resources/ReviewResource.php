@@ -16,26 +16,26 @@ class ReviewResource extends Resource
 {
     protected static ?string $model = Review::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-star';
-    protected static \UnitEnum|string|null $navigationGroup = 'Users';
+    protected static \UnitEnum|string|null $navigationGroup = 'Người dùng';
     protected static ?int $navigationSort = 2;
-    protected static ?string $navigationLabel = 'Reviews';
-    protected static ?string $modelLabel = 'Review';
-    protected static ?string $pluralModelLabel = 'Reviews';
+    protected static ?string $navigationLabel = 'Đánh giá';
+    protected static ?string $modelLabel = 'Đánh giá';
+    protected static ?string $pluralModelLabel = 'Đánh giá';
 
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Layout\Section::make('Review Details')->components([
+            Layout\Section::make('Chi tiết đánh giá')->components([
                 Field\Select::make('account_id')->label('Customer')->relationship('account', 'email')->disabled(),
                 Field\Select::make('book_id')->label('Book')->relationship('book', 'name')->disabled(),
                 Field\TextInput::make('rating')->label('Rating')->disabled(),
                 Field\Textarea::make('comment')->label('Comment')->disabled()->columnSpanFull(),
             ])->columns(4),
-            Layout\Section::make('Management')->components([
+            Layout\Section::make('Quản lý')->components([
                 Field\Select::make('status')->label('Status')->options([
-                    'pending' => 'Pending',
-                    'approved' => 'Approved',
-                    'rejected' => 'Rejected',
+                    'pending' => 'Chờ duyệt',
+                    'approved' => 'Đã duyệt',
+                    'rejected' => 'Bị từ chối',
                 ])->required(),
                 Field\Textarea::make('admin_reply')->label('Admin Reply')->columnSpanFull(),
             ]),
@@ -53,7 +53,7 @@ class ReviewResource extends Resource
                 Tables\Columns\TextColumn::make('created_at')->label('Created At')->dateTime('d/m/Y H:i')->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')->label('Status')->options(['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected']),
+                Tables\Filters\SelectFilter::make('status')->label('Status')->options(['pending' => 'Chờ duyệt', 'approved' => 'Đã duyệt', 'rejected' => 'Bị từ chối']),
             ])
             ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])
             ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);

@@ -16,11 +16,11 @@ class WarehouseResource extends Resource
 {
     protected static ?string $model = Warehouse::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-home-modern';
-    protected static \UnitEnum|string|null $navigationGroup = 'Inventory';
+    protected static \UnitEnum|string|null $navigationGroup = 'Kho hàng';
     protected static ?int $navigationSort = 1;
-    protected static ?string $navigationLabel = 'Warehouses';
-    protected static ?string $modelLabel = 'Warehouse';
-    protected static ?string $pluralModelLabel = 'Warehouses';
+    protected static ?string $navigationLabel = 'Nhà kho';
+    protected static ?string $modelLabel = 'Nhà kho';
+    protected static ?string $pluralModelLabel = 'Nhà kho';
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
@@ -47,7 +47,8 @@ class WarehouseResource extends Resource
                     ->label('Address')
                     ->columnSpanFull(),
                 Field\Toggle::make('is_active')
-                    ->label('Is Active')
+                    ->label('Active')
+                    ->inline(false)
                     ->default(true),
             ])->columns(2),
         ]);
@@ -60,7 +61,7 @@ class WarehouseResource extends Resource
                 Tables\Columns\TextColumn::make('name')->label('Name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('code')->label('Code')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('manager_name')->label('Manager')->searchable(),
-                Tables\Columns\IconColumn::make('is_active')->label('Is Active')->boolean(),
+                Tables\Columns\IconColumn::make('is_active')->label('Active')->boolean(),
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')->label('Status'),

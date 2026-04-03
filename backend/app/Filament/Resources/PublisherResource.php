@@ -16,11 +16,11 @@ class PublisherResource extends Resource
 {
     protected static ?string $model = Publisher::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-building-office';
-    protected static \UnitEnum|string|null $navigationGroup = 'Catalog';
+    protected static \UnitEnum|string|null $navigationGroup = 'Danh mục';
     protected static ?int $navigationSort = 4;
-    protected static ?string $navigationLabel = 'Publishers';
-    protected static ?string $modelLabel = 'Publisher';
-    protected static ?string $pluralModelLabel = 'Publishers';
+    protected static ?string $navigationLabel = 'Nhà xuất bản';
+    protected static ?string $modelLabel = 'Nhà xuất bản';
+    protected static ?string $pluralModelLabel = 'Nhà xuất bản';
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
@@ -30,11 +30,15 @@ class PublisherResource extends Resource
                 Field\TextInput::make('name')
                     ->label('Publisher Name')
                     ->required()
-                    ->maxLength(255),
-                Field\Textarea::make('description')
-                    ->label('Description')
+                    ->maxLength(255)
                     ->columnSpanFull(),
-            ]),
+                Field\TextInput::make('email')
+                    ->label('Email')
+                    ->email()
+                    ->required()
+                    ->maxLength(255)
+                    ->columnSpanFull(),
+            ])->columnSpanFull(),
         ]);
     }
 
@@ -43,7 +47,7 @@ class PublisherResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')->label('Name')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('books_count')->label('Books Count')->counts('books')->sortable(),
+                Tables\Columns\TextColumn::make('email')->label('Email')->searchable(),
                 Tables\Columns\TextColumn::make('created_at')->label('Created At')->dateTime()->sortable()->toggleable(),
             ])
             ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])

@@ -16,11 +16,11 @@ class InventoryResource extends Resource
 {
     protected static ?string $model = Inventory::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-cube';
-    protected static \UnitEnum|string|null $navigationGroup = 'Inventory';
+    protected static \UnitEnum|string|null $navigationGroup = 'Kho hàng';
     protected static ?int $navigationSort = 2;
-    protected static ?string $navigationLabel = 'Inventory';
-    protected static ?string $modelLabel = 'Inventory';
-    protected static ?string $pluralModelLabel = 'Inventory';
+    protected static ?string $navigationLabel = 'Tồn kho';
+    protected static ?string $modelLabel = 'Tồn kho';
+    protected static ?string $pluralModelLabel = 'Tồn kho';
 
     public static function form(Schema $schema): Schema
     {

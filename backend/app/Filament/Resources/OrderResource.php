@@ -16,32 +16,32 @@ class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-shopping-bag';
-    protected static \UnitEnum|string|null $navigationGroup = 'Sales';
+    protected static \UnitEnum|string|null $navigationGroup = 'Kinh doanh';
     protected static ?int $navigationSort = 1;
-    protected static ?string $navigationLabel = 'Orders';
-    protected static ?string $modelLabel = 'Order';
-    protected static ?string $pluralModelLabel = 'Orders';
+    protected static ?string $navigationLabel = 'Đơn hàng';
+    protected static ?string $modelLabel = 'Đơn hàng';
+    protected static ?string $pluralModelLabel = 'Đơn hàng';
 
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Layout\Section::make('Order Information')->components([
+            Layout\Section::make('Thông tin đơn hàng')->components([
                 Field\Select::make('account_id')->label('Customer')->relationship('account', 'email')->searchable()->preload()->required(),
                 Field\Select::make('current_status')->label('Status')->options([
-                    'pending' => 'Pending',
-                    'confirmed' => 'Confirmed',
-                    'processing' => 'Processing',
-                    'shipping' => 'Shipping',
-                    'delivered' => 'Delivered',
-                    'cancelled' => 'Cancelled',
+                    'pending' => 'Chờ xử lý',
+                    'confirmed' => 'Đã xác nhận',
+                    'processing' => 'Đang xử lý',
+                    'shipping' => 'Đang giao hàng',
+                    'delivered' => 'Đã giao hàng',
+                    'cancelled' => 'Đã hủy',
                 ])->required(),
                 Field\Select::make('payment_method')->label('Payment')->options([
-                    'cod' => 'COD',
-                    'bank_transfer' => 'Bank Transfer',
-                    'momo' => 'MoMo',
+                    'cod' => 'Thanh toán khi nhận hàng (COD)',
+                    'bank_transfer' => 'Chuyển khoản ngân hàng',
+                    'momo' => 'Ví MoMo',
                 ]),
             ])->columns(3),
-            Layout\Section::make('Shipping & Totals')->components([
+            Layout\Section::make('Giao hàng & Tổng cộng')->components([
                 Field\TextInput::make('shipping_name')->label('Recipient Name')->maxLength(255),
                 Field\TextInput::make('shipping_phone')->label('Phone')->maxLength(20),
                 Field\TextInput::make('final_amount')->label('Total Amount')->numeric()->prefix('₫'),
@@ -62,8 +62,8 @@ class OrderResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('current_status')->label('Status')->options([
-                    'pending' => 'Pending', 'confirmed' => 'Confirmed', 'processing' => 'Processing',
-                    'shipping' => 'Shipping', 'delivered' => 'Delivered', 'cancelled' => 'Cancelled',
+                    'pending' => 'Chờ xử lý', 'confirmed' => 'Đã xác nhận', 'processing' => 'Đang xử lý',
+                    'shipping' => 'Đang giao hàng', 'delivered' => 'Đã giao hàng', 'cancelled' => 'Đã hủy',
                 ]),
             ])
             ->actions([Actions\EditAction::make()])

@@ -16,11 +16,11 @@ class ShippingMethodResource extends Resource
 {
     protected static ?string $model = ShippingMethod::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-paper-airplane';
-    protected static \UnitEnum|string|null $navigationGroup = 'Inventory';
+    protected static \UnitEnum|string|null $navigationGroup = 'Kho hàng';
     protected static ?int $navigationSort = 3;
-    protected static ?string $navigationLabel = 'Shipping Methods';
-    protected static ?string $modelLabel = 'Shipping Method';
-    protected static ?string $pluralModelLabel = 'Shipping Methods';
+    protected static ?string $navigationLabel = 'Phương thức vận chuyển';
+    protected static ?string $modelLabel = 'Phương thức vận chuyển';
+    protected static ?string $pluralModelLabel = 'Phương thức vận chuyển';
 
     public static function form(Schema $schema): Schema
     {
@@ -28,7 +28,7 @@ class ShippingMethodResource extends Resource
             Layout\Section::make()->components([
                 Field\TextInput::make('name')->label('Name')->required()->maxLength(255),
                 Field\Textarea::make('description')->label('Description')->maxLength(500),
-                Field\Toggle::make('is_active')->label('Is Active')->default(true),
+                Field\Toggle::make('is_active')->label('Active')->inline(false)->default(true),
             ]),
         ]);
     }

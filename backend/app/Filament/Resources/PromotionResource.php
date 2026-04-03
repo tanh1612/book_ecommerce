@@ -16,23 +16,23 @@ class PromotionResource extends Resource
 {
     protected static ?string $model = Promotion::class;
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-gift';
-    protected static \UnitEnum|string|null $navigationGroup = 'Sales';
+    protected static \UnitEnum|string|null $navigationGroup = 'Kinh doanh';
     protected static ?int $navigationSort = 2;
-    protected static ?string $navigationLabel = 'Promotions';
-    protected static ?string $modelLabel = 'Promotion';
-    protected static ?string $pluralModelLabel = 'Promotions';
+    protected static ?string $navigationLabel = 'Khuyến mãi';
+    protected static ?string $modelLabel = 'Khuyến mãi';
+    protected static ?string $pluralModelLabel = 'Khuyến mãi';
 
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
             Layout\Section::make()->components([
                 Field\TextInput::make('name')->label('Promotion Name')->required()->maxLength(255),
-                Field\Select::make('type')->label('Type')->options(['flash_sale' => 'Flash Sale', 'discount' => 'Discount', 'bundle' => 'Bundle'])->required(),
+                Field\Select::make('type')->label('Type')->options(['flash_sale' => 'Flash Sale', 'discount' => 'Giảm giá', 'bundle' => 'Gói sản phẩm'])->required(),
                 Layout\Grid::make(2)->components([
                     Field\DateTimePicker::make('start_at')->label('Start At')->required(),
                     Field\DateTimePicker::make('end_at')->label('End At')->required()->after('start_at'),
                 ]),
-                Field\Select::make('status')->label('Status')->options(['draft' => 'Draft', 'active' => 'Active', 'ended' => 'Ended'])->default('draft')->required(),
+                Field\Select::make('status')->label('Status')->options(['draft' => 'Bản nháp', 'active' => 'Đang hoạt động', 'ended' => 'Đã kết thúc'])->default('draft')->required(),
             ]),
         ]);
     }

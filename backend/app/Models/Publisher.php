@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Publisher extends Model
 {
-    public $timestamps = false;
+    const UPDATED_AT = null;
+
 
     protected $fillable = [
         'name',
