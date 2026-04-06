@@ -79,4 +79,21 @@ class Category extends Model
         }
         return $depth;
     }
+
+    /**
+     * Lấy chuỗi đường dẫn tên danh mục từ Root tới danh mục hiện tại.
+     * VD: Văn học > Tiểu thuyết > Trinh thám
+     */
+    public function getBreadcrumb(): string
+    {
+        $names = [$this->name];
+        $current = $this->parent;
+
+        while ($current !== null) {
+            array_unshift($names, $current->name);
+            $current = $current->parent;
+        }
+
+        return implode(' > ', $names);
+    }
 }

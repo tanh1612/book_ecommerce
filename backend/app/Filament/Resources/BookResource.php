@@ -36,14 +36,17 @@ class BookResource extends Resource
                         ->label('Book Name')
                         ->required()
                         ->live(onBlur: true)
+                        ->columnSpanFull()
                         ->afterStateUpdated(fn (string $operation, $state, \Filament\Schemas\Components\Utilities\Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
                     Field\TextInput::make('slug')
                         ->label('Slug')
                         ->required()
-                        ->unique(ignoreRecord: true),
+                        ->unique(ignoreRecord: true)
+                        ->columnSpanFull(),
                     Field\TextInput::make('sku')
                         ->label('SKU')
-                        ->unique(ignoreRecord: true),
+                        ->unique(ignoreRecord: true)
+                        ->columnSpanFull(),
 
                     Layout\Grid::make(3)->components([
                         Field\TextInput::make('original_price')
@@ -60,25 +63,147 @@ class BookResource extends Resource
                             ->label('Active')
                             ->inline(false)
                             ->default(true),
-                    ]),
+                    ])->columnSpanFull(),
+
+                    Layout\Grid::make(2)->components([
+                        Field\TextInput::make('review_count')
+                            ->label('Đánh giá')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->numeric(),
+                        Field\TextInput::make('average_rating')
+                            ->label('Điểm trung bình')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->numeric(),
+                    ])->columnSpanFull()->visibleOn('edit'),
                 ]),
                 Layout\Tabs\Tab::make('Phân loại')->components([
                     Field\Select::make('supplier_id')
                         ->relationship('supplier', 'name')
-                        ->label('Supplier')->searchable()->preload(),
+                        ->label('Supplier')
+                        ->searchable()
+                        ->preload()
+                        ->columnSpanFull(),
                     Field\Select::make('publisher_id')
                         ->relationship('publisher', 'name')
-                        ->label('Publisher')->searchable()->preload(),
+                        ->label('Publisher')
+                        ->searchable()
+                        ->preload()
+                        ->columnSpanFull(),
                     Field\Select::make('authors')
                         ->relationship('authors', 'name')
                         ->label('Authors')
                         ->multiple()
-                        ->preload(),
+                        ->preload()
+                        ->columnSpanFull(),
                     Field\Select::make('categories')
-                        ->relationship('categories', 'name')
+                        ->relationship('categories', 'name', modifyQueryUsing: fn ($query) => $query->with('parent.parent'))
+                        ->getOptionLabelFromRecordUsing(fn ($record) => $record->getBreadcrumb())
                         ->label('Categories')
                         ->multiple()
-                        ->preload(),
+                        ->preload()
+                        ->searchable()
+                        ->columnSpanFull(),
+                ]),
+                Layout\Tabs\Tab::make('Chi tiết sách')->components([
+                    Layout\Section::make()->relationship('detail')->schema([
+                        Field\Textarea::make('description')
+                            ->label('Mô tả')
+                            ->rows(5)
+                            ->columnSpanFull(),
+
+                        Layout\Grid::make(2)->components([
+                            Field\Select::make('language')
+                                ->label('Ngôn ngữ')
+                                ->options(\App\Enums\BookLanguage::class)
+                                ->default(\App\Enums\BookLanguage::VI)
+                                ->required(),
+                            Field\TextInput::make('translator')
+                                ->label('Dịch giả'),
+                            Field\TextInput::make('publication_year')
+                                ->label('Năm xuất bản')
+                                ->numeric(),
+                            Field\TextInput::make('num_pages')
+                                ->label('Số trang')
+                                ->numeric()
+                                ->integer(),
+                            Field\TextInput::make('weight')
+                                ->label('Khối lượng (g)')
+                                ->numeric(),
+                        ])->columnSpanFull(),
+
+                        Layout\Fieldset::make('Kích thước (cm)')->schema([
+                            Field\Hidden::make('dimensions'),
+                            Field\TextInput::make('dim_length')
+                                ->label('Chiều dài')
+                                ->numeric()
+                                ->dehydrated(false)
+                                ->afterStateHydrated(function (Field\TextInput $component, ?\App\Models\BookDetail $record) {
+                                    if ($record && $record->dimensions) {
+                                        preg_match_all('/(\d+(\.\d+)?)/', $record->dimensions, $matches);
+                                        $component->state($matches[0][0] ?? null);
+                                    }
+                                })
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
+                                    $l = $get('dim_length'); $w = $get('dim_width'); $h = $get('dim_height');
+                                    if ($l !== null || $w !== null || $h !== null) {
+                                        $set('dimensions', ($l ?: '0') . ' x ' . ($w ?: '0') . ' x ' . ($h ?: '0') . ' cm');
+                                    } else {
+                                        $set('dimensions', null);
+                                    }
+                                }),
+                            Field\TextInput::make('dim_width')
+                                ->label('Chiều rộng')
+                                ->numeric()
+                                ->dehydrated(false)
+                                ->afterStateHydrated(function (Field\TextInput $component, ?\App\Models\BookDetail $record) {
+                                    if ($record && $record->dimensions) {
+                                        preg_match_all('/(\d+(\.\d+)?)/', $record->dimensions, $matches);
+                                        $component->state($matches[0][1] ?? null);
+                                    }
+                                })
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
+                                    $l = $get('dim_length'); $w = $get('dim_width'); $h = $get('dim_height');
+                                    if ($l !== null || $w !== null || $h !== null) {
+                                        $set('dimensions', ($l ?: '0') . ' x ' . ($w ?: '0') . ' x ' . ($h ?: '0') . ' cm');
+                                    } else {
+                                        $set('dimensions', null);
+                                    }
+                                }),
+                            Field\TextInput::make('dim_height')
+                                ->label('Độ dày')
+                                ->numeric()
+                                ->dehydrated(false)
+                                ->afterStateHydrated(function (Field\TextInput $component, ?\App\Models\BookDetail $record) {
+                                    if ($record && $record->dimensions) {
+                                        preg_match_all('/(\d+(\.\d+)?)/', $record->dimensions, $matches);
+                                        $component->state($matches[0][2] ?? null);
+                                    }
+                                })
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
+                                    $l = $get('dim_length'); $w = $get('dim_width'); $h = $get('dim_height');
+                                    if ($l !== null || $w !== null || $h !== null) {
+                                        $set('dimensions', ($l ?: '0') . ' x ' . ($w ?: '0') . ' x ' . ($h ?: '0') . ' cm');
+                                    } else {
+                                        $set('dimensions', null);
+                                    }
+                                }),
+                        ])->columns(3)->columnSpanFull(),
+
+                        Field\Select::make('format')
+                            ->label('Định dạng')
+                            ->options([
+                                'Bìa mềm' => 'Bìa mềm',
+                                'Bìa cứng' => 'Bìa cứng',
+                                'Bìa mềm có tay gấp' => 'Bìa mềm có tay gấp',
+                            ])
+                            ->required()
+                            ->columnSpanFull(),
+                    ])->columnSpanFull(),
                 ]),
                 Layout\Tabs\Tab::make('Hình ảnh')->components([
                     Field\Repeater::make('images')
@@ -86,15 +211,34 @@ class BookResource extends Resource
                         ->schema([
                             Field\FileUpload::make('image_url')
                                 ->label('Image')
-                                ->disk('cloudinary')
-                                ->directory('books')
                                 ->image()
                                 ->imageEditor()
-                                ->required(),
+                                ->required()
+                                ->saveUploadedFileUsing(function (
+                                    \Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file,
+                                    \Filament\Schemas\Components\Utilities\Get $get
+                                ): string {
+                                    $slug = $get('../../slug') ?? 'book';
+                                    $ext  = $file->getClientOriginalExtension() ?: 'jpg';
+                                    $ts   = now()->valueOf(); // Unique millisecond timestamp
+                                    $publicId = "{$slug}-{$ts}";
+
+                                    $result = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload(
+                                        $file->getRealPath(),
+                                        [
+                                            'folder'    => "books/{$slug}",
+                                            'public_id' => $publicId,
+                                            'overwrite' => false,
+                                            'resource_type' => 'image',
+                                        ]
+                                    );
+
+                                    return $result['secure_url']; // Store the secure URL in DB
+                                }),
                             Field\Hidden::make('sort_order'),
                         ])
                         ->grid(4)
-                        ->reorderable('sort_order')
+                        ->reorderable(true)
                         ->itemLabel(fn (array $state): ?string => $state['image_url'] ?? 'Ảnh mới')
                         ->columnSpanFull()
                         ->helperText('Ảnh đầu tiên sẽ được dùng làm ảnh đại diện (thumbnail).'),
@@ -111,10 +255,34 @@ class BookResource extends Resource
                     ->label('Thumbnail')
                     ->disk('cloudinary')
                     ->square(),
-                Tables\Columns\TextColumn::make('name')->label('Book Name')->searchable()->limit(40),
-                Tables\Columns\TextColumn::make('selling_price')->label('Selling Price')->money('VND')->sortable(),
-                Tables\Columns\TextColumn::make('sku')->label('SKU')->searchable()->toggleable(),
-                Tables\Columns\IconColumn::make('is_active')->label('Active')->boolean(),
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Book Name')
+                    ->searchable()
+                    ->limit(40),
+                Tables\Columns\TextColumn::make('selling_price')
+                    ->label('Selling Price')
+                    ->money('VND')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('original_price')
+                    ->label('Original Price')
+                    ->money('VND')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('sku')
+                    ->label('SKU')
+                    ->searchable()
+                    ->toggleable(),
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Active')
+                    ->boolean(),
+                Tables\Columns\TextColumn::make('authors.name')
+                    ->label('Authors')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('categories.name')
+                    ->label('Categories')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')->label('Status'),

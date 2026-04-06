@@ -28,6 +28,7 @@ class BookDetail extends Model
     {
         return [
             'weight' => 'decimal:2',
+            'language' => \App\Enums\BookLanguage::class,
         ];
     }
 

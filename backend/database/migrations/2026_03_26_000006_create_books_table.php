@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug')->unique();
             $table->string('sku')->unique()->nullable();
-            $table->string('thumbnail');
+            $table->string('thumbnail')->nullable();
             $table->decimal('original_price', 10, 2);
             $table->decimal('selling_price', 10, 2);
             $table->unsignedInteger('review_count')->default(0);

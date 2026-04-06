@@ -43,7 +43,11 @@ class CategoryResource extends Resource
                     ->unique(Category::class, 'slug', ignoreRecord: true),
                 Field\Select::make('parent_id')
                     ->label('Parent Category')
-                    ->relationship('parent', 'name', modifyQueryUsing: fn (\Illuminate\Database\Eloquent\Builder $query, ?Category $record) => $record ? $query->whereNotIn('id', [...$record->getDescendantIds(), $record->id]) : $query)
+                    ->relationship('parent', 'name', modifyQueryUsing: function ($query, ?Category $record) {
+                        $q = $query->with('parent.parent'); // Eager load
+                        return $record ? $q->whereNotIn('id', [...$record->getDescendantIds(), $record->id]) : $q;
+                    })
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->getBreadcrumb())
                     ->rules([
                         fn () => function (string $attribute, $value, \Closure $fail) {
                             if (!$value) return; // Không chọn cha → OK
