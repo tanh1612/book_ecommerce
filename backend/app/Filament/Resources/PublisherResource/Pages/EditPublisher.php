@@ -23,7 +23,17 @@ class EditPublisher extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                ->before(function (\App\Models\Publisher $record, Actions\DeleteAction $action) {
+                    if ($record->books()->exists()) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('Không thể xóa')
+                            ->body("Nhà xuất bản \"{$record->name}\" đang có {$record->books()->count()} sách liên kết.")
+                            ->danger()
+                            ->send();
+                        $action->halt();
+                    }
+                }),
         ];
     }
 }

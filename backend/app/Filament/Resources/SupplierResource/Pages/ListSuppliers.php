@@ -13,6 +13,11 @@ class ListSuppliers extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            \Filament\Actions\ImportAction::make()
+                ->importer(\App\Filament\Imports\SupplierImporter::class)
+                ->label('Import CSV')
+                ->color('info')
+                ->icon('heroicon-o-arrow-up-tray'),
             Actions\CreateAction::make(),
         ];
     }

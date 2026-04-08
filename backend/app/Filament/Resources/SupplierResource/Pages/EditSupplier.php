@@ -23,7 +23,17 @@ class EditSupplier extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                ->before(function (\App\Models\Supplier $record, Actions\DeleteAction $action) {
+                    if ($record->books()->exists()) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('Không thể xóa')
+                            ->body("Nhà cung cấp \"{$record->name}\" đang có {$record->books()->count()} sách liên kết.")
+                            ->danger()
+                            ->send();
+                        $action->halt();
+                    }
+                }),
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PublisherResource\Pages;
+use App\Filament\Resources\PublisherResource\RelationManagers;
 use App\Models\Publisher;
 use Filament\Forms\Components as Field;
 use Filament\Schemas\Components as Layout;
@@ -50,8 +51,44 @@ class PublisherResource extends Resource
                 Tables\Columns\TextColumn::make('email')->label('Email')->searchable(),
                 Tables\Columns\TextColumn::make('created_at')->label('Created At')->dateTime()->sortable()->toggleable(),
             ])
-            ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])
-            ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);
+            ->actions([
+                Actions\EditAction::make(),
+                Actions\DeleteAction::make()
+                    ->before(function (Publisher $record, Actions\DeleteAction $action) {
+                        if ($record->books()->exists()) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Không thể xóa')
+                                ->body("Nhà xuất bản \"{$record->name}\" đang có {$record->books()->count()} sách liên kết.")
+                                ->danger()
+                                ->send();
+                            $action->halt();
+                        }
+                    }),
+            ])
+            ->bulkActions([
+                Actions\BulkActionGroup::make([
+                    Actions\DeleteBulkAction::make()
+                        ->before(function (\Illuminate\Database\Eloquent\Collection $records, Actions\DeleteBulkAction $action) {
+                            foreach ($records as $record) {
+                                if ($record->books()->exists()) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Không thể xóa')
+                                        ->body("Có nhà xuất bản được chọn đang có sách liên kết. Hãy xử lý trước.")
+                                        ->danger()
+                                        ->send();
+                                    $action->halt();
+                                }
+                            }
+                        }),
+                ]),
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\BooksRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

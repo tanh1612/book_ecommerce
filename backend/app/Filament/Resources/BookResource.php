@@ -84,6 +84,7 @@ class BookResource extends Resource
                         ->label('Supplier')
                         ->searchable()
                         ->preload()
+                        ->required()
                         ->columnSpanFull(),
                     Field\Select::make('publisher_id')
                         ->relationship('publisher', 'name')
