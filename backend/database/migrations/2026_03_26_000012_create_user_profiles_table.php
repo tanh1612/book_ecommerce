@@ -10,11 +10,10 @@ return new class extends Migration
     {
         Schema::create('user_profiles', function (Blueprint $table) {
             $table->foreignId('account_id')->primary()->constrained('accounts')->cascadeOnDelete();
-            $table->string('first_name', 100);
-            $table->string('last_name', 100);
+            $table->string('first_name', 100)->nullable();
+            $table->string('last_name', 100)->nullable();
             $table->string('phone', 20)->nullable();
-            $table->string('avatar_url')->nullable();
-            $table->string('gender', 20);
+            $table->string('gender', 20)->nullable();
             $table->date('birthday')->nullable();
             $table->timestamp('updated_at')->nullable();
         });

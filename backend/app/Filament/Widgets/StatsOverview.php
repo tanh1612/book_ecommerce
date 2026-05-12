@@ -19,7 +19,7 @@ class StatsOverview extends BaseWidget
                 ->description('Tất cả đơn hàng đã đặt')
                 ->descriptionIcon('heroicon-m-shopping-bag')
                 ->color('primary'),
-            Stat::make('Doanh thu', number_format(Order::where('current_status', 'delivered')->sum('final_amount'), 0, ',', '.') . '₫')
+            Stat::make('Doanh thu bán hàng', number_format(Order::where('current_status', 'delivered')->sum('final_amount'), 0, ',', '.').'₫')
                 ->description('Đơn hàng đã giao thành công')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),

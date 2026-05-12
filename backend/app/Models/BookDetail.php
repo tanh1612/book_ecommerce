@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
+use App\Enums\Book\BookFormat;
+use App\Enums\Book\BookLanguage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BookDetail extends Model
 {
     public $timestamps = false;
+
     public $incrementing = false;
 
     protected $primaryKey = 'book_id';
 
     protected $fillable = [
-        'book_id',
         'description',
         'language',
         'translator',
@@ -28,7 +30,8 @@ class BookDetail extends Model
     {
         return [
             'weight' => 'decimal:2',
-            'language' => \App\Enums\BookLanguage::class,
+            'language' => BookLanguage::class,
+            'format' => BookFormat::class,
         ];
     }
 

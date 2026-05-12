@@ -11,6 +11,7 @@ use Filament\Schemas\Schema;
 use Filament\Actions;
 use Filament\Tables;
 use Filament\Tables\Table;
+use App\Enums\Promotion\PromotionStatus;
 
 class PromotionResource extends Resource
 {
@@ -32,7 +33,7 @@ class PromotionResource extends Resource
                     Field\DateTimePicker::make('start_at')->label('Start At')->required(),
                     Field\DateTimePicker::make('end_at')->label('End At')->required()->after('start_at'),
                 ]),
-                Field\Select::make('status')->label('Status')->options(['draft' => 'Bản nháp', 'active' => 'Đang hoạt động', 'ended' => 'Đã kết thúc'])->default('draft')->required(),
+                Field\Select::make('status')->label('Status')->options(PromotionStatus::class)->default(PromotionStatus::SCHEDULED)->required(),
             ]),
         ]);
     }

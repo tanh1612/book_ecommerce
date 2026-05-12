@@ -13,7 +13,19 @@ class EditBook extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                ->before(function (Actions\DeleteAction $action, \App\Models\Book $record) {
+                    $hasOrders = \Illuminate\Support\Facades\DB::table('order_items')->where('book_id', $record->id)->exists();
+                    if ($hasOrders) {
+                        \Filament\Notifications\Notification::make()
+                            ->danger()
+                            ->title('Thao tác thất bại')
+                            ->body('Không thể xóa sách này vì đã tồn tại trong đơn hàng.')
+                            ->send();
+
+                        $action->halt();
+                    }
+                }),
         ];
     }
 }

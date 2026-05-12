@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('suppliers', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('name')->unique();
             $table->string('slug')->unique();
-            $table->string('email');
+            $table->string('email')->unique()->nullable();
             $table->timestamps();
         });
     }

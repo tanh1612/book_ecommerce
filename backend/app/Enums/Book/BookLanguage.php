@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Enums;
+namespace App\Enums\Book;
 
 use Filament\Support\Contracts\HasLabel;
 

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->decimal('total_price', 15, 2);
             $table->decimal('discount_amount', 15, 2)->nullable();
             $table->boolean('is_reviewed')->default(false);
-            $table->timestamp('created_at')->nullable();
+            $table->timestamps();
         });
     }
 

@@ -10,8 +10,6 @@ use Illuminate\Support\Number;
 
 class PublisherImporter extends Importer
 {
-    use \App\Traits\GeneratesUniqueSlug;
-
     protected static ?string $model = Publisher::class;
 
     public static function getColumns(): array
@@ -20,21 +18,20 @@ class PublisherImporter extends Importer
             ImportColumn::make('name')
                 ->label('Tên NXB')
                 ->requiredMapping()
-                ->rules(['required', 'max:255', 'unique:publishers,name']),
+                ->rules(['required', 'max:255', 'unique:publishers,name'])
+                ->exampleHeader('name')
+                ->examples(['Nhà Xuất Bản Trẻ']),
             ImportColumn::make('email')
                 ->label('Email')
-                ->rules(['email', 'max:255', 'nullable']),
+                ->rules(['email', 'max:255', 'nullable'])
+                ->exampleHeader('email')
+                ->examples(['lienhe@nxbtre.com.vn']),
         ];
     }
 
     public function resolveRecord(): Publisher
     {
         return new Publisher();
-    }
-
-    protected function beforeSave(): void
-    {
-        $this->record->slug = $this->generateUniqueSlug($this->data['name'], 'publishers');
     }
 
     public static function getCompletedNotificationBody(Import $import): string

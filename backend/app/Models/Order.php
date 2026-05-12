@@ -30,6 +30,9 @@ class Order extends Model
             'total_amount' => 'decimal:2',
             'shipping_fee' => 'decimal:2',
             'final_amount' => 'decimal:2',
+            'current_status' => \App\Enums\Order\OrderStatus::class,
+            'payment_method' => \App\Enums\Order\PaymentMethod::class,
+            'payment_status' => \App\Enums\Order\PaymentStatus::class,
         ];
     }
 

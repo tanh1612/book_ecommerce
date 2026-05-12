@@ -3,25 +3,37 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\AuthorResource\Pages;
-use App\Filament\Resources\AuthorResource\RelationManagers;
+use App\Filament\Resources\AuthorResource\RelationManagers\BooksRelationManager;
 use App\Models\Author;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components as Field;
-use Filament\Schemas\Components as Layout;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components as Layout;
 use Filament\Schemas\Schema;
-use Filament\Actions;
-use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 
 class AuthorResource extends Resource
 {
     protected static ?string $model = Author::class;
+
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-users';
+
     protected static \UnitEnum|string|null $navigationGroup = 'Danh mục';
+
     protected static ?int $navigationSort = 3;
+
     protected static ?string $navigationLabel = 'Tác giả';
+
     protected static ?string $modelLabel = 'Tác giả';
+
     protected static ?string $pluralModelLabel = 'Tác giả';
+
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
@@ -47,16 +59,25 @@ class AuthorResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')->label('Name')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('email')->label('Email')->searchable(),
-                Tables\Columns\TextColumn::make('created_at')->label('Created At')->dateTime()->sortable()->toggleable(),
+                TextColumn::make('name')
+                    ->label('Name')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('email')
+                    ->label('Email')
+                    ->searchable(),
+                TextColumn::make('created_at')
+                    ->label('Created At')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(),
             ])
             ->actions([
-                Actions\EditAction::make(),
-                Actions\DeleteAction::make()
-                    ->before(function (Author $record, Actions\DeleteAction $action) {
+                EditAction::make(),
+                DeleteAction::make()
+                    ->before(function (Author $record, DeleteAction $action) {
                         if ($record->books()->exists()) {
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Không thể xóa')
                                 ->body("Tác giả \"{$record->name}\" đang có {$record->books()->count()} sách liên kết.")
                                 ->danger()
@@ -66,14 +87,14 @@ class AuthorResource extends Resource
                     }),
             ])
             ->bulkActions([
-                Actions\BulkActionGroup::make([
-                    Actions\DeleteBulkAction::make()
-                        ->before(function (\Illuminate\Database\Eloquent\Collection $records, Actions\DeleteBulkAction $action) {
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->before(function (Collection $records, DeleteBulkAction $action) {
                             foreach ($records as $record) {
                                 if ($record->books()->exists()) {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title('Không thể xóa')
-                                        ->body("Có tác giả được chọn đang có sách liên kết. Hãy xử lý trước.")
+                                        ->body('Có tác giả được chọn đang có sách liên kết. Hãy xử lý trước.')
                                         ->danger()
                                         ->send();
                                     $action->halt();
@@ -87,7 +108,7 @@ class AuthorResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\BooksRelationManager::class,
+            BooksRelationManager::class,
         ];
     }
 

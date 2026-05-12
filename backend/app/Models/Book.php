@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -19,8 +20,6 @@ class Book extends Model
         'thumbnail',
         'original_price',
         'selling_price',
-        'review_count',
-        'average_rating',
         'is_active',
     ];
 
@@ -77,5 +76,12 @@ class Book extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    protected function thumbnail(): Attribute
+    {
+        return Attribute::make(
+            get: fn (mixed $value) => $value ?? $this->images->sortBy('sort_order')->first()?->public_id,
+        );
     }
 }

@@ -13,14 +13,17 @@ class BookObserver
      */
     public function deleting(Book $book): void
     {
-        // 1. Purge all gallery images from Cloudinary
-        foreach ($book->images as $image) {
-            if ($image->public_id) {
-                try {
-                    Cloudinary::destroy($image->public_id);
-                } catch (\Exception $e) {
-                    Log::error("Failed to purge image from Cloudinary for book '{$book->id}': " . $e->getMessage());
-                }
+        // 1. Purge all images and the book folder from Cloudinary
+        if ($slug = $book->slug) {
+            $folderPath = "books/{$slug}";
+            try {
+                // Delete all assets in the folder
+                \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::adminApi()->deleteAssetsByPrefix($folderPath . '/');
+                
+                // Delete the folder itself
+                \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::adminApi()->deleteFolder($folderPath);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Failed to purge Cloudinary folder '{$folderPath}': " . $e->getMessage());
             }
         }
     }

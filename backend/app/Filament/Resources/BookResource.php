@@ -20,9 +20,13 @@ class BookResource extends Resource
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-book-open';
 
     protected static \UnitEnum|string|null $navigationGroup = 'Danh mục';
+
     protected static ?int $navigationSort = 1;
+
     protected static ?string $navigationLabel = 'Sách';
+
     protected static ?string $modelLabel = 'Sách';
+
     protected static ?string $pluralModelLabel = 'Sách';
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -117,8 +121,8 @@ class BookResource extends Resource
                         Layout\Grid::make(2)->components([
                             Field\Select::make('language')
                                 ->label('Ngôn ngữ')
-                                ->options(\App\Enums\BookLanguage::class)
-                                ->default(\App\Enums\BookLanguage::VI)
+                                ->options(\App\Enums\Book\BookLanguage::class)
+                                ->default(\App\Enums\Book\BookLanguage::VI)
                                 ->required(),
                             Field\TextInput::make('translator')
                                 ->label('Dịch giả'),
@@ -148,9 +152,11 @@ class BookResource extends Resource
                                 })
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
-                                    $l = $get('dim_length'); $w = $get('dim_width'); $h = $get('dim_height');
+                                    $l = $get('dim_length');
+                                    $w = $get('dim_width');
+                                    $h = $get('dim_height');
                                     if ($l !== null || $w !== null || $h !== null) {
-                                        $set('dimensions', ($l ?: '0') . ' x ' . ($w ?: '0') . ' x ' . ($h ?: '0') . ' cm');
+                                        $set('dimensions', ($l ?: '0').' x '.($w ?: '0').' x '.($h ?: '0').' cm');
                                     } else {
                                         $set('dimensions', null);
                                     }
@@ -167,9 +173,11 @@ class BookResource extends Resource
                                 })
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
-                                    $l = $get('dim_length'); $w = $get('dim_width'); $h = $get('dim_height');
+                                    $l = $get('dim_length');
+                                    $w = $get('dim_width');
+                                    $h = $get('dim_height');
                                     if ($l !== null || $w !== null || $h !== null) {
-                                        $set('dimensions', ($l ?: '0') . ' x ' . ($w ?: '0') . ' x ' . ($h ?: '0') . ' cm');
+                                        $set('dimensions', ($l ?: '0').' x '.($w ?: '0').' x '.($h ?: '0').' cm');
                                     } else {
                                         $set('dimensions', null);
                                     }
@@ -186,9 +194,11 @@ class BookResource extends Resource
                                 })
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
-                                    $l = $get('dim_length'); $w = $get('dim_width'); $h = $get('dim_height');
+                                    $l = $get('dim_length');
+                                    $w = $get('dim_width');
+                                    $h = $get('dim_height');
                                     if ($l !== null || $w !== null || $h !== null) {
-                                        $set('dimensions', ($l ?: '0') . ' x ' . ($w ?: '0') . ' x ' . ($h ?: '0') . ' cm');
+                                        $set('dimensions', ($l ?: '0').' x '.($w ?: '0').' x '.($h ?: '0').' cm');
                                     } else {
                                         $set('dimensions', null);
                                     }
@@ -197,11 +207,7 @@ class BookResource extends Resource
 
                         Field\Select::make('format')
                             ->label('Định dạng')
-                            ->options([
-                                'Bìa mềm' => 'Bìa mềm',
-                                'Bìa cứng' => 'Bìa cứng',
-                                'Bìa mềm có tay gấp' => 'Bìa mềm có tay gấp',
-                            ])
+                            ->options(\App\Enums\Book\BookFormat::class)
                             ->required()
                             ->columnSpanFull(),
                     ])->columnSpanFull(),
@@ -210,32 +216,14 @@ class BookResource extends Resource
                     Field\Repeater::make('images')
                         ->relationship('images')
                         ->schema([
-                            Field\FileUpload::make('image_url')
+                            Field\FileUpload::make('public_id')
                                 ->label('Image')
+                                ->disk('cloudinary')
+                                ->directory(fn (\Filament\Schemas\Components\Utilities\Get $get) => 'books/'.($get('../../slug') ?? 'book'))
                                 ->image()
                                 ->imageEditor()
-                                ->required()
-                                ->saveUploadedFileUsing(function (
-                                    \Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file,
-                                    \Filament\Schemas\Components\Utilities\Get $get
-                                ): string {
-                                    $slug = $get('../../slug') ?? 'book';
-                                    $ext  = $file->getClientOriginalExtension() ?: 'jpg';
-                                    $ts   = now()->valueOf(); // Unique millisecond timestamp
-                                    $publicId = "{$slug}-{$ts}";
-
-                                    $result = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload(
-                                        $file->getRealPath(),
-                                        [
-                                            'folder'    => "books/{$slug}",
-                                            'public_id' => $publicId,
-                                            'overwrite' => false,
-                                            'resource_type' => 'image',
-                                        ]
-                                    );
-
-                                    return $result['secure_url']; // Store the secure URL in DB
-                                }),
+                                ->fetchFileInformation(false)
+                                ->required(),
                             Field\Hidden::make('sort_order'),
                         ])
                         ->grid(4)
@@ -289,7 +277,26 @@ class BookResource extends Resource
                 Tables\Filters\TernaryFilter::make('is_active')->label('Status'),
             ])
             ->actions([Actions\EditAction::make()])
-            ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);
+            ->bulkActions([
+                Actions\BulkActionGroup::make([
+                    Actions\DeleteBulkAction::make()
+                        ->before(function (Actions\DeleteBulkAction $action, \Illuminate\Database\Eloquent\Collection $records) {
+                            $hasOrders = \Illuminate\Support\Facades\DB::table('order_items')
+                                ->whereIn('book_id', $records->pluck('id'))
+                                ->exists();
+
+                            if ($hasOrders) {
+                                \Filament\Notifications\Notification::make()
+                                    ->danger()
+                                    ->title('Thao tác thất bại')
+                                    ->body('Một hoặc nhiều sách đã chọn đang tồn tại trong đơn hàng, không thể xóa.')
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        }),
+                ])
+            ]);
     }
 
     public static function getPages(): array

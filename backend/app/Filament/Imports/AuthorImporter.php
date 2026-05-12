@@ -10,8 +10,6 @@ use Illuminate\Support\Number;
 
 class AuthorImporter extends Importer
 {
-    use \App\Traits\GeneratesUniqueSlug;
-
     protected static ?string $model = Author::class;
 
     public static function getColumns(): array
@@ -20,21 +18,20 @@ class AuthorImporter extends Importer
             ImportColumn::make('name')
                 ->label('Tên tác giả')
                 ->requiredMapping()
-                ->rules(['required', 'max:255']),
+                ->rules(['required', 'max:255'])
+                ->exampleHeader('name')
+                ->examples(['Nguyễn Nhật Ánh']),
             ImportColumn::make('email')
                 ->label('Email')
-                ->rules(['email', 'max:255', 'nullable']),
+                ->rules(['email', 'max:255', 'nullable'])
+                ->exampleHeader('email')
+                ->examples(['nguyennhatanh@example.com']),
         ];
     }
 
     public function resolveRecord(): Author
     {
         return new Author();
-    }
-
-    protected function beforeSave(): void
-    {
-        $this->record->slug = $this->generateUniqueSlug($this->data['name'], 'authors');
     }
 
     public static function getCompletedNotificationBody(Import $import): string
