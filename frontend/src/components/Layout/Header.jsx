@@ -1,41 +1,37 @@
+// src/components/Layout/Header.jsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiSearch, FiShoppingCart, FiUser, FiHeart, FiMapPin, FiMenu, FiChevronRight } from 'react-icons/fi';
 import { CATEGORIES_DB } from '../../utils/constants';
+import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  // 1. Tách mảng Danh mục cha (những category có parent_id là null)
   const parentCategories = CATEGORIES_DB.filter(cat => cat.parent_id === null && cat.is_active);
-
-  // 2. State lưu ID của danh mục cha đang được hover. Mặc định là ID của danh mục cha đầu tiên.
   const [activeMenuId, setActiveMenuId] = useState(parentCategories[0]?.id || null);
-
-  // 3. Lọc ra các Danh mục con dựa vào parent_id khớp với activeMenuId
   const subCategories = CATEGORIES_DB.filter(cat => cat.parent_id === activeMenuId && cat.is_active);
 
-  // Thanh tìm kiếm
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
+  // Dùng Context thay vì localStorage/Redux
+  const { user, logout } = useAuth();
+  const { totalQuantity } = useCart();
+
   const handleSearch = () => {
     if (searchTerm.trim() !== '') {
-      // Chuyển hướng sang trang search kèm từ khóa trên URL
       navigate(`/search?keyword=${encodeURIComponent(searchTerm.trim())}`);
-      setIsMenuOpen(false); // Đóng menu nếu đang mở
+      setIsMenuOpen(false);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+    if (e.key === 'Enter') handleSearch();
   };
 
   return (
     <header className="bg-white relative z-50">
-      
       {/* TẦNG 1: TOP BAR */}
       <div className="bg-[#157a2c] text-white text-sm hidden md:block">
         <div className="container mx-auto px-4 py-1.5 flex justify-between items-center">
@@ -83,7 +79,11 @@ const Header = () => {
           <Link to="/cart" className="flex flex-col items-center text-gray-600 hover:text-[#157a2c] relative transition-colors">
             <FiShoppingCart size={22} strokeWidth={1.5} />
             <span className="text-[11px] mt-1">Giỏ hàng</span>
-            <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">0</span>
+            {totalQuantity > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                {totalQuantity}
+              </span>
+            )}
           </Link>
           <Link to="/wishlist" className="flex flex-col items-center text-gray-600 hover:text-[#157a2c] relative transition-colors">
             <FiHeart size={22} strokeWidth={1.5} />
@@ -91,27 +91,22 @@ const Header = () => {
             <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">0</span>
           </Link>
           
-          {/* === ĐÃ SỬA PHẦN TÀI KHOẢN TẠI ĐÂY === */}
-          {localStorage.getItem('activeUser') ? (
+          {user ? (
             <div className="flex flex-col items-center text-[#157a2c] relative group">
-              {/* Bấm vào để sang trang Profile */}
               <div 
                 className="flex flex-col items-center cursor-pointer"
                 onClick={() => navigate('/profile')}
               >
                 <FiUser size={22} strokeWidth={1.5} />
                 <span className="text-[11px] mt-1 font-bold whitespace-nowrap">
-                  {JSON.parse(localStorage.getItem('activeUser')).name}
+                  {user.lastName} {user.firstName}
                 </span>
               </div>
-              
-              {/* Nút Đăng xuất hiện ra khi hover */}
               <div className="absolute top-full pt-2 right-0 hidden group-hover:block z-50">
                 <button 
                   onClick={() => {
-                    localStorage.removeItem('activeUser');
+                    logout();
                     navigate('/'); 
-                    window.location.reload();
                   }}
                   className="bg-white border border-gray-200 shadow-lg rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap"
                 >
@@ -125,32 +120,24 @@ const Header = () => {
               <span className="text-[11px] mt-1">Tài khoản</span>
             </Link>
           )}
-          {/* ===================================== */}
-
         </div>
       </div>
 
       {/* TẦNG 3: MENU ĐIỀU HƯỚNG & MEGA MENU */}
       <div className="border-b border-gray-200 relative">
         <div className="container mx-auto px-4 flex items-center gap-8">
-          
-          {/* KHU VỰC NÚT DANH MỤC CÓ SỰ KIỆN HOVER */}
           <div 
             className="relative"
             onMouseEnter={() => setIsMenuOpen(true)}
             onMouseLeave={() => setIsMenuOpen(false)}
           >
-            {/* Nút Danh Mục */}
             <button className={`flex items-center gap-2 font-bold py-3 px-6 border-x border-gray-100 transition-colors ${isMenuOpen ? 'text-[#157a2c] bg-gray-50' : 'text-[#157a2c] bg-white'}`}>
               <FiMenu size={20} />
               DANH MỤC
             </button>
 
-            {/* BẢNG MEGA MENU DROPDOWN */}
             {isMenuOpen && (
               <div className="absolute top-full left-0 w-[850px] flex shadow-2xl border border-gray-100 rounded-b-lg overflow-hidden bg-white">
-                
-                {/* Cột trái: Danh mục cha */}
                 <div className="w-64 bg-white flex-shrink-0">
                   <ul className="flex flex-col">
                     {parentCategories.map((category) => (
@@ -169,8 +156,6 @@ const Header = () => {
                     ))}
                   </ul>
                 </div>
-
-                {/* Cột phải: Danh mục con */}
                 <div className="flex-grow bg-[#f3f4f6] p-6">
                   {subCategories.length > 0 ? (
                     <div className="grid grid-cols-3 gap-3">
@@ -189,12 +174,10 @@ const Header = () => {
                     <div className="text-gray-400 italic text-sm">Đang cập nhật danh mục...</div>
                   )}
                 </div>
-
               </div>
             )}
           </div>
 
-          {/* Các link điều hướng tĩnh */}
           <ul className="flex items-center gap-6 text-sm text-gray-800 font-medium">
             <li><Link to="/sach-moi" className="hover:text-[#157a2c] transition">Sách mới</Link></li>
             <li><Link to="/sach-ban-chay" className="hover:text-[#157a2c] transition">Sách bán chạy</Link></li>
@@ -204,7 +187,6 @@ const Header = () => {
           </ul>
         </div>
       </div>
-
     </header>
   );
 };

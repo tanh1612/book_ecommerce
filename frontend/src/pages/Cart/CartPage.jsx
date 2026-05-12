@@ -1,75 +1,22 @@
 // src/pages/Cart/CartPage.jsx
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiTrash2, FiMinus, FiPlus, FiChevronRight } from 'react-icons/fi';
 import { formatCurrency } from '../../utils/formatters';
-
-// Mock Data chuẩn khớp với Database.dbml
-const INITIAL_CART = [
-  {
-    id: 1, // ID của bảng cart_items
-    bookId: 1, 
-    name: "Túp lều bác Tom (TB 2026)",
-    thumbnail: "https://placehold.co/100x150/EEE/31343C?text=Tup+Leu",
-    salePrice: 150000,
-    originalPrice: 150000,
-    quantity: 2, // Số lượng khách chọn
-    selected: true, // Trạng thái ô checkbox
-    inStock: 50 // Lấy từ bảng inventories
-  },
-  {
-    id: 2,
-    bookId: 6,
-    name: "Người tình Sputnik",
-    thumbnail: "https://placehold.co/100x150/EEE/31343C?text=Sputnik",
-    salePrice: 81600,
-    originalPrice: 96000,
-    quantity: 1,
-    selected: false,
-    inStock: 5
-  }
-];
+import { useCart } from '../../context/CartContext';
 
 const CartPage = () => {
-const navigate = useNavigate();
+  const navigate = useNavigate();
+  const { cartItems, updateQuantity, removeFromCart, toggleSelect, toggleAll } = useCart();
 
-  // Dùng State để quản lý danh sách giỏ hàng, cho phép sửa/xóa
-  const [cartItems, setCartItems] = useState(INITIAL_CART);
-
-  // 1. Hàm cập nhật số lượng (chặn không cho nhỏ hơn 1 và lớn hơn tồn kho)
   const handleUpdateQuantity = (id, newQuantity, inStock) => {
-    if (newQuantity < 1) return;
-    if (newQuantity > inStock) {
-      alert(`Rất tiếc, sản phẩm này chỉ còn ${inStock} cuốn trong kho!`);
-      return;
-    }
-    setCartItems(items => 
-      items.map(item => item.id === id ? { ...item, quantity: newQuantity } : item)
-    );
-  };
-
-  // 2. Hàm bật/tắt ô checkbox của từng sản phẩm
-  const handleToggleSelect = (id) => {
-    setCartItems(items => 
-      items.map(item => item.id === id ? { ...item, selected: !item.selected } : item)
-    );
-  };
-
-  // 3. Hàm Xóa sản phẩm khỏi giỏ
-  const handleRemoveItem = (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn bỏ sản phẩm này khỏi giỏ hàng?')) {
-      setCartItems(items => items.filter(item => item.id !== id));
+    if (newQuantity >= 1 && newQuantity <= inStock) {
+      updateQuantity(id, newQuantity);
     }
   };
 
-  // 4. Hàm chọn/bỏ chọn TẤT CẢ
   const isAllSelected = cartItems.length > 0 && cartItems.every(item => item.selected);
-  const handleToggleAll = () => {
-    const newState = !isAllSelected;
-    setCartItems(items => items.map(item => ({ ...item, selected: newState })));
-  };
-
-  // 5. Tự động tính Tổng tiền (Chỉ cộng những cuốn có selected === true)
+  
   const cartSummary = useMemo(() => {
     const selectedItems = cartItems.filter(item => item.selected);
     const totalItems = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -79,7 +26,6 @@ const navigate = useNavigate();
 
   return (
     <div className="bg-gray-50 min-h-screen pb-12">
-      {/* BREADCRUMB */}
       <div className="bg-white py-3 border-b border-gray-200 mb-8">
         <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
           <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
@@ -98,17 +44,14 @@ const navigate = useNavigate();
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-8">
-            
-            {/* CỘT TRÁI: DANH SÁCH SẢN PHẨM */}
             <div className="lg:w-2/3">
-              {/* Thanh tiêu đề bảng */}
               <div className="bg-white p-4 rounded-lg shadow-sm flex items-center mb-4 text-sm font-medium text-gray-600">
                 <div className="w-1/2 flex items-center gap-4">
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 text-[#157a2c] rounded border-gray-300"
                     checked={isAllSelected}
-                    onChange={handleToggleAll}
+                    onChange={() => toggleAll(!isAllSelected)}
                   />
                   <span>Chọn tất cả ({cartItems.length} sản phẩm)</span>
                 </div>
@@ -117,18 +60,15 @@ const navigate = useNavigate();
                 <div className="w-1/12 text-center"><FiTrash2 size={18} className="mx-auto" /></div>
               </div>
 
-              {/* Danh sách Items */}
               <div className="bg-white rounded-lg shadow-sm flex flex-col">
                 {cartItems.map((item, index) => (
                   <div key={item.id} className={`p-4 flex items-center border-gray-100 ${index !== cartItems.length - 1 ? 'border-b' : ''}`}>
-                    
-                    {/* Checkbox & Ảnh & Tên */}
                     <div className="w-1/2 flex items-center gap-4">
                       <input 
                         type="checkbox" 
                         className="w-4 h-4 text-[#157a2c] rounded border-gray-300"
                         checked={item.selected}
-                        onChange={() => handleToggleSelect(item.id)}
+                        onChange={() => toggleSelect(item.id)}
                       />
                       <img src={item.thumbnail} alt={item.name} className="w-20 h-28 object-cover border border-gray-200 rounded" />
                       <div className="flex flex-col">
@@ -142,7 +82,6 @@ const navigate = useNavigate();
                       </div>
                     </div>
 
-                    {/* Khối chỉnh số lượng */}
                     <div className="w-1/6 flex justify-center">
                       <div className="flex items-center border border-gray-300 rounded overflow-hidden h-8 w-24">
                         <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1, item.inStock)} className="px-2 hover:bg-gray-100 text-gray-600 h-full transition flex items-center justify-center"><FiMinus size={14} /></button>
@@ -151,24 +90,20 @@ const navigate = useNavigate();
                       </div>
                     </div>
 
-                    {/* Thành tiền */}
                     <div className="w-1/4 text-right font-bold text-[#157a2c] text-lg">
                       {formatCurrency(item.salePrice * item.quantity)}
                     </div>
 
-                    {/* Nút Xóa */}
                     <div className="w-1/12 flex justify-center">
-                      <button onClick={() => handleRemoveItem(item.id)} className="text-gray-400 hover:text-red-500 transition p-2">
+                      <button onClick={() => { if(window.confirm('Bỏ sản phẩm này?')) removeFromCart(item.id); }} className="text-gray-400 hover:text-red-500 transition p-2">
                         <FiTrash2 size={20} />
                       </button>
                     </div>
-
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* CỘT PHẢI: TỔNG KẾT ĐƠN HÀNG */}
             <div className="lg:w-1/3">
               <div className="bg-white p-6 rounded-lg shadow-sm sticky top-4">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Tổng kết đơn hàng</h2>
@@ -200,7 +135,6 @@ const navigate = useNavigate();
                 </button>
               </div>
             </div>
-
           </div>
         )}
       </div>

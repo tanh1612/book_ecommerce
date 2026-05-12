@@ -1,21 +1,31 @@
 // src/pages/Auth/LoginPage.jsx
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiChevronRight } from 'react-icons/fi';
+import { useAuth } from '../../context/AuthContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const { login } = useAuth(); // Hút hàm login từ AuthContext
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Đang xử lý đăng nhập với:', { email, password });
-    // Báo cáo khóa luận: Chỗ này sau này sẽ gọi API Axios (POST /api/login)
+    // Giả lập dữ liệu trả về từ API (khớp bảng user_profiles)
+    const mockUser = {
+      id: 1,
+      firstName: "Quân",
+      lastName: "Lê Minh",
+      email: email
+    };
+    
+    login(mockUser);
+    navigate('/');
   };
 
   return (
     <div className="bg-gray-50 min-h-screen pb-12">
-      {/* BREADCRUMB */}
       <div className="bg-white py-3 border-b border-gray-200 mb-8">
         <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
           <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
