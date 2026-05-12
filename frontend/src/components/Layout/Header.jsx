@@ -5,6 +5,7 @@ import { FiSearch, FiShoppingCart, FiUser, FiHeart, FiMapPin, FiMenu, FiChevronR
 import { CATEGORIES_DB } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -18,6 +19,7 @@ const Header = () => {
   // Dùng Context thay vì localStorage/Redux
   const { user, logout } = useAuth();
   const { totalQuantity } = useCart();
+  const { wishlistItems } = useWishlist();
 
   const handleSearch = () => {
     if (searchTerm.trim() !== '') {
@@ -85,10 +87,15 @@ const Header = () => {
               </span>
             )}
           </Link>
+        {/* NÚT YÊU THÍCH ĐÃ ĐƯỢC CẬP NHẬT */}
           <Link to="/wishlist" className="flex flex-col items-center text-gray-600 hover:text-[#157a2c] relative transition-colors">
             <FiHeart size={22} strokeWidth={1.5} />
             <span className="text-[11px] mt-1">Yêu thích</span>
-            <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">0</span>
+            {wishlistItems.length > 0 && (
+              <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                {wishlistItems.length}
+              </span>
+            )}
           </Link>
           
           {user ? (

@@ -1,90 +1,181 @@
 // src/pages/Auth/RegisterPage.jsx
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FiChevronRight } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const RegisterPage = () => {
-  // Bám sát DB: accounts (email, password) + user_profiles (first_name, last_name)
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    firstName: '',
     lastName: '',
+    firstName: '',
     email: '',
+    otp: '', // Thêm trường OTP
     password: '',
-    confirmPassword: ''
   });
+  
+  const [showPassword, setShowPassword] = useState(false);
+  const [countdown, setCountdown] = useState(0); // State đếm ngược gửi mã
+  const [isSending, setIsSending] = useState(false);
+
+  // Logic đếm ngược 60s sau khi bấm lấy mã
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
+  // Điều kiện để làm sáng nút Đăng ký (Phải nhập đủ cả OTP)
+  const isSubmitDisabled = !formData.lastName || !formData.firstName || !formData.email || !formData.otp || !formData.password;
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleGetOTP = () => {
+    if (!formData.email) {
+      alert("Vui lòng nhập email trước khi lấy mã!");
+      return;
+    }
+    setIsSending(true);
+    // Giả lập gọi API gửi mail
+    setTimeout(() => {
+      alert(`Mã xác nhận đã được gửi đến email: ${formData.email}`);
+      setIsSending(false);
+      setCountdown(60); // Bắt đầu đếm ngược 60 giây
+    }, 1000);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-      alert("Mật khẩu xác nhận không khớp!");
-      return;
-    }
-    console.log('Đang xử lý đăng ký với:', formData);
-    // Báo cáo khóa luận: Chỗ này sẽ gọi API Axios (POST /api/register)
+    alert('🎉 Đăng ký thành công! Vui lòng đăng nhập.');
+    navigate('/login');
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-12">
-      {/* BREADCRUMB */}
-      <div className="bg-white py-3 border-b border-gray-200 mb-8">
-        <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
-          <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
-          <FiChevronRight size={14} className="text-gray-400" />
-          <span className="text-[#157a2c] font-medium">Đăng ký tài khoản</span>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 flex justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 w-full max-w-lg">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">TẠO TÀI KHOẢN MỚI</h1>
-          
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            
-            <div className="flex gap-4">
-              <div className="w-1/2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Họ <span className="text-red-500">*</span></label>
-                <input type="text" name="lastName" required placeholder="Nhập họ" className="w-full border border-gray-300 rounded-md py-2.5 px-4 outline-none focus:border-[#157a2c] focus:ring-1 focus:ring-[#157a2c]" value={formData.lastName} onChange={handleChange} />
-              </div>
-              <div className="w-1/2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tên <span className="text-red-500">*</span></label>
-                <input type="text" name="firstName" required placeholder="Nhập tên" className="w-full border border-gray-300 rounded-md py-2.5 px-4 outline-none focus:border-[#157a2c] focus:ring-1 focus:ring-[#157a2c]" value={formData.firstName} onChange={handleChange} />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
-              <input type="email" name="email" required placeholder="Nhập email hợp lệ" className="w-full border border-gray-300 rounded-md py-2.5 px-4 outline-none focus:border-[#157a2c] focus:ring-1 focus:ring-[#157a2c]" value={formData.email} onChange={handleChange} />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu <span className="text-red-500">*</span></label>
-              <input type="password" name="password" required placeholder="Tối thiểu 6 ký tự" className="w-full border border-gray-300 rounded-md py-2.5 px-4 outline-none focus:border-[#157a2c] focus:ring-1 focus:ring-[#157a2c]" value={formData.password} onChange={handleChange} />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Xác nhận mật khẩu <span className="text-red-500">*</span></label>
-              <input type="password" name="confirmPassword" required placeholder="Nhập lại mật khẩu" className="w-full border border-gray-300 rounded-md py-2.5 px-4 outline-none focus:border-[#157a2c] focus:ring-1 focus:ring-[#157a2c]" value={formData.confirmPassword} onChange={handleChange} />
-            </div>
-
-            <button type="submit" className="w-full bg-[#157a2c] text-white font-bold py-3 mt-4 rounded-md hover:bg-green-800 transition-colors shadow-sm">
-              ĐĂNG KÝ
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-600 border-t border-gray-100 pt-6">
-            Đã có tài khoản?{' '}
-            <Link to="/login" className="text-[#157a2c] font-bold hover:underline">
-              Đăng nhập tại đây
-            </Link>
+    <div className="bg-[#f0f0f0] min-h-screen py-10 flex justify-center px-4">
+      <div className="bg-white rounded-lg shadow-sm w-full max-w-[450px] flex flex-col h-fit p-6 md:p-10 border border-gray-100">
+        
+        {/* Hệ thống Tabs */}
+        <div className="flex mb-8 border-b border-gray-200">
+          <Link to="/login" className="flex-1 text-center pb-3 text-gray-500 text-[17px] font-medium hover:text-[#157a2c] transition-colors">
+            Đăng nhập
+          </Link>
+          <div className="flex-1 text-center pb-3 text-[#157a2c] text-[17px] font-medium border-b-2 border-[#157a2c] cursor-default">
+            Đăng ký
           </div>
         </div>
+
+        {/* Nội dung Form */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          
+          {/* Nhập Họ và Tên */}
+          <div className="flex gap-3">
+            <div className="w-1/2">
+              <label className="block text-[14px] text-gray-700 mb-1.5">Họ</label>
+              <input 
+                type="text" name="lastName" 
+                placeholder="Nhập họ" 
+                className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
+                value={formData.lastName} onChange={handleChange} 
+              />
+            </div>
+            <div className="w-1/2">
+              <label className="block text-[14px] text-gray-700 mb-1.5">Tên</label>
+              <input 
+                type="text" name="firstName" 
+                placeholder="Nhập tên" 
+                className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
+                value={formData.firstName} onChange={handleChange} 
+              />
+            </div>
+          </div>
+
+          {/* Nhập Email + Nút Lấy mã */}
+          <div>
+            <label className="block text-[14px] text-gray-700 mb-1.5">Email</label>
+            <div className="relative">
+              <input 
+                type="email" name="email" 
+                placeholder="Nhập email" 
+                className="w-full border border-gray-300 rounded py-2.5 px-3 pr-24 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
+                value={formData.email} onChange={handleChange} 
+              />
+              <button 
+                type="button"
+                disabled={countdown > 0 || isSending}
+                onClick={handleGetOTP}
+                className={`absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded text-[13px] font-bold transition-all ${
+                  countdown > 0 || isSending 
+                    ? 'text-gray-400 cursor-not-allowed' 
+                    : 'text-[#157a2c] hover:bg-green-50'
+                }`}
+              >
+                {isSending ? "Đang gửi..." : countdown > 0 ? `Gửi lại (${countdown}s)` : "Lấy mã"}
+              </button>
+            </div>
+          </div>
+
+          {/* Nhập mã OTP */}
+          <div>
+            <label className="block text-[14px] text-gray-700 mb-1.5">Mã xác nhận OTP</label>
+            <input 
+              type="text" name="otp" 
+              placeholder="Nhập mã 6 ký tự" 
+              maxLength="6"
+              className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
+              value={formData.otp} onChange={handleChange} 
+            />
+          </div>
+
+          {/* Nhập Mật khẩu */}
+          <div>
+            <label className="block text-[14px] text-gray-700 mb-1.5">Mật khẩu</label>
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} name="password" 
+                placeholder="Nhập mật khẩu" 
+                className="w-full border border-gray-300 rounded py-2.5 px-3 pr-12 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
+                value={formData.password} onChange={handleChange} 
+              />
+              <button 
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2489F4] text-[14px] font-medium hover:text-blue-700"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? "Ẩn" : "Hiện"}
+              </button>
+            </div>
+          </div>
+
+          {/* Cụm Nút bấm */}
+          <div className="flex flex-col gap-3 mt-4">
+            <button 
+              type="submit" 
+              disabled={isSubmitDisabled}
+              className={`w-full py-2.5 rounded font-bold text-[16px] transition-colors ${
+                isSubmitDisabled 
+                  ? 'bg-[#e0e0e0] text-gray-500 cursor-not-allowed' 
+                  : 'bg-[#157a2c] text-white hover:bg-green-800 shadow-sm'
+              }`}
+            >
+              Đăng ký
+            </button>
+            
+            <button 
+              type="button" 
+              onClick={() => navigate('/')}
+              className="w-full py-2.5 rounded font-bold text-[16px] text-[#157a2c] bg-white border border-[#157a2c] hover:bg-green-50 transition-colors"
+            >
+              Bỏ qua
+            </button>
+          </div>
+
+          <div className="mt-2 text-center text-[13px] text-gray-500 leading-relaxed">
+            Bằng việc đăng ký, bạn đã đồng ý với Bookify về<br />
+            <a href="#" className="text-[#157a2c] hover:underline font-medium">Điều khoản dịch vụ</a> & <a href="#" className="text-[#157a2c] hover:underline font-medium">Chính sách bảo mật</a>
+          </div>
+        </form>
+        
       </div>
     </div>
   );

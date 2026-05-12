@@ -1,91 +1,110 @@
 // src/pages/Auth/LoginPage.jsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiChevronRight } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth(); // Hút hàm login từ AuthContext
+  const { login } = useAuth();
+
+  // Kiểm tra xem đã nhập đủ thông tin chưa để làm sáng nút Đăng nhập
+  const isSubmitDisabled = !email || !password;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Giả lập dữ liệu trả về từ API (khớp bảng user_profiles)
     const mockUser = {
       id: 1,
       firstName: "Quân",
       lastName: "Lê Minh",
       email: email
     };
-    
     login(mockUser);
     navigate('/');
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-12">
-      <div className="bg-white py-3 border-b border-gray-200 mb-8">
-        <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
-          <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
-          <FiChevronRight size={14} className="text-gray-400" />
-          <span className="text-[#157a2c] font-medium">Đăng nhập</span>
+    <div className="bg-[#f0f0f0] min-h-screen py-10 flex justify-center px-4">
+      {/* Khung Card chính */}
+      <div className="bg-white rounded-lg shadow-sm w-full max-w-[450px] flex flex-col h-fit p-6 md:p-10 border border-gray-100">
+        
+        {/* Hệ thống Tabs */}
+        <div className="flex mb-8 border-b border-gray-200">
+          <div className="flex-1 text-center pb-3 text-[#157a2c] text-[17px] font-medium border-b-2 border-[#157a2c] cursor-default">
+            Đăng nhập
+          </div>
+          <Link to="/register" className="flex-1 text-center pb-3 text-gray-500 text-[17px] font-medium hover:text-[#157a2c] transition-colors">
+            Đăng ký
+          </Link>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 flex justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 w-full max-w-md">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">ĐĂNG NHẬP</h1>
-          
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email của bạn <span className="text-red-500">*</span></label>
-              <input 
-                type="email" 
-                required
-                placeholder="Nhập email"
-                className="w-full border border-gray-300 rounded-md py-2.5 px-4 outline-none focus:border-[#157a2c] focus:ring-1 focus:ring-[#157a2c] transition-all"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+        {/* Nội dung Form */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {/* Cột Email */}
+          <div>
+            <label className="block text-[14px] text-gray-700 mb-1.5">Email</label>
+            <input 
+              type="email" 
+              placeholder="Nhập email của bạn"
+              className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] transition-all text-[15px]"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu <span className="text-red-500">*</span></label>
+          {/* Cột Mật khẩu */}
+          <div>
+            <label className="block text-[14px] text-gray-700 mb-1.5">Mật khẩu</label>
+            <div className="relative">
               <input 
-                type="password" 
-                required
+                type={showPassword ? "text" : "password"} 
                 placeholder="Nhập mật khẩu"
-                className="w-full border border-gray-300 rounded-md py-2.5 px-4 outline-none focus:border-[#157a2c] focus:ring-1 focus:ring-[#157a2c] transition-all"
+                className="w-full border border-gray-300 rounded py-2.5 px-3 pr-12 outline-none focus:border-[#157a2c] transition-all text-[15px]"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              {/* Nút Hiện/Ẩn mật khẩu (màu xanh dương giống ảnh) */}
+              <button 
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2489F4] text-[14px] font-medium hover:text-blue-700"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? "Ẩn" : "Hiện"}
+              </button>
             </div>
+          </div>
 
-            <div className="flex justify-between items-center text-sm mt-2 mb-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 text-[#157a2c] rounded border-gray-300 focus:ring-[#157a2c]" />
-                <span className="text-gray-600">Ghi nhớ đăng nhập</span>
-              </label>
-              <a href="#" className="text-[#157a2c] hover:underline font-medium">Quên mật khẩu?</a>
-            </div>
+          {/* Quên mật khẩu */}
+          <div className="text-right mt-1">
+            <a href="#" className="text-[#157a2c] text-[14px] hover:underline">Quên mật khẩu?</a>
+          </div>
 
+          {/* Cụm Nút bấm */}
+          <div className="flex flex-col gap-3 mt-4">
             <button 
               type="submit" 
-              className="w-full bg-[#157a2c] text-white font-bold py-3 rounded-md hover:bg-green-800 transition-colors shadow-sm"
+              disabled={isSubmitDisabled}
+              className={`w-full py-2.5 rounded font-bold text-[16px] transition-colors ${
+                isSubmitDisabled 
+                  ? 'bg-[#e0e0e0] text-gray-500 cursor-not-allowed' 
+                  : 'bg-[#157a2c] text-white hover:bg-green-800 shadow-sm'
+              }`}
             >
-              ĐĂNG NHẬP
+              Đăng nhập
             </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-600 border-t border-gray-100 pt-6">
-            Bạn chưa có tài khoản?{' '}
-            <Link to="/register" className="text-[#157a2c] font-bold hover:underline">
-              Đăng ký ngay
-            </Link>
+            
+            <button 
+              type="button" 
+              onClick={() => navigate('/')}
+              className="w-full py-2.5 rounded font-bold text-[16px] text-[#157a2c] bg-white border border-[#157a2c] hover:bg-green-50 transition-colors"
+            >
+              Bỏ qua
+            </button>
           </div>
-        </div>
+        </form>
+        
       </div>
     </div>
   );

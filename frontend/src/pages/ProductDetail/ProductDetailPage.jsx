@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { FiShoppingCart, FiHeart, FiChevronRight, FiMinus, FiPlus } from 'react-icons/fi';
 import { formatCurrency } from '../../utils/formatters';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext'; // THÊM IMPORT
 
 const mockBookDetail = {
-  id: 1, // Khớp với bookId trong DB
+  id: 1,
   name: "Túp lều bác Tom (TB 2026)",
   author: "Harriet Beecher Stowe",
   publisher: "Nhà xuất bản Hội Nhà văn",
@@ -32,6 +33,7 @@ const mockBookDetail = {
 const ProductDetailPage = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useWishlist(); // KÉO CÔNG CỤ TỪ WISHLIST
 
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(mockBookDetail.thumbnail);
@@ -50,6 +52,9 @@ const ProductDetailPage = () => {
     handleAddToCart();
     navigate('/cart');
   };
+
+  // Kiểm tra xem sách này đã được thả tim chưa
+  const isFavorite = isInWishlist(mockBookDetail.id);
 
   return (
     <div className="bg-white min-h-screen pb-12">
@@ -111,7 +116,7 @@ const ProductDetailPage = () => {
               <span className="text-gray-700 font-medium w-24">Số lượng:</span>
               <div className="flex items-center border border-gray-300 rounded overflow-hidden h-10">
                 <button onClick={handleDecrease} className="px-3 hover:bg-gray-100 text-gray-600 h-full transition"><FiMinus /></button>
-                <input type="text" value={quantity} readOnly className="w-14 text-center border-x border-gray-300 h-full font-medium outline-none" />
+                <input type="text" value={quantity} readOnly className="w-full text-center border-x border-gray-300 h-full font-medium outline-none" />
                 <button onClick={handleIncrease} className="px-3 hover:bg-gray-100 text-gray-600 h-full transition"><FiPlus /></button>
               </div>
             </div>
@@ -129,8 +134,17 @@ const ProductDetailPage = () => {
               >
                 Mua ngay
               </button>
-              <button className="w-14 h-14 bg-white border border-gray-200 text-gray-500 rounded-lg flex items-center justify-center hover:text-red-500 hover:border-red-200 transition shadow-sm" title="Thêm vào yêu thích">
-                <FiHeart size={24} />
+              {/* NÚT YÊU THÍCH SẼ ĐỔI MÀU NẾU ĐƯỢC CHỌN */}
+              <button 
+                onClick={() => toggleWishlist(mockBookDetail)}
+                className={`w-14 h-14 border rounded-lg flex items-center justify-center transition shadow-sm ${
+                  isFavorite 
+                    ? 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100' 
+                    : 'bg-white text-gray-500 border-gray-200 hover:text-red-500 hover:border-red-200'
+                }`} 
+                title={isFavorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+              >
+                <FiHeart size={24} className={isFavorite ? 'fill-current' : ''} />
               </button>
             </div>
           </div>
