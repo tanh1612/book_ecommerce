@@ -7,6 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CartItem extends Model
 {
+    protected static function booted()
+    {
+        static::saving(function ($item) {
+            if ($item->quantity <= 0) {
+                throw new \InvalidArgumentException('Số lượng của sản phẩm trong giỏ hàng phải lớn hơn 0.');
+            }
+        });
+    }
+
     protected $fillable = [
         'cart_id',
         'book_id',

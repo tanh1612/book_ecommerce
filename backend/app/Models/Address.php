@@ -7,8 +7,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Address extends Model
 {
-    public $timestamps = false;
-
     protected $fillable = [
         'account_id',
         'recipient_name',

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('ward_code', 20)->nullable();
             $table->string('detail_address');
             $table->boolean('is_default')->default(false);
-            $table->timestamp('created_at')->nullable();
+            $table->timestamps();
         });
     }
 

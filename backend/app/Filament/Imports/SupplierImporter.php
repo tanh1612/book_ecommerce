@@ -20,10 +20,14 @@ class SupplierImporter extends Importer
             ImportColumn::make('name')
                 ->label('Tên nhà cung cấp')
                 ->requiredMapping()
-                ->rules(['required', 'max:255', 'unique:suppliers,name']),
+                ->rules(['required', 'max:255', 'unique:suppliers,name'])
+                ->exampleHeader('name')
+                ->examples(['Fahasa']),
             ImportColumn::make('email')
                 ->label('Email')
-                ->rules(['email', 'max:255', 'nullable']),
+                ->rules(['email', 'max:255', 'nullable'])
+                ->exampleHeader('email')
+                ->examples(['info@fahasa.com']),
         ];
     }
 

@@ -61,7 +61,7 @@ return [
         ],
 
         'cloudinary' => [
-            'driver' => 'cloudinary',
+            'driver' => 'cloudinary_fast',
             'url' => env('CLOUDINARY_URL'),
         ],
 

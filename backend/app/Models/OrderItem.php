@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class OrderItem extends Model
 {
-    public $timestamps = false;
-
     protected $fillable = [
         'order_id',
         'book_id',

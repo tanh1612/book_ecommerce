@@ -53,9 +53,12 @@ class BookImageObserver
         // 1. Delete physical file from Cloudinary
         if ($bookImage->public_id) {
             try {
-                Cloudinary::destroy($bookImage->public_id);
+                // Cloudinary Admin/Upload API requires public_id without extension
+                $publicIdWithoutExtension = preg_replace('/\.[^.]+$/', '', $bookImage->public_id);
+                
+                \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->destroy($publicIdWithoutExtension);
             } catch (\Exception $e) {
-                Log::error("Failed to delete image from Cloudinary: " . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error("Failed to delete image from Cloudinary: " . $e->getMessage());
             }
         }
 

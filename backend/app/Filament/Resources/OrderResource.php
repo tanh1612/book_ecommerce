@@ -10,6 +10,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Actions;
 use Filament\Tables;
+use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentMethod;
+use App\Enums\Order\PaymentStatus;
 use Filament\Tables\Table;
 
 class OrderResource extends Resource
@@ -27,19 +30,9 @@ class OrderResource extends Resource
         return $schema->components([
             Layout\Section::make('Thông tin đơn hàng')->components([
                 Field\Select::make('account_id')->label('Customer')->relationship('account', 'email')->searchable()->preload()->required(),
-                Field\Select::make('current_status')->label('Status')->options([
-                    'pending' => 'Chờ xử lý',
-                    'confirmed' => 'Đã xác nhận',
-                    'processing' => 'Đang xử lý',
-                    'shipping' => 'Đang giao hàng',
-                    'delivered' => 'Đã giao hàng',
-                    'cancelled' => 'Đã hủy',
-                ])->required(),
-                Field\Select::make('payment_method')->label('Payment')->options([
-                    'cod' => 'Thanh toán khi nhận hàng (COD)',
-                    'bank_transfer' => 'Chuyển khoản ngân hàng',
-                    'momo' => 'Ví MoMo',
-                ]),
+                Field\Select::make('current_status')->label('Status')->options(OrderStatus::class)->required(),
+                Field\Select::make('payment_method')->label('Payment')->options(PaymentMethod::class),
+                Field\Select::make('payment_status')->label('Payment Status')->options(PaymentStatus::class),
             ])->columns(3),
             Layout\Section::make('Giao hàng & Tổng cộng')->components([
                 Field\TextInput::make('shipping_name')->label('Recipient Name')->maxLength(255),
@@ -57,14 +50,13 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('account.email')->label('Customer')->searchable()->limit(25),
                 Tables\Columns\TextColumn::make('final_amount')->label('Total Amount')->money('VND')->sortable(),
                 Tables\Columns\TextColumn::make('current_status')->label('Status')->badge(),
+                Tables\Columns\TextColumn::make('payment_status')->label('Payment Status')->badge(),
                 Tables\Columns\TextColumn::make('created_at')->label('Created At')->dateTime('d/m/Y H:i')->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('current_status')->label('Status')->options([
-                    'pending' => 'Chờ xử lý', 'confirmed' => 'Đã xác nhận', 'processing' => 'Đang xử lý',
-                    'shipping' => 'Đang giao hàng', 'delivered' => 'Đã giao hàng', 'cancelled' => 'Đã hủy',
-                ]),
+                Tables\Filters\SelectFilter::make('current_status')->label('Status')->options(OrderStatus::class),
+                Tables\Filters\SelectFilter::make('payment_status')->label('Payment Status')->options(PaymentStatus::class),
             ])
             ->actions([Actions\EditAction::make()])
             ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);

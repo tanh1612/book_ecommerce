@@ -27,7 +27,8 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('')
             ->login()
-            ->brandName('Book Admin')
+            ->passwordReset()
+            ->brandName('Admin Panel')
             ->colors([
                 'primary' => Color::Indigo,
                 'danger' => Color::Rose,

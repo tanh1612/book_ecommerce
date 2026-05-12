@@ -47,17 +47,18 @@ class Category extends Model
         $descendantIds = [];
         $queue = [$this->id];
 
-        while (!empty($queue)) {
+        while (! empty($queue)) {
             $currentIds = $queue;
             $queue = [];
             $children = static::whereIn('parent_id', $currentIds)->pluck('id')->toArray();
             foreach ($children as $childId) {
-                if (!in_array($childId, $descendantIds)) {
+                if (! in_array($childId, $descendantIds)) {
                     $descendantIds[] = $childId;
                     $queue[] = $childId;
                 }
             }
         }
+
         return $descendantIds;
     }
 
@@ -71,12 +72,17 @@ class Category extends Model
         $visited = [$this->id];
 
         while ($current->parent_id !== null) {
-            if (in_array($current->parent_id, $visited)) break;
+            if (in_array($current->parent_id, $visited)) {
+                break;
+            }
             $visited[] = $current->parent_id;
             $current = $current->parent;
-            if (!$current) break;
+            if (! $current) {
+                break;
+            }
             $depth++;
         }
+
         return $depth;
     }
 
@@ -95,5 +101,25 @@ class Category extends Model
         }
 
         return implode(' > ', $names);
+    }
+
+    /**
+     * Tìm khoảng cách đến nhánh con sâu nhất của danh mục này (Không có con = 0).
+     * Đã tối ưu hiệu năng: Đếm số tầng bằng BFS, loại bỏ hoàn toàn N+1 Query.
+     */
+    public function getMaxDescendantDepth(): int
+    {
+        $depth = 0;
+        $queue = [$this->id];
+
+        while (! empty($queue)) {
+            $queue = static::whereIn('parent_id', $queue)->pluck('id')->toArray();
+
+            if (! empty($queue)) {
+                $depth++;
+            }
+        }
+
+        return $depth;
     }
 }

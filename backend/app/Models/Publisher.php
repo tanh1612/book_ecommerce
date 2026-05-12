@@ -7,14 +7,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Publisher extends Model
 {
-    const UPDATED_AT = null;
-
+    public const UPDATED_AT = null;
 
     protected $fillable = [
         'name',
         'email',
     ];
-
 
     public function books(): HasMany
     {

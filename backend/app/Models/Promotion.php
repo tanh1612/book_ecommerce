@@ -21,6 +21,7 @@ class Promotion extends Model
         return [
             'start_at' => 'datetime',
             'end_at' => 'datetime',
+            'status' => \App\Enums\Promotion\PromotionStatus::class,
         ];
     }
 
