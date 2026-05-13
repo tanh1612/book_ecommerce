@@ -41,8 +41,7 @@ const Header = () => {
             <li className="flex items-center gap-1 hover:text-gray-200 cursor-pointer">
               <FiMapPin /> Hệ Thống Cửa Hàng
             </li>
-            <li className="hover:text-gray-200 cursor-pointer">Về Nhã Nam</li>
-            <li className="hover:text-gray-200 cursor-pointer">Tin Sách</li>
+            <li className="hover:text-gray-200 cursor-pointer">Về Bookify</li>
             <li className="hover:text-gray-200 cursor-pointer">Event</li>
           </ul>
           <div className="flex items-center gap-3">

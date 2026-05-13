@@ -1,7 +1,7 @@
 // src/pages/Home/HomePage.jsx
 import { Link } from "react-router-dom";
 import { FiChevronRight, FiZap } from "react-icons/fi";
-import BannerSlider from "../../components/Home/BannerSlider"; // (Nhớ sửa lại tên file BannerSlider nếu trước đó viết sai chính tả nhé)
+import BannerSlider from "../../components/Home/BannerSlider";
 import ProductSlider from "../../components/Product/ProductSlider";
 import ProductCard from "../../components/Product/ProductCard";
 
@@ -34,12 +34,12 @@ const HomePage = () => {
         <BannerSlider />
       </section>
 
-      {/* KHU VỰC 2: FLASH SALE */}
-      <section className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl p-4 md:p-6 shadow-md relative overflow-hidden">
+      {/* KHU VỰC 2: FLASH SALE (Đã đồng bộ màu xanh Nhã Nam) */}
+      <section className="bg-gradient-to-r from-[#157a2c] to-[#0e5c1f] rounded-xl p-4 md:p-6 shadow-md relative overflow-hidden">
         {/* Tiêu đề Flash Sale */}
         <div className="flex justify-between items-center mb-6 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="bg-white text-red-600 p-2 rounded-full animate-pulse">
+            <div className="bg-white text-[#157a2c] p-2 rounded-full animate-pulse">
               <FiZap size={24} className="fill-current" />
             </div>
             <h2 className="text-2xl md:text-3xl font-extrabold text-white italic">
@@ -47,12 +47,12 @@ const HomePage = () => {
             </h2>
             {/* Giả lập đồng hồ đếm ngược */}
             <div className="hidden md:flex gap-2 ml-6">
-              <span className="bg-black text-white px-2 py-1 rounded font-bold">02</span>:
-              <span className="bg-black text-white px-2 py-1 rounded font-bold">45</span>:
-              <span className="bg-black text-white px-2 py-1 rounded font-bold">12</span>
+              <span className="bg-black/40 text-white px-2 py-1 rounded font-bold">02</span>:
+              <span className="bg-black/40 text-white px-2 py-1 rounded font-bold">45</span>:
+              <span className="bg-black/40 text-white px-2 py-1 rounded font-bold">12</span>
             </div>
           </div>
-          <Link to="/sach-khuyen-mai" className="text-white hover:text-yellow-200 text-sm font-medium flex items-center gap-1 transition">
+          <Link to="/sach-khuyen-mai" className="text-white hover:text-green-200 text-sm font-medium flex items-center gap-1 transition">
             Xem tất cả <FiChevronRight />
           </Link>
         </div>
@@ -66,8 +66,8 @@ const HomePage = () => {
       {/* KHU VỰC 3: SÁCH MỚI PHÁT HÀNH */}
       <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div className="flex justify-between items-end mb-6 border-b border-gray-100 pb-4">
-          <h2 className="text-2xl font-bold text-gray-800 uppercase flex items-center gap-2">
-            📚 Sách Mới Phát Hành
+          <h2 className="text-2xl font-bold text-[#157a2c] uppercase flex items-center gap-2">
+            Sách Mới Phát Hành
           </h2>
           <Link to="/sach-moi" className="text-[#157a2c] hover:underline text-sm font-medium flex items-center">
             Xem thêm <FiChevronRight />
@@ -82,7 +82,7 @@ const HomePage = () => {
       <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div className="flex justify-center mb-8">
           <h2 className="text-2xl font-bold text-[#157a2c] uppercase bg-green-50 px-6 py-2 rounded-full inline-block">
-            ✨ Gợi Ý Dành Riêng Cho Bạn
+            Gợi Ý Dành Riêng Cho Bạn
           </h2>
         </div>
         
