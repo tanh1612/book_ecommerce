@@ -1,0 +1,59 @@
+---
+description: Queue jobs and scheduled tasks running on Redis driver
+globs: backend/app/Jobs/**/*.php,backend/app/Console/**/*.php
+alwaysApply: false
+---
+
+# Queue & Cronjob Rules
+
+## Driver
+
+`QUEUE_CONNECTION=redis` across all environments. Run workers via `php artisan queue:work` (or Horizon in production).
+
+## When to Use a Queued Job
+
+Any operation that is one of:
+
+- Slow (>500ms expected) — CSV import, Cloudinary upload, Meilisearch indexing.
+- External API call — Gemini embedding / chat, VietQR, email/SMS.
+- Bulk DB write.
+
+MUST implement `ShouldQueue`.
+
+## Job Skeleton
+
+```php
+class ProcessBookImport implements ShouldQueue
+{
+    use Queueable;
+
+    public int $tries = 3;
+    public int $backoff = 30; // seconds
+
+    public function __construct(public int $importId) {}
+
+    public function handle(BookImportService $service): void
+    {
+        $service->run($this->importId);
+    }
+
+    public function failed(\Throwable $e): void
+    {
+        Log::error('ProcessBookImport failed', [
+            'import_id' => $this->importId,
+            'error' => $e->getMessage(),
+        ]);
+    }
+}
+```
+
+## Scheduled Tasks
+
+Define in `routes/console.php` (Laravel 11+ convention) using `Schedule::command(...)`.
+
+Required scheduled jobs for Bookify:
+
+- **Auto-cancel expired VietQR orders** — every 5 minutes. Cancel unpaid orders older than 12h and restore inventory.
+- **Refund timeout closure** — daily. Auto-close failed-delivery orders if the customer has not contacted within the configured window.
+- **Low-stock notifications** — daily. Notify admin of books below reorder threshold.
+- **Reco precomputation** — hourly for personalized, every 6h for popularity-based (see `recommendation-system.mdc`).

@@ -38,6 +38,7 @@ class Account extends Authenticatable implements FilamentUser, HasName
         'password',
         'role',
         'is_active',
+        'email_verified_at',
     ];
 
     protected $hidden = [

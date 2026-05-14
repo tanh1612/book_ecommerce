@@ -1,0 +1,45 @@
+---
+description: Filament 4 admin panel conventions
+globs: backend/app/Filament/**/*.php
+alwaysApply: false
+---
+
+# Filament 4 Admin Conventions
+
+## Resource Structure
+
+Each Resource lives at `app/Filament/Resources/{Name}Resource.php` with sub-folders:
+
+- `Pages/List{Name}.php`
+- `Pages/Create{Name}.php`
+- `Pages/Edit{Name}.php`
+- `Pages/View{Name}.php` (when read-only view is needed)
+- `RelationManagers/*RelationManager.php`
+
+## Schema-based Forms (Filament 4)
+
+Use the `Schema::make()` builder syntax. Do NOT use the legacy `Form::make()` API from Filament 3.
+
+```php
+public static function form(Schema $schema): Schema
+{
+    return $schema->components([
+        TextInput::make('name')->required()->maxLength(255),
+        Select::make('category_id')->relationship('category', 'name')->preload(),
+    ]);
+}
+```
+
+## Bulk Import
+
+Use `Filament\Actions\Importer` for CSV imports. Failed rows are persisted in the `failed_import_rows` table (migration `2026_04_09_005325_create_failed_import_rows_table.php` already exists). Imports MUST run on the queue (`shouldQueue = true`).
+
+Existing importers: `AuthorImporter`, `SupplierImporter`, `BookImporter` — follow the same shape for new ones.
+
+## Relation Managers
+
+For one-to-many / many-to-many relations, register a Relation Manager in the parent Resource's `getRelations()`. Existing patterns: `BooksRelationManager`, `InventoriesRelationManager`, `PromotionItemsRelationManager`.
+
+## Tables
+
+Define searchable, sortable, and filterable columns explicitly. Use `BadgeColumn` for enums. Apply a soft-delete filter (`TrashedFilter`) when the model uses `SoftDeletes`.

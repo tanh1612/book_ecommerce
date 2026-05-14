@@ -1,0 +1,32 @@
+---
+description: Use when working with Eloquent models, migrations, queries, seeders, factories, or Filament Resources — references the canonical DB schema dump.
+alwaysApply: false
+---
+
+# Database Schema Reference
+
+## Canonical Source
+
+[backend/docs/database_schema.md](backend/docs/database_schema.md) is the MySQL 8.4.3 DDL dump exported from HeidiSQL. It is the **single source of truth** for the live database structure.
+
+## When to Read It
+
+Before writing or modifying:
+
+- Eloquent models (`$fillable`, `$casts`, relationships)
+- Migrations (new tables, columns, indexes, FKs)
+- Raw queries / query builder calls
+- Seeders / factories
+- Filament Resources (form fields, table columns)
+
+Verify against the dump: table name, column name, type, nullability, FK constraint, unique key, index.
+
+## Maintenance Rule
+
+- **Do NOT hand-edit** `database_schema.md`. It must be re-exported from MySQL whenever the schema changes.
+- After creating and running a new migration, remind the developer to re-export the dump.
+- Treat any discrepancy between migrations and the dump as a bug and flag it immediately.
+
+## Key Tables (Quick Reference)
+
+`accounts`, `addresses`, `user_profiles`, `books`, `book_details`, `book_images`, `book_authors`, `book_categories`, `authors`, `publishers`, `suppliers`, `categories`, `warehouses`, `inventories`, `promotions`, `cart_items`, `orders`, `order_items`, `shipping_methods`, `shipping_rates`, `reviews`, `failed_import_rows`, `personal_access_tokens`.

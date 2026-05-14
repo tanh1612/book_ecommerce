@@ -1,0 +1,41 @@
+---
+description: Use when configuring Meilisearch indexes, search endpoints, or sync — attribute weights, typo tolerance, vector embeddings.
+alwaysApply: false
+---
+
+# Meilisearch Configuration
+
+## Index: `books`
+
+### Searchable Attributes (priority order — first = highest weight)
+
+1. `title` — book title (HIGHEST priority).
+2. `authors.name` — author name (HIGH priority).
+3. `description` — book description (MEDIUM priority).
+
+```json
+{
+  "searchableAttributes": ["title", "authors.name", "description"]
+}
+```
+
+### Filterable Attributes
+
+`category_id`, `author_id`, `publisher_id`, `selling_price`, `average_rating`, `is_active`, `promotion_id`.
+
+### Sortable Attributes
+
+`selling_price`, `created_at`, `average_rating`, `review_count`.
+
+## Features
+
+- **Typo tolerance**: keep Meilisearch defaults enabled.
+- **Auto-suggest**: use prefix search or `/multi-search` for the autocomplete dropdown.
+- **Vector search**: a separate `books_vector` index (or `_vectors` field on the same index) for RAG retrieval. Embedding model = Google Gemini `text-embedding-004`.
+
+## Sync Strategy
+
+- Index changes through a queueable job (`SyncBookToMeilisearch`).
+- Trigger on `Book` model events via an Eloquent observer: `created`, `updated`, `deleted`.
+- Provide a bulk reindex command, e.g. `php artisan meilisearch:reindex books`.
+- On `is_active = false` or stock-out, do not delete from index — keep the record but rely on filterable attributes to hide it at query time.

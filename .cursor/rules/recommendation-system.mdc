@@ -1,0 +1,37 @@
+---
+description: Use when implementing book recommendation logic — cold-start, collaborative filtering, and availability filtering.
+alwaysApply: false
+---
+
+# Recommendation System
+
+## Strategy Selection
+
+Pick algorithm based on user state:
+
+- **Guest** (not logged in): **Popularity-based + Content-based** (best-sellers, new arrivals, high-rated). Solves the cold-start problem.
+- **Member** (logged in): **Collaborative Filtering** on past interactions (purchases, views, ratings).
+  - If interaction history is below the configured threshold → fall back to popularity-based.
+
+## Data Sources
+
+- Purchase history: `orders` + `order_items`.
+- Views: session/event tracking (introduce a `book_views` table or analytics pipeline if missing).
+- Ratings: `reviews` (only `approved` status).
+
+## Mandatory Filtering
+
+The final recommendation list MUST exclude:
+
+- Books with `is_active = false`.
+- Books with total stock across all warehouses = 0 (out of stock).
+- Books the user already purchased recently (configurable window) — avoid duplicate suggestions.
+
+## Implementation
+
+- Service: `App\Services\Recommendation\RecommendationService`.
+- Heavy computation (CF matrix factorization, popularity ranking) runs in **scheduled jobs**; results cached in Redis:
+  - `reco:user:{account_id}` — personalized, TTL 1 hour.
+  - `reco:popular` — popularity-based, TTL 6 hours.
+- API endpoints return cached results synchronously. **Never compute on request.**
+- Cache invalidation: invalidate `reco:user:{account_id}` on new purchase / review event.

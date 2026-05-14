@@ -1,0 +1,34 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Tech Stack (Backend Focus)
+
+## Primary Stack
+
+- **Laravel 12** (PHP 8.3) — API-only backend.
+- **Laravel Sanctum 4** — SPA cookie-based authentication.
+- **Filament 4** — admin panel (TALL stack, SSR), mounted on the same Laravel app.
+
+## Data Layer
+
+- **MySQL 8.4.3** — relational core, used for all transactional data (ACID).
+- **Redis** — cache, queue driver, session store, AI conversation context (TTL 24h).
+- **Meilisearch** — full-text search + vector search for the RAG chatbot.
+
+## Third-party Services
+
+- **Cloudinary** — image storage and on-the-fly optimization.
+- **Google Gemini API** — LLM (chat completion) + embedding model for RAG.
+- **VietQR** — dynamic QR code payment gateway.
+
+## Frontend Consumer (out of scope)
+
+The SPA frontend (ReactJS) runs on a separate domain and consumes the REST API.
+The backend MUST support:
+
+- **CORS** with `supports_credentials: true`.
+- **Sanctum SPA cookie** authentication (stateful domains).
+
+Do NOT generate or modify frontend code in this codebase.

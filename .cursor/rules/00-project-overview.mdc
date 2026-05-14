@@ -1,0 +1,31 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Bookify — Project Overview
+
+**Bookify** is a B2C e-commerce website distributing physical books. The core goal is to digitize bookstore operations and personalize the shopping experience through AI (RAG chatbot + recommendation system).
+
+## Business Modules
+
+The system is split into 6 subsystems:
+
+1. **Account & Authentication** — registration, login, password reset, profile, address book.
+2. **Shopping** — browse/search books, cart, checkout, order tracking, reviews.
+3. **AI** — RAG virtual assistant (chatbot) + book recommendation engine.
+4. **Catalog & Inventory** — books, categories, authors, publishers, suppliers, warehouses, promotions.
+5. **Order & Shipping** — order processing, shipping methods, payment (COD / VietQR), refunds.
+6. **Admin & Statistics** — customer management, revenue reports, product/order statistics, import error tracking, internal notifications.
+
+## Customer Roles
+
+- **Guest** (not logged in): cart via `session_id`, popularity-based recommendations.
+- **Member** (logged in): cart via `account_id`, collaborative filtering recommendations, order history.
+- **Admin / Staff**: access Filament admin panel only.
+
+## Repository Layout
+
+- `backend/` — Laravel API + Filament admin (the scope of this codebase).
+- `frontend/` — React SPA (out of scope; do not modify).
+- `backend/docs/` — design and schema documents.

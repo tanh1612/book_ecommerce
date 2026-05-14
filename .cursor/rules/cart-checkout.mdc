@@ -1,0 +1,40 @@
+---
+description: Use when implementing cart, checkout, or payment logic — guest cart sync, inventory check, COD vs VietQR.
+alwaysApply: false
+---
+
+# Cart & Checkout
+
+## Cart Storage
+
+- **Guest cart**: keyed by `session_id` in `cart_items` (column `session_id` nullable, `account_id` nullable).
+- **Member cart**: keyed by `account_id`.
+
+## Login Sync (CRITICAL)
+
+When a guest logs in, the backend MUST merge the session cart into the member cart:
+
+1. Trigger from the login controller or an event listener (`Login` event).
+2. For each row `cart_items.session_id = X`:
+   - If the same `book_id` already exists for the member → **sum quantities** (cộng dồn).
+   - Else → reassign `account_id = Y`, set `session_id = NULL`.
+3. Delete leftover session-only rows.
+4. Wrap the whole merge in a single DB transaction.
+
+## Checkout Flow
+
+1. Validate stock in real time (use `SELECT ... FOR UPDATE` on inventory rows inside a transaction).
+2. Compute totals: subtotal + shipping fee (from `shipping_rates` by province) + applied promotions.
+3. Create the `Order` row and `OrderItem` rows with a **price snapshot** — do not reference live `books.selling_price` later.
+4. Decrement inventory atomically.
+5. Clear cart rows for this user/session.
+6. Dispatch order-confirmation notification.
+
+## Payment
+
+- **COD**: order status → `pending`, payment status → `pending_cod`.
+- **VietQR**: generate dynamic QR via VietQR API. Set order TTL **12 hours**. A scheduled job auto-cancels expired unpaid orders and restores inventory (see [queue-cronjob.mdc](.cursor/rules/queue-cronjob.mdc)).
+
+## Idempotency
+
+The checkout endpoint MUST be idempotent. Accept and verify a client-supplied `idempotency_key` to prevent duplicate orders on network retry.

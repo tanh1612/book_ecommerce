@@ -1,0 +1,39 @@
+---
+description: Laravel backend conventions for controllers, services, models, and routes
+globs: backend/**/*.php
+alwaysApply: false
+---
+
+# Laravel Backend Conventions
+
+## Layered Pattern
+
+`Controller (thin) → Service (business logic) → Repository (optional) → Eloquent Model`
+
+- Controllers only orchestrate: validate via `FormRequest`, delegate to a service, return a `JsonResource`.
+- Services contain all business rules; inject via constructor.
+- Models stay clean: relationships, scopes, casts, accessors only — no business decisions.
+
+## Request / Response
+
+- Input validation: `app/Http/Requests/*Request.php` extending `FormRequest`.
+- Output shape: `app/Http/Resources/*Resource.php` / `*Collection.php`.
+- Use Laravel's pagination helpers (`->paginate()`, `->cursorPaginate()`); never hand-roll pagination arrays.
+
+## Routes
+
+- All API routes in `routes/api.php` under `/api/v1/` prefix.
+- Group by domain (auth, catalog, cart, order, ai, admin-stats).
+- Apply middleware: `auth:sanctum`, `throttle:api`, custom policies.
+
+## Enums
+
+Use enums in `app/Enums/` instead of magic strings (existing: `BookLanguage`, `ReviewStatus`). Register via `$casts` on the model.
+
+## Authorization
+
+Use `Policy` + `Gate` — never hardcode role checks inside controllers. Register policies in `AuthServiceProvider`.
+
+## Database Reference
+
+Before writing new queries, migrations, or model relationships, read [backend/docs/database_schema.md](backend/docs/database_schema.md) to verify table names, columns, FKs, and indexes. Avoid duplicate migrations or column typos.
