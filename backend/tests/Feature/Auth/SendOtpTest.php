@@ -18,7 +18,7 @@ test('send otp succeeds for new email', function () {
         'email' => 'newuser@example.com',
     ]);
 
-    $response->assertOk()->assertJsonPath('message', 'Mã xác nhận đã được gửi đến email của bạn.');
+    $response->assertOk()->assertJsonPath('message', 'Mã xác nhận đã được gửi đến email newuser@example.com.');
 
     Mail::assertQueued(RegistrationOtpMail::class);
 });

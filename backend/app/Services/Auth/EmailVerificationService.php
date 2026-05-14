@@ -29,6 +29,11 @@ class EmailVerificationService
     {
         return Cache::store(config('registration.cache_store', 'redis'));
     }
+    
+    private function normalizedEmailKey(string $email): string
+    {
+        return strtolower(trim($email));
+    }
 
     public function sendOtp(string $email): void
     {
@@ -146,10 +151,5 @@ class EmailVerificationService
 
             throw $e;
         }
-    }
-
-    private function normalizedEmailKey(string $email): string
-    {
-        return strtolower(trim($email));
     }
 }

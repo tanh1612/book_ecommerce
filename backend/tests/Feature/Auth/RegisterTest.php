@@ -5,8 +5,8 @@ use App\Mail\RegistrationOtpMail;
 use App\Models\Account;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -34,13 +34,11 @@ test('customer can register an account', function () {
     $token = $verifyResponse->json('register_token');
     expect($token)->toHaveLength(60);
 
-    $response = $this
-        ->withHeader('Referer', 'http://localhost')
-        ->postJson('/api/v1/auth/register', [
-            'email' => $email,
-            'password' => 'password',
-            'register_token' => $token,
-        ]);
+    $response = $this->postJson('/api/v1/auth/register', [
+        'email' => $email,
+        'password' => 'password',
+        'register_token' => $token,
+    ]);
 
     $response
         ->assertCreated()
@@ -60,7 +58,7 @@ test('customer can register an account', function () {
         'account_id' => $account->id,
     ]);
 
-    $this->assertAuthenticatedAs($account);
+    $this->assertGuest();
 });
 
 test('email must be unique when registering', function () {
@@ -91,14 +89,12 @@ test('client cannot choose account role when registering', function () {
         'otp' => $otp,
     ])->json('register_token');
 
-    $response = $this
-        ->withHeader('Referer', 'http://localhost')
-        ->postJson('/api/v1/auth/register', [
-            'email' => $email,
-            'password' => 'password',
-            'register_token' => $token,
-            'role' => AccountRole::Admin->value,
-        ]);
+    $response = $this->postJson('/api/v1/auth/register', [
+        'email' => $email,
+        'password' => 'password',
+        'register_token' => $token,
+        'role' => AccountRole::Admin->value,
+    ]);
 
     $response
         ->assertCreated()
@@ -122,13 +118,11 @@ test('register rejects invalid register token', function () {
         'otp' => $otp,
     ])->assertOk();
 
-    $response = $this
-        ->withHeader('Referer', 'http://localhost')
-        ->postJson('/api/v1/auth/register', [
-            'email' => $email,
-            'password' => 'password',
-            'register_token' => Str::random(60),
-        ]);
+    $response = $this->postJson('/api/v1/auth/register', [
+        'email' => $email,
+        'password' => 'password',
+        'register_token' => Str::random(60),
+    ]);
 
     $response
         ->assertUnprocessable()
@@ -139,12 +133,10 @@ test('register rejects invalid register token', function () {
 });
 
 test('register requires register_token', function () {
-    $response = $this
-        ->withHeader('Referer', 'http://localhost')
-        ->postJson('/api/v1/auth/register', [
-            'email' => 'customer@example.com',
-            'password' => 'password',
-        ]);
+    $response = $this->postJson('/api/v1/auth/register', [
+        'email' => 'customer@example.com',
+        'password' => 'password',
+    ]);
 
     $response->assertUnprocessable()->assertJsonValidationErrors('register_token');
 });
