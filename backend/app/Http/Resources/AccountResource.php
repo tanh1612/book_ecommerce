@@ -22,8 +22,8 @@ class AccountResource extends JsonResource
                 'first_name' => $this->profile?->first_name,
                 'last_name' => $this->profile?->last_name,
                 'phone' => $this->profile?->phone,
-                'gender' => $this->profile?->gender,
-                'birthday' => $this->profile?->birthday,
+                'gender' => $this->profile?->gender?->value,
+                'birthday' => $this->profile?->birthday?->format('Y-m-d'),
             ]),
         ];
     }

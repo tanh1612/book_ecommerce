@@ -8,6 +8,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Uses Laravel cache (Redis in production per .env). Tests use array driver.
+    | Shared with password-reset OTP / reset tokens.
     |
     */
 
