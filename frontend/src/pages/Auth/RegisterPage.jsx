@@ -4,16 +4,15 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  // Đã xóa lastName và firstName
   const [formData, setFormData] = useState({
-    lastName: '',
-    firstName: '',
     email: '',
-    otp: '', // Thêm trường OTP
+    otp: '', 
     password: '',
   });
   
   const [showPassword, setShowPassword] = useState(false);
-  const [countdown, setCountdown] = useState(0); // State đếm ngược gửi mã
+  const [countdown, setCountdown] = useState(0); 
   const [isSending, setIsSending] = useState(false);
 
   // Logic đếm ngược 60s sau khi bấm lấy mã
@@ -24,8 +23,8 @@ const RegisterPage = () => {
     }
   }, [countdown]);
 
-  // Điều kiện để làm sáng nút Đăng ký (Phải nhập đủ cả OTP)
-  const isSubmitDisabled = !formData.lastName || !formData.firstName || !formData.email || !formData.otp || !formData.password;
+  // Điều kiện để làm sáng nút Đăng ký (chỉ kiểm tra email, otp, password)
+  const isSubmitDisabled = !formData.email || !formData.otp || !formData.password;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -41,7 +40,7 @@ const RegisterPage = () => {
     setTimeout(() => {
       alert(`Mã xác nhận đã được gửi đến email: ${formData.email}`);
       setIsSending(false);
-      setCountdown(60); // Bắt đầu đếm ngược 60 giây
+      setCountdown(60); 
     }, 1000);
   };
 
@@ -68,28 +67,6 @@ const RegisterPage = () => {
         {/* Nội dung Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           
-          {/* Nhập Họ và Tên */}
-          <div className="flex gap-3">
-            <div className="w-1/2">
-              <label className="block text-[14px] text-gray-700 mb-1.5">Họ</label>
-              <input 
-                type="text" name="lastName" 
-                placeholder="Nhập họ" 
-                className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
-                value={formData.lastName} onChange={handleChange} 
-              />
-            </div>
-            <div className="w-1/2">
-              <label className="block text-[14px] text-gray-700 mb-1.5">Tên</label>
-              <input 
-                type="text" name="firstName" 
-                placeholder="Nhập tên" 
-                className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
-                value={formData.firstName} onChange={handleChange} 
-              />
-            </div>
-          </div>
-
           {/* Nhập Email + Nút Lấy mã */}
           <div>
             <label className="block text-[14px] text-gray-700 mb-1.5">Email</label>
@@ -117,7 +94,7 @@ const RegisterPage = () => {
 
           {/* Nhập mã OTP */}
           <div>
-            <label className="block text-[14px] text-gray-700 mb-1.5">Mã xác nhận OTP</label>
+            <label className="block text-[14px] text-gray-700 mb-1.5">Mã xác nhận</label>
             <input 
               type="text" name="otp" 
               placeholder="Nhập mã 6 ký tự" 
@@ -127,25 +104,27 @@ const RegisterPage = () => {
             />
           </div>
 
-          {/* Nhập Mật khẩu */}
-          <div>
-            <label className="block text-[14px] text-gray-700 mb-1.5">Mật khẩu</label>
-            <div className="relative">
-              <input 
-                type={showPassword ? "text" : "password"} name="password" 
-                placeholder="Nhập mật khẩu" 
-                className="w-full border border-gray-300 rounded py-2.5 px-3 pr-12 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
-                value={formData.password} onChange={handleChange} 
-              />
-              <button 
-                type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2489F4] text-[14px] font-medium hover:text-blue-700"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? "Ẩn" : "Hiện"}
-              </button>
+          {/* Nhập Mật khẩu (Chỉ hiển thị khi đã nhập OTP) */}
+          {formData.otp.length > 0 && (
+            <div className="animate-fade-in">
+              <label className="block text-[14px] text-gray-700 mb-1.5">Mật khẩu</label>
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} name="password" 
+                  placeholder="Nhập mật khẩu" 
+                  className="w-full border border-gray-300 rounded py-2.5 px-3 pr-12 outline-none focus:border-[#157a2c] transition-all text-[15px]" 
+                  value={formData.password} onChange={handleChange} 
+                />
+                <button 
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2489F4] text-[14px] font-medium hover:text-blue-700"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? "Ẩn" : "Hiện"}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Cụm Nút bấm */}
           <div className="flex flex-col gap-3 mt-4">
