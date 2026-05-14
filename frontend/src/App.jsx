@@ -11,10 +11,16 @@ import CheckoutPage from './pages/Checkout/CheckoutPage';
 import ProfilePage from './pages/Profile/ProfilePage';
 // THÊM DÒNG IMPORT NÀY
 import WishlistPage from './Wishlist/WishlistPage'; 
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
+
+
 
 function App() {
   return (
     <BrowserRouter>
+    <ToastContainer position="top-right" autoClose={3000} />
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
@@ -23,6 +29,7 @@ function App() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
           
           {/* THÊM ROUTE WISHLIST TẠI ĐÂY */}
           <Route path="wishlist" element={<WishlistPage />} />

@@ -1,32 +1,41 @@
-// src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
+import authApi from '../services/authApi';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
+  // Tự động kiểm tra xem Cookie còn hạn không khi vừa mở Web
   useEffect(() => {
-    // Lấy thông tin user từ localStorage khi load trang
-    const savedUser = localStorage.getItem('activeUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    const checkLoginStatus = async () => {
+      try {
+        const res = await authApi.getProfile();
+        setUser(res.data);
+      } catch (err) {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkLoginStatus();
   }, []);
 
-  const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem('activeUser', JSON.stringify(userData));
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('activeUser');
+  const login = (userData) => setUser(userData);
+  
+  const logout = async () => {
+    try {
+      await authApi.logout();
+      setUser(null);
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      {children}
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
