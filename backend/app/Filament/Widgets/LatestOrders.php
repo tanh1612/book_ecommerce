@@ -11,7 +11,7 @@ class LatestOrders extends BaseWidget
 {
     protected static ?int $sort = 1;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected static ?string $heading = 'Đơn hàng gần đây';
 
@@ -23,16 +23,16 @@ class LatestOrders extends BaseWidget
             )
             ->columns([
                 Tables\Columns\TextColumn::make('id')
-                    ->label('Order ID')
+                    ->label('Mã đơn')
                     ->prefix('#'),
                 Tables\Columns\TextColumn::make('account.email')
-                    ->label('Customer')
+                    ->label('Khách hàng')
                     ->limit(25),
                 Tables\Columns\TextColumn::make('final_amount')
-                    ->label('Total Amount')
+                    ->label('Tổng tiền')
                     ->money('VND'),
                 Tables\Columns\TextColumn::make('current_status')
-                    ->label('Status')
+                    ->label('Trạng thái')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'pending' => 'warning',
@@ -53,7 +53,7 @@ class LatestOrders extends BaseWidget
                         default => $state ?? '—',
                     }),
                 Tables\Columns\TextColumn::make('created_at')
-                    ->label('Created At')
+                    ->label('Ngày đặt')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
             ])

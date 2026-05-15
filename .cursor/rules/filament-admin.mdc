@@ -43,3 +43,47 @@ For one-to-many / many-to-many relations, register a Relation Manager in the par
 ## Tables
 
 Define searchable, sortable, and filterable columns explicitly. Use `BadgeColumn` for enums. Apply a soft-delete filter (`TrashedFilter`) when the model uses `SoftDeletes`.
+
+## Admin UI Design System
+
+The Filament admin panel MUST provide a consistent Vietnamese-first experience across all pages.
+
+### Language
+
+- Use Vietnamese for all user-facing UI text: navigation labels, model labels, plural labels, form labels, table headings, actions, filters, helper text, validation messages, modal headings, notifications, empty states, and relation manager titles.
+- Keep PHP class names, method names, variables, database fields, and enum keys in English.
+- Use short, natural Vietnamese labels. Avoid mixing English terms unless they are accepted product/domain terms.
+
+### Navigation
+
+- Group resources by business domain using Vietnamese navigation groups, for example: `Danh mục`, `Kho hàng`, `Đơn hàng`, `Khách hàng`, `Khuyến mãi`, `Hệ thống`.
+- Each Resource MUST define consistent `navigationLabel`, `modelLabel`, `pluralModelLabel`, and `navigationGroup` when the default generated text is not Vietnamese.
+- Use one clear icon per Resource. Do not change icons arbitrarily between related resources.
+
+### Page Structure
+
+- List pages should prioritize search, filters, status visibility, and primary actions in a predictable position.
+- Create/Edit pages should use sections with Vietnamese headings and concise descriptions when helpful.
+- Use a two-column form layout for common detail forms when the fields are balanced; use one column for long text, rich content, or fields that need full width.
+- Relation Managers must use the same Vietnamese labels, table conventions, and actions as standalone Resources for the same domain.
+
+### Forms
+
+- Required fields must be explicit with validation rules and Vietnamese labels.
+- Use `helperText()` only when it reduces ambiguity for admin users.
+- Do not rely on disabled or hidden fields for data integrity. Backend validation and authorization must enforce the real rules.
+- Prefer shared support classes for repeated labels, validation rules, status text, or option lists.
+
+### Tables
+
+- Table columns should use Vietnamese headings and consistent ordering: identity/name first, domain status next, important metrics next, timestamps last.
+- Status columns must use consistent badge labels and colors across all Resources.
+- Use searchable/sortable/toggleable columns intentionally. Avoid exposing low-value technical columns by default.
+- Date/time columns should use a consistent Vietnamese-friendly display format.
+
+### Actions, Modals, And Notifications
+
+- Use Vietnamese action labels such as `Tạo mới`, `Chỉnh sửa`, `Xem chi tiết`, `Xóa`, `Khôi phục`, `Nhập CSV`, `Xuất dữ liệu`.
+- Destructive actions must have Vietnamese confirmation modal headings/descriptions.
+- Success and error notifications must be Vietnamese and describe the business result, not internal implementation details.
+- Keep primary actions visually consistent across List/Create/Edit pages.

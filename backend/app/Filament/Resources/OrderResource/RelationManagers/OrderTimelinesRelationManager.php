@@ -2,10 +2,11 @@
 
 namespace App\Filament\Resources\OrderResource\RelationManagers;
 
-use Filament\Forms;
-use Filament\Schemas\Schema;
-use Filament\Resources\RelationManagers\RelationManager;
+use App\Enums\Order\OrderStatus;
 use Filament\Actions;
+use Filament\Forms;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -13,26 +14,18 @@ class OrderTimelinesRelationManager extends RelationManager
 {
     protected static string $relationship = 'timelines';
 
-    protected static ?string $title = 'Status History';
+    protected static ?string $title = 'Lịch sử trạng thái';
 
     public function form(Schema $schema): Schema
     {
         return $schema
             ->schema([
                 Forms\Components\Select::make('status')
-                    ->label('Status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'confirmed' => 'Confirmed',
-                        'processing' => 'Processing',
-                        'shipping' => 'Shipping',
-                        'delivered' => 'Delivered',
-                        'cancelled' => 'Cancelled',
-                        'returned' => 'Returned',
-                    ])
+                    ->label('Trạng thái')
+                    ->options(OrderStatus::class)
                     ->required(),
                 Forms\Components\Textarea::make('note')
-                    ->label('Note')
+                    ->label('Ghi chú')
                     ->maxLength(500),
             ]);
     }
@@ -42,7 +35,7 @@ class OrderTimelinesRelationManager extends RelationManager
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('status')
-                    ->label('Status')
+                    ->label('Trạng thái')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'pending' => 'warning',
@@ -52,30 +45,29 @@ class OrderTimelinesRelationManager extends RelationManager
                         'delivered' => 'success',
                         'cancelled' => 'danger',
                         'returned' => 'gray',
+                        'refund_closed' => 'gray',
                         default => 'secondary',
                     })
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'pending' => 'Pending',
-                        'confirmed' => 'Confirmed',
-                        'processing' => 'Processing',
-                        'shipping' => 'Shipping',
-                        'delivered' => 'Delivered',
-                        'cancelled' => 'Cancelled',
-                        'returned' => 'Returned',
-                        default => $state,
+                    ->formatStateUsing(function (string $state): string {
+                        $enum = OrderStatus::tryFrom($state);
+
+                        return $enum?->getLabel() ?? match ($state) {
+                            'returned' => 'Trả hàng',
+                            default => $state,
+                        };
                     }),
                 Tables\Columns\TextColumn::make('note')
-                    ->label('Note')
+                    ->label('Ghi chú')
                     ->limit(50),
                 Tables\Columns\TextColumn::make('created_at')
-                    ->label('Time')
+                    ->label('Thời điểm')
                     ->dateTime('d/m/Y H:i:s')
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->headerActions([
                 Actions\CreateAction::make()
-                    ->label('Add Status'),
+                    ->label('Thêm trạng thái'),
             ])
             ->actions([])
             ->bulkActions([]);

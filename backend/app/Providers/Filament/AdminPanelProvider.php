@@ -2,6 +2,14 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Actions\AttachAction;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\DetachAction;
+use Filament\Actions\DetachBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -10,6 +18,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -20,6 +29,18 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
+    public function boot(): void
+    {
+        CreateAction::configureUsing(fn (CreateAction $action) => $action->label('Tạo mới'));
+        EditAction::configureUsing(fn (EditAction $action) => $action->label('Chỉnh sửa'));
+        ViewAction::configureUsing(fn (ViewAction $action) => $action->label('Xem chi tiết'));
+        DeleteAction::configureUsing(fn (DeleteAction $action) => $action->label('Xóa'));
+        DeleteBulkAction::configureUsing(fn (DeleteBulkAction $action) => $action->label('Xóa đã chọn'));
+        AttachAction::configureUsing(fn (AttachAction $action) => $action->label('Gán'));
+        DetachAction::configureUsing(fn (DetachAction $action) => $action->label('Gỡ'));
+        DetachBulkAction::configureUsing(fn (DetachBulkAction $action) => $action->label('Gỡ đã chọn'));
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
@@ -28,7 +49,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('')
             ->login()
             ->passwordReset()
-            ->brandName('Admin Panel')
+            ->brandName('Quản trị Bookify')
             ->colors([
                 'primary' => Color::Indigo,
                 'danger' => Color::Rose,
@@ -37,6 +58,7 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
+            ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop()
             ->databaseNotifications()
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])

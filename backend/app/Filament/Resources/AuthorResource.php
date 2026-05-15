@@ -38,10 +38,10 @@ class AuthorResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->columns(1)->components([
             Layout\Section::make()->components([
                 Field\TextInput::make('name')
-                    ->label('Author Name')
+                    ->label('Tên tác giả')
                     ->required()
                     ->maxLength(255)
                     ->columnSpanFull(),
@@ -60,14 +60,14 @@ class AuthorResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->label('Name')
+                    ->label('Tên')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('email')
                     ->label('Email')
                     ->searchable(),
                 TextColumn::make('created_at')
-                    ->label('Created At')
+                    ->label('Ngày tạo')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(),

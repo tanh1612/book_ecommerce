@@ -2,10 +2,10 @@
 
 namespace App\Filament\Resources\PromotionResource\RelationManagers;
 
-use Filament\Forms;
-use Filament\Schemas\Schema;
-use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Actions;
+use Filament\Forms;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -13,34 +13,34 @@ class PromotionItemsRelationManager extends RelationManager
 {
     protected static string $relationship = 'items';
 
-    protected static ?string $title = 'Promotional Items';
+    protected static ?string $title = 'Sản phẩm trong chương trình';
 
     public function form(Schema $schema): Schema
     {
         return $schema
             ->schema([
                 Forms\Components\Select::make('book_id')
-                    ->label('Book')
+                    ->label('Sách')
                     ->relationship('book', 'name')
                     ->searchable()
                     ->preload()
                     ->required(),
                 Forms\Components\Select::make('discount_type')
-                    ->label('Discount Type')
+                    ->label('Kiểu giảm')
                     ->options([
-                        'percentage' => 'Percentage (%)',
-                        'fixed' => 'Fixed Amount (₫)',
+                        'percentage' => 'Phần trăm (%)',
+                        'fixed' => 'Số tiền cố định (₫)',
                     ])
                     ->required(),
                 Forms\Components\TextInput::make('discount_value')
-                    ->label('Discount Value')
+                    ->label('Giá trị giảm')
                     ->numeric()
                     ->required(),
                 Forms\Components\TextInput::make('stock_limit')
-                    ->label('Stock Limit')
+                    ->label('Giới hạn tồn bán')
                     ->numeric(),
                 Forms\Components\TextInput::make('max_quantity_per_user')
-                    ->label('Limit Per User')
+                    ->label('Tối đa / khách')
                     ->numeric(),
             ]);
     }
@@ -50,27 +50,27 @@ class PromotionItemsRelationManager extends RelationManager
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('book.name')
-                    ->label('Book')
+                    ->label('Sách')
                     ->limit(30)
                     ->searchable(),
                 Tables\Columns\TextColumn::make('discount_type')
-                    ->label('Type')
+                    ->label('Kiểu')
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'percentage' => '%',
                         'fixed' => '₫',
                         default => $state,
                     }),
                 Tables\Columns\TextColumn::make('discount_value')
-                    ->label('Value')
+                    ->label('Giá trị')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('stock_limit')
-                    ->label('Limit')
+                    ->label('Giới hạn')
                     ->placeholder('∞'),
                 Tables\Columns\TextColumn::make('sold_quantity')
-                    ->label('Sold')
+                    ->label('Đã bán')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('max_quantity_per_user')
-                    ->label('Max/User')
+                    ->label('Tối đa / khách')
                     ->placeholder('∞'),
             ])
             ->headerActions([

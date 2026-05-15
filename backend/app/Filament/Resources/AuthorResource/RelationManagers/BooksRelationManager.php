@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\AuthorResource\RelationManagers;
 
 use App\Filament\Resources\BookResource;
-use Filament\Forms\Components as Field;
-use Filament\Schemas\Schema;
-use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Actions;
+use Filament\Forms\Components as Field;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -34,22 +34,22 @@ class BooksRelationManager extends RelationManager
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\ImageColumn::make('thumbnail')
-                    ->label('Thumbnail')
+                    ->label('Ảnh bìa')
                     ->disk('cloudinary')
                     ->square(),
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Book Name')
+                    ->label('Tên sách')
                     ->searchable()
                     ->limit(40),
                 Tables\Columns\TextColumn::make('selling_price')
-                    ->label('Selling Price')
+                    ->label('Giá bán')
                     ->money('VND')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sku')
                     ->label('SKU')
                     ->searchable(),
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label('Hoạt động')
                     ->boolean(),
             ])
             ->filters([
@@ -60,7 +60,7 @@ class BooksRelationManager extends RelationManager
             ])
             ->actions([
                 Actions\Action::make('edit_book')
-                    ->label('Edit')
+                    ->label('Chỉnh sửa')
                     ->icon('heroicon-o-pencil')
                     ->url(fn ($record): string => BookResource::getUrl('edit', ['record' => $record])),
                 Actions\DetachAction::make(),
