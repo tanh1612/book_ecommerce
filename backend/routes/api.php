@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Account\AddressController;
 use App\Http\Controllers\Api\V1\Account\PasswordController;
 use App\Http\Controllers\Api\V1\Account\ProfileController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
+use App\Http\Controllers\Api\V1\Location\LocationController;
 use Illuminate\Support\Facades\Route;
 
 // Auth routes
@@ -36,6 +38,15 @@ Route::prefix('v1/auth')->group(function (): void {
         ->middleware(['web', 'auth:sanctum']);
 });
 
+// Public location proxy (cached upstream administrative data)
+Route::prefix('v1/locations')->middleware('throttle:120,1')->group(function (): void {
+    // Get provinces
+    Route::get('provinces', [LocationController::class, 'provinces']);
+
+    // Get wards by province code
+    Route::get('provinces/{provinceCode}/wards', [LocationController::class, 'wards']);
+});
+
 // Account routes
 Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function (): void {
     // Get profile
@@ -46,4 +57,7 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function
 
     // Change password
     Route::patch('password', [PasswordController::class, 'update']);
+
+    // Address book
+    Route::post('addresses', [AddressController::class, 'store']);
 });
