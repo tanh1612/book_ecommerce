@@ -17,7 +17,9 @@ class ListBooks extends ListRecords
                 ->importer(\App\Filament\Imports\BookImporter::class)
                 ->label('Nhập CSV')
                 ->color('info')
-                ->icon('heroicon-o-arrow-down-tray'),
+                ->icon('heroicon-o-arrow-down-tray')
+                ->chunkSize(50)
+                ->maxRows(20_000),
             Actions\CreateAction::make(),
         ];
     }

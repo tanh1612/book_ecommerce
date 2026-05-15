@@ -17,7 +17,9 @@ class ListPublishers extends ListRecords
                 ->importer(\App\Filament\Imports\PublisherImporter::class)
                 ->label('Nhập CSV')
                 ->color('info')
-                ->icon('heroicon-o-arrow-down-tray'),
+                ->icon('heroicon-o-arrow-down-tray')
+                ->chunkSize(200)
+                ->maxRows(50_000),
             Actions\CreateAction::make(),
         ];
     }

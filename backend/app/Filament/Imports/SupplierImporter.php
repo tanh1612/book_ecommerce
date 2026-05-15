@@ -3,14 +3,17 @@
 namespace App\Filament\Imports;
 
 use App\Models\Supplier;
+use App\Traits\GeneratesUniqueSlug;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Number;
+use Illuminate\Validation\Rule;
 
 class SupplierImporter extends Importer
 {
-    use \App\Traits\GeneratesUniqueSlug;
+    use GeneratesUniqueSlug;
 
     protected static ?string $model = Supplier::class;
 
@@ -25,7 +28,7 @@ class SupplierImporter extends Importer
                 ->examples(['Fahasa']),
             ImportColumn::make('email')
                 ->label('Email')
-                ->rules(['email', 'max:255', 'nullable'])
+                ->rules(['nullable', 'email', 'max:255', Rule::unique('suppliers', 'email')])
                 ->exampleHeader('email')
                 ->examples(['info@fahasa.com']),
         ];
@@ -33,7 +36,7 @@ class SupplierImporter extends Importer
 
     public function resolveRecord(): Supplier
     {
-        return new Supplier();
+        return new Supplier;
     }
 
     protected function beforeSave(): void
@@ -43,12 +46,23 @@ class SupplierImporter extends Importer
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Nhập nhà cung cấp thành công: ' . Number::format($import->successful_rows) . ' dòng.';
+        $body = 'Nhập nhà cung cấp thành công: '.Number::format($import->successful_rows).' dòng.';
 
         if ($failedRowsCount = $import->getFailedRowsCount()) {
-            $body .= ' ' . Number::format($failedRowsCount) . ' dòng bị lỗi.';
+            $body .= ' '.Number::format($failedRowsCount).' dòng bị lỗi.';
         }
 
         return $body;
+    }
+
+    public static function modifyCompletedNotification(Notification $notification, Import $import): Notification
+    {
+        if ($import->getFailedRowsCount() > 0) {
+            $notification->color('warning');
+        } else {
+            $notification->color('success');
+        }
+
+        return $notification;
     }
 }
