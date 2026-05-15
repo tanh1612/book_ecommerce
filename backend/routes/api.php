@@ -58,6 +58,15 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function
     // Change password
     Route::patch('password', [PasswordController::class, 'update']);
 
-    // Address book
+    // List addresses
+    Route::get('addresses', [AddressController::class, 'index']);
+
+    // Create address
     Route::post('addresses', [AddressController::class, 'store']);
+
+    // Update address
+    Route::patch('addresses/{address}', [AddressController::class, 'update']);
+
+    // Delete address
+    Route::delete('addresses/{address}', [AddressController::class, 'destroy']);
 });
