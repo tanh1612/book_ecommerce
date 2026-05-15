@@ -19,7 +19,7 @@ class ReviewResource extends Resource
 
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-star';
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Người dùng';
+    protected static \UnitEnum|string|null $navigationGroup = 'Khách hàng';
 
     protected static ?int $navigationSort = 2;
 
@@ -31,16 +31,16 @@ class ReviewResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->columns(1)->components([
             Layout\Section::make('Chi tiết đánh giá')->components([
-                Field\Select::make('account_id')->label('Customer')->relationship('account', 'email')->disabled(),
-                Field\Select::make('book_id')->label('Book')->relationship('book', 'name')->disabled(),
-                Field\TextInput::make('rating')->label('Rating')->disabled(),
-                Field\Textarea::make('comment')->label('Comment')->disabled()->columnSpanFull(),
+                Field\Select::make('account_id')->label('Khách hàng')->relationship('account', 'email')->disabled(),
+                Field\Select::make('book_id')->label('Sách')->relationship('book', 'name')->disabled(),
+                Field\TextInput::make('rating')->label('Điểm số')->disabled(),
+                Field\Textarea::make('comment')->label('Nội dung')->disabled()->columnSpanFull(),
             ])->columns(4),
             Layout\Section::make('Quản lý')->components([
-                Field\Select::make('status')->label('Status')->options(ReviewStatus::class)->required(),
-                Field\Textarea::make('admin_reply')->label('Admin Reply')->columnSpanFull(),
+                Field\Select::make('status')->label('Trạng thái')->options(ReviewStatus::class)->required(),
+                Field\Textarea::make('admin_reply')->label('Phản hồi từ quản trị')->columnSpanFull(),
             ]),
         ]);
     }
@@ -50,18 +50,18 @@ class ReviewResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('book.name')
-                    ->label('Book')
+                    ->label('Sách')
                     ->searchable()
                     ->limit(30),
                 Tables\Columns\TextColumn::make('account.email')
-                    ->label('Customer')
+                    ->label('Khách hàng')
                     ->searchable()
                     ->limit(25),
                 Tables\Columns\TextColumn::make('rating')
-                    ->label('Rating')
+                    ->label('Điểm')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->label('Status')
+                    ->label('Trạng thái')
                     ->badge()
                     ->color(fn (ReviewStatus $state): string => match ($state) {
                         ReviewStatus::PENDING => 'warning',
@@ -74,12 +74,12 @@ class ReviewResource extends Resource
                         ReviewStatus::REJECTED => 'heroicon-o-x-circle',
                     }),
                 Tables\Columns\TextColumn::make('created_at')
-                    ->label('Created At')
+                    ->label('Ngày tạo')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')->label('Status')->options(ReviewStatus::class),
+                Tables\Filters\SelectFilter::make('status')->label('Trạng thái')->options(ReviewStatus::class),
             ])
             ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])
             ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);

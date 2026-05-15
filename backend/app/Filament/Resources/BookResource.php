@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\BookResource\Pages;
+use App\Filament\Resources\BookResource\RelationManagers;
 use App\Models\Book;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
@@ -33,11 +34,11 @@ class BookResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->columns(1)->components([
             Layout\Tabs::make('Tabs')->tabs([
                 Layout\Tabs\Tab::make('Thông tin chung')->components([
                     Field\TextInput::make('name')
-                        ->label('Book Name')
+                        ->label('Tên sách')
                         ->required()
                         ->live(onBlur: true)
                         ->columnSpanFull()
@@ -54,17 +55,17 @@ class BookResource extends Resource
 
                     Layout\Grid::make(3)->components([
                         Field\TextInput::make('original_price')
-                            ->label('Original Price')
+                            ->label('Giá gốc')
                             ->default(0)
                             ->numeric()
                             ->required(),
                         Field\TextInput::make('selling_price')
-                            ->label('Selling Price')
+                            ->label('Giá bán')
                             ->default(0)
                             ->numeric()
                             ->required(),
                         Field\Toggle::make('is_active')
-                            ->label('Active')
+                            ->label('Đang hoạt động')
                             ->inline(false)
                             ->default(true),
                     ])->columnSpanFull(),
@@ -85,27 +86,27 @@ class BookResource extends Resource
                 Layout\Tabs\Tab::make('Phân loại')->components([
                     Field\Select::make('supplier_id')
                         ->relationship('supplier', 'name')
-                        ->label('Supplier')
+                        ->label('Nhà cung cấp')
                         ->searchable()
                         ->preload()
                         ->required()
                         ->columnSpanFull(),
                     Field\Select::make('publisher_id')
                         ->relationship('publisher', 'name')
-                        ->label('Publisher')
+                        ->label('Nhà xuất bản')
                         ->searchable()
                         ->preload()
                         ->columnSpanFull(),
                     Field\Select::make('authors')
                         ->relationship('authors', 'name')
-                        ->label('Authors')
+                        ->label('Tác giả')
                         ->multiple()
                         ->preload()
                         ->columnSpanFull(),
                     Field\Select::make('categories')
                         ->relationship('categories', 'name', modifyQueryUsing: fn ($query) => $query->with('parent.parent'))
                         ->getOptionLabelFromRecordUsing(fn ($record) => $record->getBreadcrumb())
-                        ->label('Categories')
+                        ->label('Danh mục')
                         ->multiple()
                         ->preload()
                         ->searchable()
@@ -217,7 +218,7 @@ class BookResource extends Resource
                         ->relationship('images')
                         ->schema([
                             Field\FileUpload::make('public_id')
-                                ->label('Image')
+                                ->label('Ảnh')
                                 ->disk('cloudinary')
                                 ->directory(fn (\Filament\Schemas\Components\Utilities\Get $get) => 'books/'.($get('../../slug') ?? 'book'))
                                 ->image()
@@ -241,19 +242,19 @@ class BookResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\ImageColumn::make('thumbnail')
-                    ->label('Thumbnail')
+                    ->label('Ảnh bìa')
                     ->disk('cloudinary')
                     ->square(),
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Book Name')
+                    ->label('Tên sách')
                     ->searchable()
                     ->limit(40),
                 Tables\Columns\TextColumn::make('selling_price')
-                    ->label('Selling Price')
+                    ->label('Giá bán')
                     ->money('VND')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('original_price')
-                    ->label('Original Price')
+                    ->label('Giá gốc')
                     ->money('VND')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -262,19 +263,19 @@ class BookResource extends Resource
                     ->searchable()
                     ->toggleable(),
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label('Hoạt động')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('authors.name')
-                    ->label('Authors')
+                    ->label('Tác giả')
                     ->badge()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('categories.name')
-                    ->label('Categories')
+                    ->label('Danh mục')
                     ->badge()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')->label('Status'),
+                Tables\Filters\TernaryFilter::make('is_active')->label('Trạng thái'),
             ])
             ->actions([Actions\EditAction::make()])
             ->bulkActions([
@@ -295,8 +296,16 @@ class BookResource extends Resource
                                 $action->halt();
                             }
                         }),
-                ])
+                ]),
             ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\InventoriesRelationManager::class,
+            RelationManagers\ReviewsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

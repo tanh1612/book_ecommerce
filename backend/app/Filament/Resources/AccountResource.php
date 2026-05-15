@@ -21,7 +21,7 @@ class AccountResource extends Resource
 
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-users';
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Người dùng';
+    protected static \UnitEnum|string|null $navigationGroup = 'Khách hàng';
 
     protected static ?int $navigationSort = 1;
 
@@ -33,7 +33,7 @@ class AccountResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->columns(1)->components([
             Layout\Section::make('Chi tiết tài khoản')
                 ->description('Quản lý thông tin đăng nhập và quyền hạn')
                 ->components([
@@ -45,20 +45,20 @@ class AccountResource extends Resource
                         ->maxLength(255),
 
                     Field\TextInput::make('password')
-                        ->label('Password')
+                        ->label('Mật khẩu')
                         ->password()
                         ->required(fn (string $operation): bool => $operation === 'create')
                         ->dehydrated(fn (?string $state) => filled($state)),
 
                     Field\Select::make('role')
-                        ->label('Role')
+                        ->label('Vai trò')
                         ->options(AccountRole::class)
                         ->default(AccountRole::Customer)
                         ->native(false)
                         ->required(),
 
                     Field\Toggle::make('is_active')
-                        ->label('Active')
+                        ->label('Đang hoạt động')
                         ->inline(false)
                         ->default(true)
                         ->hidden(fn (string $operation): bool => $operation === 'create'),
@@ -77,7 +77,7 @@ class AccountResource extends Resource
                     ->sortable(),
 
                 Columns\TextColumn::make('role')
-                    ->label('Role')
+                    ->label('Vai trò')
                     ->badge()
                     ->color(fn (AccountRole $state): string => match ($state) {
                         AccountRole::Admin => 'danger',
@@ -85,18 +85,18 @@ class AccountResource extends Resource
                     }),
 
                 Columns\IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label('Hoạt động')
                     ->boolean(),
 
                 Columns\TextColumn::make('created_at')
-                    ->label('Created At')
+                    ->label('Ngày tạo')
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 Filters\SelectFilter::make('role')
-                    ->label('Role')
+                    ->label('Vai trò')
                     ->options(AccountRole::class)
                     ->native(false),
             ])

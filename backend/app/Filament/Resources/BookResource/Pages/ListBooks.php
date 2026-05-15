@@ -15,7 +15,7 @@ class ListBooks extends ListRecords
         return [
             \Filament\Actions\ImportAction::make()
                 ->importer(\App\Filament\Imports\BookImporter::class)
-                ->label('Import CSV')
+                ->label('Nhập CSV')
                 ->color('info')
                 ->icon('heroicon-o-arrow-down-tray'),
             Actions\CreateAction::make(),

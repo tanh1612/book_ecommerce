@@ -34,10 +34,10 @@ class CategoryResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->columns(1)->components([
             Layout\Section::make()->components([
                 Field\TextInput::make('name')
-                    ->label('Name')
+                    ->label('Tên danh mục')
                     ->required()
                     ->maxLength(255)
                     ->live(onBlur: true)
@@ -50,7 +50,7 @@ class CategoryResource extends Resource
                     ->columnSpanFull()
                     ->unique(Category::class, 'slug', ignoreRecord: true),
                 Field\Select::make('parent_id')
-                    ->label('Parent Category')
+                    ->label('Danh mục cha')
                     ->relationship('parent', 'name', modifyQueryUsing: function ($query, ?Category $record) {
                         $q = $query->with('parent.parent');
 
@@ -99,7 +99,7 @@ class CategoryResource extends Resource
                     ->columnSpanFull()
                     ->placeholder('— Không có (Danh mục gốc) —'),
                 Field\Toggle::make('is_active')
-                    ->label('Active')
+                    ->label('Đang hoạt động')
                     ->inline(false)
                     ->default(true),
             ])->columnSpanFull(),
@@ -111,24 +111,24 @@ class CategoryResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Name')
+                    ->label('Tên')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('parent.name')
-                    ->label('Parent Category')
+                    ->label('Danh mục cha')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Is Active')
+                    ->label('Hoạt động')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('updated_at')
-                    ->label('Updated At')
+                    ->label('Cập nhật')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')->label('Status'),
+                Tables\Filters\TernaryFilter::make('is_active')->label('Trạng thái'),
             ])
             ->actions([
                 Actions\EditAction::make(),
