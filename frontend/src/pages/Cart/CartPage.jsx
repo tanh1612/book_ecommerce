@@ -17,10 +17,11 @@ const CartPage = () => {
 
   const isAllSelected = cartItems.length > 0 && cartItems.every(item => item.selected);
   
-  const cartSummary = useMemo(() => {
+ const cartSummary = useMemo(() => {
     const selectedItems = cartItems.filter(item => item.selected);
     const totalItems = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-    const totalPrice = selectedItems.reduce((sum, item) => sum + (item.salePrice * item.quantity), 0);
+    // Thay đổi salePrice thành price (trường từ API)
+    const totalPrice = selectedItems.reduce((sum, item) => sum + ((item.price || item.selling_price) * item.quantity), 0);
     return { totalItems, totalPrice };
   }, [cartItems]);
 
