@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Account\PasswordController;
 use App\Http\Controllers\Api\V1\Account\ProfileController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
+use App\Http\Controllers\Api\V1\Catalog\BookController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +46,18 @@ Route::prefix('v1/locations')->middleware('throttle:120,1')->group(function (): 
 
     // Get wards by province code
     Route::get('provinces/{provinceCode}/wards', [LocationController::class, 'wards']);
+});
+
+// Public catalog
+Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void {
+    // Get filters
+    Route::get('filters', [BookController::class, 'filters']);
+
+    // List books
+    Route::get('', [BookController::class, 'index']);
+
+    // Get book
+    Route::get('{slug}', [BookController::class, 'show']);
 });
 
 // Account routes

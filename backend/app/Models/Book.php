@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Book extends Model
 {
+    /** @use HasFactory<\Database\Factories\BookFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'supplier_id',
         'publisher_id',
@@ -76,6 +81,14 @@ class Book extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    /**
+     * Storefront chỉ hiển thị sách đang bật; dùng chung cho API catalog và metadata bộ lọc.
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
     }
 
     protected function thumbnail(): Attribute

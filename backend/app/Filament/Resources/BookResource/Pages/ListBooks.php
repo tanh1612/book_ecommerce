@@ -17,7 +17,7 @@ class ListBooks extends ListRecords
                 ->importer(\App\Filament\Imports\BookImporter::class)
                 ->label('Import CSV')
                 ->color('info')
-                ->icon('heroicon-o-arrow-up-tray'),
+                ->icon('heroicon-o-arrow-down-tray'),
             Actions\CreateAction::make(),
         ];
     }
