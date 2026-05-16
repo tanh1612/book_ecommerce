@@ -11,6 +11,8 @@ use App\Http\Resources\AccountResource;
 use App\Services\Auth\EmailVerificationService;
 use App\Services\Auth\LoginAccountService;
 use App\Services\Auth\RegisterAccountService;
+use App\Services\Cart\GuestCartTokenService;
+use App\Services\Cart\MergeGuestCartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +25,7 @@ class AuthController extends Controller
         $emailVerificationService->sendOtp($request->validated('email'));
 
         return response()->json([
-            'message' => 'Mã xác nhận đã được gửi đến email ' . $request->validated('email') . '.',
+            'message' => 'Mã xác nhận đã được gửi đến email '.$request->validated('email').'.',
         ], Response::HTTP_OK);
     }
 
@@ -39,18 +41,30 @@ class AuthController extends Controller
         ], Response::HTTP_OK);
     }
 
-    public function register(RegisterRequest $request, RegisterAccountService $registerAccountService): JsonResponse
-    {
+    public function register(
+        RegisterRequest $request,
+        RegisterAccountService $registerAccountService,
+        MergeGuestCartService $mergeGuestCartService,
+        GuestCartTokenService $guestCartTokenService,
+    ): JsonResponse {
+        $guestToken = $guestCartTokenService->getRawTokenFromRequest();
         $account = $registerAccountService->register($request->validated());
+        $mergeGuestCartService->assignGuestCartToNewAccount($guestToken, $account);
 
         return (new AccountResource($account))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
-    public function login(LoginRequest $request, LoginAccountService $loginAccountService): JsonResponse
-    {
+    public function login(
+        LoginRequest $request,
+        LoginAccountService $loginAccountService,
+        MergeGuestCartService $mergeGuestCartService,
+        GuestCartTokenService $guestCartTokenService,
+    ): JsonResponse {
+        $preLoginGuestToken = $guestCartTokenService->getRawTokenFromRequest();
         $account = $loginAccountService->login($request->validated(), $request->ip());
+        $mergeGuestCartService->mergeGuestCartAfterLogin($preLoginGuestToken, $account);
 
         return (new AccountResource($account))->response();
     }

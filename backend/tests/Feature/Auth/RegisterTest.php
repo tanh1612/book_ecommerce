@@ -3,6 +3,11 @@
 use App\Enums\Account\AccountRole;
 use App\Mail\RegistrationOtpMail;
 use App\Models\Account;
+use App\Models\Book;
+use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\Inventory;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -139,4 +144,83 @@ test('register requires register_token', function () {
     ]);
 
     $response->assertUnprocessable()->assertJsonValidationErrors('register_token');
+});
+
+test('guest cart attaches to new account on register', function () {
+    Mail::fake();
+
+    $email = 'customer@example.com';
+    $book = Book::factory()->create();
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'warehouse_id' => Warehouse::factory(),
+        'quantity' => 10,
+        'reserved_quantity' => 0,
+    ]);
+
+    $this->getJson('/api/v1/cart')->assertOk();
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated();
+    $itemId = CartItem::query()->firstOrFail()->id;
+    $this->patchJson("/api/v1/cart/items/{$itemId}", ['selected' => false])->assertOk();
+
+    $this->postJson('/api/v1/auth/register/send-otp', ['email' => $email])->assertOk();
+    $otp = Mail::queued(RegistrationOtpMail::class)->first()->otp;
+    $token = $this->postJson('/api/v1/auth/register/verify-otp', [
+        'email' => $email,
+        'otp' => $otp,
+    ])->json('register_token');
+
+    $this->postJson('/api/v1/auth/register', [
+        'email' => $email,
+        'password' => 'password',
+        'register_token' => $token,
+    ])->assertCreated();
+
+    $account = Account::query()->where('email', $email)->firstOrFail();
+    $cart = Cart::query()->where('account_id', $account->id)->firstOrFail();
+    expect($cart->guest_token_hash)->toBeNull();
+
+    $item = CartItem::query()->where('cart_id', $cart->id)->firstOrFail();
+    expect($item->quantity)->toBe(2)
+        ->and($item->selected)->toBeFalse();
+});
+
+test('failed register does not reassign guest cart', function () {
+    Mail::fake();
+
+    $email = 'customer@example.com';
+    $book = Book::factory()->create();
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'warehouse_id' => Warehouse::factory(),
+        'quantity' => 10,
+        'reserved_quantity' => 0,
+    ]);
+
+    $this->getJson('/api/v1/cart')->assertOk();
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 1,
+    ])->assertCreated();
+
+    $guestCart = Cart::query()->firstOrFail();
+    expect($guestCart->account_id)->toBeNull();
+
+    $this->postJson('/api/v1/auth/register/send-otp', ['email' => $email])->assertOk();
+    $otp = Mail::queued(RegistrationOtpMail::class)->first()->otp;
+    $this->postJson('/api/v1/auth/register/verify-otp', [
+        'email' => $email,
+        'otp' => $otp,
+    ])->assertOk();
+
+    $this->postJson('/api/v1/auth/register', [
+        'email' => $email,
+        'password' => 'password',
+        'register_token' => Str::random(60),
+    ])->assertUnprocessable();
+
+    expect(Cart::query()->find($guestCart->id)?->account_id)->toBeNull();
 });

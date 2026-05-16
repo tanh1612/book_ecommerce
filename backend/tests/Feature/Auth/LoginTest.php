@@ -2,6 +2,11 @@
 
 use App\Enums\Account\AccountRole;
 use App\Models\Account;
+use App\Models\Book;
+use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\Inventory;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -207,4 +212,106 @@ test('login validates remember type', function (): void {
     $response
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['remember']);
+});
+
+test('guest cart merges into member cart after login', function (): void {
+    $account = Account::factory()->create([
+        'email' => 'member@example.com',
+    ]);
+
+    $book = Book::factory()->create();
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'warehouse_id' => Warehouse::factory(),
+        'quantity' => 10,
+        'reserved_quantity' => 0,
+    ]);
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated();
+
+    $this->postJson('/api/v1/auth/login', [
+        'email' => 'member@example.com',
+        'password' => 'password',
+    ])->assertOk();
+
+    $this->getJson('/api/v1/cart')
+        ->assertOk()
+        ->assertJsonPath('data.total_quantity', 2);
+
+    $cart = Cart::query()->where('account_id', $account->id)->firstOrFail();
+    expect($cart->guest_token_hash)->toBeNull()
+        ->and(CartItem::query()->where('cart_id', $cart->id)->count())->toBe(1);
+});
+
+test('login merges duplicate book quantities from guest cart', function (): void {
+    $account = Account::factory()->create([
+        'email' => 'member@example.com',
+    ]);
+
+    $book = Book::factory()->create();
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'warehouse_id' => Warehouse::factory(),
+        'quantity' => 10,
+        'reserved_quantity' => 0,
+    ]);
+
+    $memberCart = Cart::query()->create([
+        'account_id' => $account->id,
+        'guest_token_hash' => null,
+        'guest_token_expires_at' => null,
+    ]);
+    CartItem::query()->create([
+        'cart_id' => $memberCart->id,
+        'book_id' => $book->id,
+        'quantity' => 1,
+        'selected' => true,
+    ]);
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated();
+
+    $this->postJson('/api/v1/auth/login', [
+        'email' => 'member@example.com',
+        'password' => 'password',
+    ])->assertOk();
+
+    $this->getJson('/api/v1/cart')
+        ->assertOk()
+        ->assertJsonPath('data.total_quantity', 3);
+
+    expect(CartItem::query()->where('cart_id', $memberCart->id)->count())->toBe(1);
+});
+
+test('failed login does not merge guest cart', function (): void {
+    Account::factory()->create([
+        'email' => 'member@example.com',
+    ]);
+
+    $book = Book::factory()->create();
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'warehouse_id' => Warehouse::factory(),
+        'quantity' => 10,
+        'reserved_quantity' => 0,
+    ]);
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated();
+
+    $guestTokenHash = Cart::query()->firstOrFail()->guest_token_hash;
+
+    $this->postJson('/api/v1/auth/login', [
+        'email' => 'member@example.com',
+        'password' => 'wrong-password',
+    ])->assertUnprocessable();
+
+    expect(Cart::query()->where('guest_token_hash', $guestTokenHash)->exists())->toBeTrue();
 });

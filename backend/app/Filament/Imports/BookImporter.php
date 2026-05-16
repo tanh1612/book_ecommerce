@@ -95,17 +95,17 @@ class BookImporter extends Importer
                 ->fillRecordUsing(fn () => null),
 
             ImportColumn::make('authors')
-                ->label('Tác giả (Cách nhau dấu |)')
+                ->label('Tác giả (Cách nhau dấu phẩy)')
                 ->rules(['nullable'])
                 ->exampleHeader('authors')
-                ->examples(['Nguyễn Văn Huyên | Trần Đại Nghĩa'])
+                ->examples(['Nguyễn Văn Huyên, Trần Đại Nghĩa'])
                 ->fillRecordUsing(fn () => null),
 
             ImportColumn::make('categories')
-                ->label('Danh mục (Breadcrumb cách nhau dấu |)')
+                ->label('Danh mục (Nhiều breadcrumb cách nhau dấu phẩy)')
                 ->rules(['nullable'])
                 ->exampleHeader('categories')
-                ->examples(['Sách tiếng Việt > Tiểu sử - Hồi ký | Sách tiếng Việt > Khoa Học'])
+                ->examples(['Sách tiếng Việt > Tiểu sử - Hồi ký, Sách tiếng Việt > Khoa Học'])
                 ->fillRecordUsing(fn () => null),
 
             ImportColumn::make('description')
@@ -204,7 +204,7 @@ class BookImporter extends Importer
         }
 
         if (filled($this->data['authors'] ?? null)) {
-            $names = array_values(array_unique(array_filter(array_map('trim', explode('|', $this->data['authors'])))));
+            $names = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->data['authors'])))));
             foreach ($names as $name) {
                 $matches = Author::where('name', $name)->get();
                 if ($matches->isEmpty()) {
@@ -218,7 +218,7 @@ class BookImporter extends Importer
         }
 
         if (filled($this->data['categories'] ?? null)) {
-            $breadcrumbs = array_values(array_unique(array_filter(array_map('trim', explode('|', $this->data['categories'])))));
+            $breadcrumbs = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->data['categories'])))));
             $map = $this->breadcrumbToCategoryIdMap();
             foreach ($breadcrumbs as $breadcrumb) {
                 if (! isset($map[$breadcrumb])) {

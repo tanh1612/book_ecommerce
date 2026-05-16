@@ -201,12 +201,13 @@ DROP TABLE IF EXISTS `carts`;
 CREATE TABLE `carts` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `account_id` bigint unsigned DEFAULT NULL,
-  `session_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `guest_token_hash` char(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `guest_token_expires_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `carts_account_id_unique` (`account_id`),
-  UNIQUE KEY `carts_session_id_unique` (`session_id`),
+  UNIQUE KEY `carts_guest_token_hash_unique` (`guest_token_hash`),
   CONSTRAINT `carts_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

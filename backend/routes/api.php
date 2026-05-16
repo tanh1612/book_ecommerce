@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Account\PasswordController;
 use App\Http\Controllers\Api\V1\Account\ProfileController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
+use App\Http\Controllers\Api\V1\Cart\CartController;
 use App\Http\Controllers\Api\V1\Catalog\BookController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
 use Illuminate\Support\Facades\Route;
@@ -19,7 +20,8 @@ Route::prefix('v1/auth')->group(function (): void {
     Route::post('register/verify-otp', [AuthController::class, 'verifyOtp']);
 
     // Register
-    Route::post('register', [AuthController::class, 'register']);
+    Route::post('register', [AuthController::class, 'register'])
+        ->middleware('web');
 
     // Forgot password
     Route::post('password/forgot/send-otp', [ForgotPasswordController::class, 'sendOtp'])
@@ -58,6 +60,21 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
 
     // Get book
     Route::get('{slug}', [BookController::class, 'show']);
+});
+
+// Cart (HttpOnly guest cart token cookie for guests; Sanctum session for members)
+Route::prefix('v1/cart')->middleware(['web', 'throttle:120,1'])->group(function (): void {
+    // Get cart
+    Route::get('', [CartController::class, 'show']);
+
+    // Add item to cart
+    Route::post('items', [CartController::class, 'addItem']);
+
+    // Update item in cart
+    Route::patch('items/{cartItem}', [CartController::class, 'updateItem']);
+
+    // Remove item from cart
+    Route::delete('items/{cartItem}', [CartController::class, 'removeItem']);
 });
 
 // Account routes

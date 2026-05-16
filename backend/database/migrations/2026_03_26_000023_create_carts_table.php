@@ -11,7 +11,8 @@ return new class extends Migration
         Schema::create('carts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('account_id')->nullable()->unique()->constrained('accounts')->cascadeOnDelete();
-            $table->string('session_id')->unique()->nullable();
+            $table->string('guest_token_hash', 64)->unique()->nullable();
+            $table->timestamp('guest_token_expires_at')->nullable();
             $table->timestamps();
         });
     }
