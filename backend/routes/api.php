@@ -39,7 +39,7 @@ Route::prefix('v1/auth')->group(function (): void {
         ->middleware(['web', 'auth:sanctum']);
 });
 
-// Public location proxy (cached upstream administrative data)
+// Public location proxy
 Route::prefix('v1/locations')->middleware('throttle:120,1')->group(function (): void {
     // Get provinces
     Route::get('provinces', [LocationController::class, 'provinces']);

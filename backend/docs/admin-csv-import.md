@@ -17,5 +17,5 @@
 
 ## Xem lỗi sau import
 
-- Vào **Hệ thống → Lịch sử nhập CSV**, mở một phiên import → tab **Dòng lỗi** (payload JSON + `validation_error`).
-- Filament cũng gửi **database notification** khi import xong; nếu có dòng lỗi, thông báo dùng màu cảnh báo.
+- Filament gửi **database notification** khi import xong; nếu có dòng lỗi, thông báo dùng màu cảnh báo (và thường có hành động tải CSV dòng lỗi nếu cấu hình mặc định).
+- Chi tiết từng dòng lỗi vẫn được lưu trong bảng `failed_import_rows` (có thể tra cứu qua DB / công cụ nội bộ nếu cần).

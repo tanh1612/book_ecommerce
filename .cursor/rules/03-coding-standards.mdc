@@ -47,3 +47,7 @@ try {
 
 - Reply in **Vietnamese**, objective and direct, no fluff or filler praise.
 - Always present a plan first and wait for approval before executing non-trivial changes.
+- When code changes require runtime configuration, environment variables, services, or local setup to work correctly, explicitly remind the user in the final response:
+  - Which files or settings need updating, e.g. `.env`, `config/*.php`, Docker/Redis/MySQL/service settings.
+  - Exact variable names or config keys, expected example values, and whether `php artisan config:clear` / cache clear / service restart is needed.
+  - What breaks or behaves differently if the configuration is not updated.
