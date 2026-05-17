@@ -178,6 +178,28 @@ class CartService
         }
     }
 
+    public function updateItemsSelection(bool $selected): Cart
+    {
+        try {
+            return DB::transaction(function () use ($selected): Cart {
+                $cart = Cart::query()->whereKey($this->getCurrentCart()->id)->lockForUpdate()->firstOrFail();
+
+                CartItem::query()
+                    ->where('cart_id', $cart->id)
+                    ->update(['selected' => $selected]);
+
+                return $cart;
+            });
+        } catch (Throwable $e) {
+            Log::error('Update cart items selection failed', [
+                'selected' => $selected,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
     public function removeItem(CartItem $cartItem): Cart
     {
         try {

@@ -70,6 +70,9 @@ Route::prefix('v1/cart')->middleware(['web', 'throttle:120,1'])->group(function 
     // Add item to cart
     Route::post('items', [CartController::class, 'addItem']);
 
+    // Select or deselect all cart items
+    Route::patch('items/selection', [CartController::class, 'updateItemsSelection']);
+
     // Update item in cart
     Route::patch('items/{cartItem}', [CartController::class, 'updateItem']);
 

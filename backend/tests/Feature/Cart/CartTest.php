@@ -153,3 +153,74 @@ test('cannot update cart item belonging to another guest token', function (): vo
     $this->patchJson("/api/v1/cart/items/{$itemId}", ['quantity' => 2])
         ->assertNotFound();
 });
+
+test('guest can select all cart items in one request', function (): void {
+    $bookA = createBookWithAvailableStock(5);
+    $bookB = createBookWithAvailableStock(5);
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $bookA->id,
+        'quantity' => 1,
+    ])->assertCreated();
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $bookB->id,
+        'quantity' => 2,
+    ])->assertCreated();
+
+    $itemIds = CartItem::query()->orderBy('id')->pluck('id');
+
+    foreach ($itemIds as $itemId) {
+        $this->patchJson("/api/v1/cart/items/{$itemId}", ['selected' => false])->assertOk();
+    }
+
+    $this->patchJson('/api/v1/cart/items/selection', ['selected' => true])
+        ->assertOk()
+        ->assertJsonPath('data.selected_quantity', 3)
+        ->assertJsonPath('data.selected_subtotal', 300_000.0);
+
+    expect(CartItem::query()->where('selected', false)->count())->toBe(0);
+});
+
+test('guest can deselect all cart items in one request', function (): void {
+    $bookA = createBookWithAvailableStock(5);
+    $bookB = createBookWithAvailableStock(5);
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $bookA->id,
+        'quantity' => 1,
+    ])->assertCreated();
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $bookB->id,
+        'quantity' => 1,
+    ])->assertCreated();
+
+    $this->patchJson('/api/v1/cart/items/selection', ['selected' => false])
+        ->assertOk()
+        ->assertJsonPath('data.selected_quantity', 0)
+        ->assertJsonPath('data.selected_subtotal', 0.0);
+
+    expect(CartItem::query()->where('selected', true)->count())->toBe(0);
+});
+
+test('bulk cart selection requires selected boolean', function (): void {
+    $this->getJson('/api/v1/cart')->assertOk();
+
+    $this->patchJson('/api/v1/cart/items/selection', [])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('selected');
+
+    $this->patchJson('/api/v1/cart/items/selection', ['selected' => 'not-a-boolean'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('selected');
+});
+
+test('guest can bulk update selection on empty cart', function (): void {
+    $this->getJson('/api/v1/cart')->assertOk();
+
+    $this->patchJson('/api/v1/cart/items/selection', ['selected' => false])
+        ->assertOk()
+        ->assertJsonPath('data.items', [])
+        ->assertJsonPath('data.selected_quantity', 0);
+});

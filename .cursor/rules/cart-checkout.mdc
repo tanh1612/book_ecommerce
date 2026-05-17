@@ -7,19 +7,19 @@ alwaysApply: false
 
 ## Cart Storage
 
-- **Guest cart**: keyed by `session_id` in `cart_items` (column `session_id` nullable, `account_id` nullable).
-- **Member cart**: keyed by `account_id`.
+- **Guest cart**: bảng `carts` với `guest_token_hash` (SHA-256 của token opaque) + `guest_token_expires_at`. Token thô nằm trong **cookie HttpOnly** do API cấp; **không** lưu token thô trong DB và **không** dùng `session_id` Laravel làm owner giỏ.
+- **Member cart**: bảng `carts` với `account_id` (unique), `guest_token_hash` / `guest_token_expires_at` = NULL.
+- **Dòng giỏ**: bảng `cart_items` — `cart_id`, `book_id`, `quantity`, `selected` (unique `cart_id` + `book_id`). Không có cột `session_id` hay `account_id` trên `cart_items`.
 
-## Login Sync (CRITICAL)
+## Login / Register Sync (CRITICAL)
 
-When a guest logs in, the backend MUST merge the session cart into the member cart:
+Khi guest đăng ký hoặc đăng nhập, backend **merge** giỏ guest (theo cookie token) sang giỏ member:
 
-1. Trigger from the login controller or an event listener (`Login` event).
-2. For each row `cart_items.session_id = X`:
-   - If the same `book_id` already exists for the member → **sum quantities** (cộng dồn).
-   - Else → reassign `account_id = Y`, set `session_id = NULL`.
-3. Delete leftover session-only rows.
-4. Wrap the whole merge in a single DB transaction.
+1. Trigger từ luồng `register` / `login` sau khi tạo session đăng nhập (nếu có).
+2. Resolve guest cart: `carts.guest_token_hash = SHA256(raw_cookie_token)`.
+3. Nếu member **chưa** có `carts` theo `account_id`: gán `carts.account_id`, xóa `guest_token_*`, xóa cookie guest.
+4. Nếu member **đã** có cart: với mỗi `cart_items` của guest cart — cùng `book_id` với member → **cộng dồn** `quantity`, gộp `selected` (OR); khác `book_id` → chuyển dòng sang `cart_id` của member; xóa guest cart; xóa cookie guest.
+5. Toàn bộ merge trong **một transaction** (lock guest + member cart khi cần).
 
 ## Checkout Flow
 
@@ -27,7 +27,7 @@ When a guest logs in, the backend MUST merge the session cart into the member ca
 2. Compute totals: subtotal + shipping fee (from `shipping_rates` by province) + applied promotions.
 3. Create the `Order` row and `OrderItem` rows with a **price snapshot** — do not reference live `books.selling_price` later.
 4. Decrement inventory atomically.
-5. Clear cart rows for this user/session.
+5. Clear `cart_items` theo quy tắc checkout (thường các dòng `selected` đã thành order, hoặc toàn bộ giỏ member sau khi tạo order thành công).
 6. Dispatch order-confirmation notification.
 
 ## Payment

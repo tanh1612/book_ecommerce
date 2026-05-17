@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Cart;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cart\AddCartItemRequest;
 use App\Http\Requests\Cart\UpdateCartItemRequest;
+use App\Http\Requests\Cart\UpdateCartItemsSelectionRequest;
 use App\Http\Resources\CartResource;
 use App\Models\CartItem;
 use App\Services\Cart\CartService;
@@ -32,6 +33,14 @@ class CartController extends Controller
     {
         $validated = $request->validated();
         $cartService->updateItem($cartItem, $validated);
+
+        return new CartResource($cartService->getCurrentCartForApi());
+    }
+
+    public function updateItemsSelection(UpdateCartItemsSelectionRequest $request, CartService $cartService): CartResource
+    {
+        $validated = $request->validated();
+        $cartService->updateItemsSelection((bool) $validated['selected']);
 
         return new CartResource($cartService->getCurrentCartForApi());
     }

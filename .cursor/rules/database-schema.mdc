@@ -29,4 +29,4 @@ Verify against the dump: table name, column name, type, nullability, FK constrai
 
 ## Key Tables (Quick Reference)
 
-`accounts`, `addresses`, `user_profiles`, `books`, `book_details`, `book_images`, `book_authors`, `book_categories`, `authors`, `publishers`, `suppliers`, `categories`, `warehouses`, `inventories`, `promotions`, `cart_items`, `orders`, `order_items`, `shipping_methods`, `shipping_rates`, `reviews`, `failed_import_rows`, `personal_access_tokens`.
+`accounts`, `user_profiles`, `addresses`, `books`, `book_details`, `book_images`, `book_authors`, `book_categories`, `authors`, `publishers`, `suppliers`, `categories`, `warehouses`, `inventories`, `promotions`, `promotion_items`, `carts`, `cart_items`, `orders`, `order_items`, `order_timelines`, `shipping_methods`, `shipping_rates`, `reviews`, `notifications`, `imports`, `failed_import_rows`, `payment_transactions`, `personal_access_tokens`, plus infra tables (`sessions`, `cache`, `jobs`, …) như trong dump.
