@@ -7,11 +7,16 @@ use App\Filament\Resources\WarehouseResource\RelationManagers;
 use App\Models\Warehouse;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components as Layout;
 use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class WarehouseResource extends Resource
 {
@@ -80,8 +85,72 @@ class WarehouseResource extends Resource
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')->label('Trạng thái'),
             ])
-            ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])
-            ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);
+            ->actions([
+                Actions\EditAction::make(),
+                static::configureWarehouseDeleteAction(Actions\DeleteAction::make()),
+            ])
+            ->bulkActions([
+                Actions\BulkActionGroup::make([
+                    static::configureWarehouseDeleteBulkAction(Actions\DeleteBulkAction::make()),
+                ]),
+            ]);
+    }
+
+    public static function configureWarehouseDeleteAction(Actions\DeleteAction $action): Actions\DeleteAction
+    {
+        return $action
+            ->before(function (Warehouse $record): void {
+                if ($record->inventories()->exists()) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Không thể xóa kho')
+                        ->body('Kho vẫn còn dòng tồn kho. Hãy xóa hoặc chuyển hết sản phẩm trong mục tồn kho của kho này trước.')
+                        ->send();
+
+                    throw (new Halt)->rollBackDatabaseTransaction(false);
+                }
+            })
+            ->failureNotification(null)
+            ->using(function (Warehouse $record): bool {
+                try {
+                    return (bool) $record->delete();
+                } catch (QueryException $e) {
+                    Log::error('Warehouse delete failed', [
+                        'warehouse_id' => $record->getKey(),
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    Notification::make()
+                        ->danger()
+                        ->title('Không thể xóa kho')
+                        ->body('Không xóa được do ràng buộc dữ liệu. Kiểm tra các bản ghi liên quan hoặc thử lại sau.')
+                        ->send();
+
+                    return false;
+                }
+            });
+    }
+
+    public static function configureWarehouseDeleteBulkAction(Actions\DeleteBulkAction $action): Actions\DeleteBulkAction
+    {
+        return $action
+            ->before(function (Collection $records): void {
+                $blocked = $records->filter(fn (mixed $record): bool => $record instanceof Warehouse && $record->inventories()->exists());
+
+                if ($blocked->isNotEmpty()) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Không thể xóa kho')
+                        ->body(
+                            $blocked->count() === $records->count()
+                                ? 'Các kho đã chọn vẫn còn tồn kho. Hãy xóa hoặc chuyển hết tồn trước.'
+                                : sprintf('Có %d kho trong số đã chọn vẫn còn tồn kho.', $blocked->count())
+                        )
+                        ->send();
+
+                    throw (new Halt)->rollBackDatabaseTransaction(false);
+                }
+            });
     }
 
     public static function getRelations(): array

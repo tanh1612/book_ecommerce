@@ -18,7 +18,7 @@ class InventoryFactory extends Factory
     {
         return [
             'book_id' => Book::factory(),
-            'warehouse_id' => Warehouse::factory(),
+            'warehouse_id' => fn (): int => (int) (Warehouse::query()->value('id') ?? Warehouse::factory()->create()->id),
             'quantity' => fake()->numberBetween(0, 100),
             'sold_quantity' => 0,
             'reserved_quantity' => 0,

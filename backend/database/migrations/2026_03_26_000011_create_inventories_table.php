@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('location_code', 50);
             $table->timestamp('last_restocked_at')->nullable();
 
-            $table->unique(['book_id', 'warehouse_id']);
+            $table->unique('book_id');
         });
     }
 

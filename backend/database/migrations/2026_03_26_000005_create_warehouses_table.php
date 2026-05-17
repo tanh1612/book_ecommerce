@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('address', 500);
             $table->boolean('is_active')->default(true);
+            $table->unsignedTinyInteger('singleton_key')->default(1)->unique();
             $table->timestamp('created_at')->nullable();
         });
     }

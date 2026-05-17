@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS `books` (
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `sku` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-`thumbnail` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+`thumbnail` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
 `original_price` decimal(10,2) NOT NULL,
 `selling_price` decimal(10,2) NOT NULL,
 `review_count` int unsigned NOT NULL DEFAULT '0',
@@ -91,7 +91,7 @@ KEY `books_average_rating_index` (`average_rating`),
 KEY `books_created_at_index` (`created_at`),
 CONSTRAINT `books_publisher_id_foreign` FOREIGN KEY (`publisher_id`) REFERENCES `publishers` (`id`) ON DELETE SET NULL,
 CONSTRAINT `books_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -141,13 +141,13 @@ CREATE TABLE IF NOT EXISTS `book_images` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `book_id` bigint unsigned NOT NULL,
 `public_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-`image_url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+`image_url` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 `sort_order` int unsigned NOT NULL DEFAULT '0',
 `created_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 KEY `book_images_book_id_foreign` (`book_id`),
 CONSTRAINT `book_images_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -203,7 +203,7 @@ UNIQUE KEY `cart_items_cart_id_book_id_unique` (`cart_id`,`book_id`),
 KEY `cart_items_book_id_foreign` (`book_id`),
 CONSTRAINT `cart_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
 CONSTRAINT `cart_items_cart_id_foreign` FOREIGN KEY (`cart_id`) REFERENCES `carts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -286,12 +286,12 @@ CREATE TABLE IF NOT EXISTS `inventories` (
 `location_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
 `last_restocked_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
-UNIQUE KEY `inventories_book_id_warehouse_id_unique` (`book_id`,`warehouse_id`),
+UNIQUE KEY `inventories_book_id_unique` (`book_id`) USING BTREE,
 KEY `inventories_warehouse_id_foreign` (`warehouse_id`),
 CONSTRAINT `inventories_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
 CONSTRAINT `inventories_warehouse_id_foreign` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`) ON DELETE RESTRICT,
 CONSTRAINT `inventories_reserved_within_quantity_check` CHECK ((`reserved_quantity` <= `quantity`))
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -576,7 +576,7 @@ CREATE TABLE IF NOT EXISTS `shipping_methods` (
 `created_at` timestamp NULL DEFAULT NULL,
 `updated_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -592,7 +592,7 @@ PRIMARY KEY (`id`),
 KEY `shipping_rates_shipping_method_id_foreign` (`shipping_method_id`),
 KEY `shipping_rates_province_code_index` (`province_code`),
 CONSTRAINT `shipping_rates_shipping_method_id_foreign` FOREIGN KEY (`shipping_method_id`) REFERENCES `shipping_methods` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -634,10 +634,11 @@ CREATE TABLE IF NOT EXISTS `warehouses` (
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `address` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
 `is_active` tinyint(1) NOT NULL DEFAULT '1',
+`singleton_key` tinyint unsigned NOT NULL DEFAULT '1' COMMENT 'Single-warehouse guard: unique constant value',
 `created_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
-KEY `warehouses_is_active_index` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+UNIQUE KEY `warehouses_singleton_key_unique` (`singleton_key`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ShippingMethodResource\Pages;
+use App\Filament\Resources\ShippingMethodResource\RelationManagers;
 use App\Models\ShippingMethod;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
@@ -70,6 +71,13 @@ class ShippingMethodResource extends Resource
             ])
             ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])
             ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\RatesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

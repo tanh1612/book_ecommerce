@@ -26,39 +26,29 @@ final class InventoryFilamentRules
         };
     }
 
-    public static function uniqueBookWarehouseForResource(Get $get, ?Model $record): \Illuminate\Validation\Rules\Unique
+    public static function uniqueBookIdForInventory(?Model $record): \Illuminate\Validation\Rules\Unique
     {
         $ignoreId = $record instanceof Inventory ? $record->getKey() : null;
 
-        return Rule::unique('inventories', 'warehouse_id')
-            ->where('book_id', $get('book_id'))
-            ->ignore($ignoreId);
+        return Rule::unique('inventories', 'book_id')->ignore($ignoreId);
     }
 
-    public static function uniqueWarehouseBookForResource(Get $get, ?Model $record): \Illuminate\Validation\Rules\Unique
+    /**
+     * RelationManager on Book: book_id is implicit; block a second inventory row for the same book.
+     *
+     * @return \Closure(string, mixed, \Closure): void
+     */
+    public static function assertOwnerBookHasAtMostOneInventoryRelation(RelationManager $livewire, ?Model $record): \Closure
     {
-        $ignoreId = $record instanceof Inventory ? $record->getKey() : null;
-
-        return Rule::unique('inventories', 'book_id')
-            ->where('warehouse_id', $get('warehouse_id'))
-            ->ignore($ignoreId);
-    }
-
-    public static function uniqueWarehouseForBookRelation(Get $get, RelationManager $livewire, ?Model $record): \Illuminate\Validation\Rules\Unique
-    {
-        $ignoreId = $record instanceof Inventory ? $record->getKey() : null;
-
-        return Rule::unique('inventories', 'warehouse_id')
-            ->where('book_id', $livewire->ownerRecord->getKey())
-            ->ignore($ignoreId);
-    }
-
-    public static function uniqueBookForWarehouseRelation(Get $get, RelationManager $livewire, ?Model $record): \Illuminate\Validation\Rules\Unique
-    {
-        $ignoreId = $record instanceof Inventory ? $record->getKey() : null;
-
-        return Rule::unique('inventories', 'book_id')
-            ->where('warehouse_id', $livewire->ownerRecord->getKey())
-            ->ignore($ignoreId);
+        return function (string $attribute, mixed $value, \Closure $fail) use ($livewire, $record): void {
+            $bookId = (int) $livewire->ownerRecord->getKey();
+            $query = Inventory::query()->where('book_id', $bookId);
+            if ($record instanceof Inventory) {
+                $query->whereKeyNot($record->getKey());
+            }
+            if ($query->exists()) {
+                $fail('Cuốn sách này đã có dòng tồn kho; mỗi sách chỉ được một dòng.');
+            }
+        };
     }
 }

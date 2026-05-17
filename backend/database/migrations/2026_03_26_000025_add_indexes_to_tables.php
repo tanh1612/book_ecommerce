@@ -21,11 +21,6 @@ return new class extends Migration
             $table->index('is_active');
         });
 
-        // Warehouses - filter active warehouses
-        Schema::table('warehouses', function (Blueprint $table) {
-            $table->index('is_active');
-        });
-
         // Orders - filter/search theo status, thời gian
         Schema::table('orders', function (Blueprint $table) {
             $table->index('current_status');
@@ -72,10 +67,6 @@ return new class extends Migration
         });
 
         Schema::table('categories', function (Blueprint $table) {
-            $table->dropIndex(['is_active']);
-        });
-
-        Schema::table('warehouses', function (Blueprint $table) {
             $table->dropIndex(['is_active']);
         });
 

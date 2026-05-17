@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InventoryResource\Pages;
-use App\Filament\Support\InventoryFilamentLabels;
 use App\Filament\Support\InventoryFilamentRules;
 use App\Models\Inventory;
 use Filament\Actions;
@@ -47,58 +46,62 @@ class InventoryResource extends Resource
                         ->columnSpanFull()
                         ->components([
                             Field\Select::make('book_id')
-                                ->label(InventoryFilamentLabels::attribute('book_id'))
+                                ->label('Sách')
                                 ->relationship('book', 'name', fn (Builder $query) => $query->where('is_active', true))
                                 ->searchable()
                                 ->preload()
                                 ->required()
-                                ->rule(fn (Get $get, ?Inventory $record) => InventoryFilamentRules::uniqueWarehouseBookForResource($get, $record))
+                                ->rule(fn (Get $get, ?Inventory $record) => InventoryFilamentRules::uniqueBookIdForInventory($record))
                                 ->columnSpan(['default' => 'full', 'lg' => 6]),
                             Field\Select::make('warehouse_id')
-                                ->label(InventoryFilamentLabels::attribute('warehouse_id'))
+                                ->label('Kho')
                                 ->relationship('warehouse', 'name', fn (Builder $query) => $query->where('is_active', true))
                                 ->searchable()
                                 ->preload()
                                 ->required()
-                                ->rule(fn (Get $get, ?Inventory $record) => InventoryFilamentRules::uniqueBookWarehouseForResource($get, $record))
                                 ->columnSpan(['default' => 'full', 'lg' => 6]),
                         ]),
                     Layout\Grid::make(3)
                         ->columnSpanFull()
                         ->components([
                             Field\TextInput::make('quantity')
-                                ->label(InventoryFilamentLabels::attribute('quantity'))
+                                ->label('Số lượng tồn')
                                 ->numeric()
                                 ->minValue(0)
                                 ->default(0)
-                                ->required()
-                                ->rules(['integer']),
+                                ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
+                                ->rules(['integer', 'min:0'])
+                                ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state))),
                             Field\TextInput::make('sold_quantity')
-                                ->label(InventoryFilamentLabels::attribute('sold_quantity'))
+                                ->label('Đã bán')
                                 ->numeric()
                                 ->minValue(0)
                                 ->default(0)
-                                ->required()
-                                ->rules(['integer']),
+                                ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
+                                ->rules(['integer', 'min:0'])
+                                ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state))),
                             Field\TextInput::make('reserved_quantity')
-                                ->label(InventoryFilamentLabels::attribute('reserved_quantity'))
+                                ->label('Đang giữ')
                                 ->numeric()
                                 ->minValue(0)
                                 ->default(0)
-                                ->required()
-                                ->rules(['integer'])
+                                ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
+                                ->rules(['integer', 'min:0'])
+                                ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state)))
                                 ->rule(InventoryFilamentRules::reservedQuantityLteOnHand()),
                         ]),
                     Layout\Grid::make(12)
                         ->columnSpanFull()
                         ->components([
                             Field\TextInput::make('location_code')
-                                ->label(InventoryFilamentLabels::attribute('location_code'))
-                                ->required()
+                                ->label('Mã vị trí')
                                 ->maxLength(50)
+                                ->mutateStateForValidationUsing(fn (mixed $state): string => $state === null ? '' : trim((string) $state))
+                                ->rules(['string', 'max:50'])
+                                ->dehydrateStateUsing(fn (mixed $state): string => $state === null ? '' : trim((string) $state))
                                 ->columnSpan(['default' => 'full', 'lg' => 6]),
                             Field\DateTimePicker::make('last_restocked_at')
-                                ->label(InventoryFilamentLabels::attribute('last_restocked_at'))
+                                ->label('Nhập kho gần nhất')
                                 ->seconds(false)
                                 ->columnSpan(['default' => 'full', 'lg' => 6]),
                         ]),
@@ -111,23 +114,23 @@ class InventoryResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('book.name')
-                    ->label(InventoryFilamentLabels::attribute('book'))
+                    ->label('Sách')
                     ->searchable()
                     ->sortable()
                     ->limit(40),
                 Tables\Columns\TextColumn::make('warehouse.name')
-                    ->label(InventoryFilamentLabels::attribute('warehouse'))
+                    ->label('Kho')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('quantity')
-                    ->label(InventoryFilamentLabels::attribute('quantity'))
+                    ->label('Số lượng tồn')
                     ->sortable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('reserved_quantity')
-                    ->label(InventoryFilamentLabels::attribute('reserved_quantity'))
+                    ->label('Đang giữ')
                     ->sortable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('available_stock')
-                    ->label(InventoryFilamentLabels::attribute('available_stock'))
+                    ->label('Có thể bán')
                     ->sortable(true, function (Builder $query, string $direction): Builder {
                         $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
 
@@ -139,31 +142,31 @@ class InventoryResource extends Resource
                         default => 'success',
                     }),
                 Tables\Columns\TextColumn::make('sold_quantity')
-                    ->label(InventoryFilamentLabels::attribute('sold_quantity'))
+                    ->label('Đã bán')
                     ->sortable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('location_code')
-                    ->label(InventoryFilamentLabels::attribute('location_code'))
+                    ->label('Mã vị trí')
                     ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('last_restocked_at')
-                    ->label(InventoryFilamentLabels::attribute('last_restocked_at'))
+                    ->label('Nhập kho gần nhất')
                     ->dateTime('d/m/Y H:i')
                     ->toggleable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('warehouse_id')
-                    ->label(InventoryFilamentLabels::attribute('warehouse_id'))
+                    ->label('Kho')
                     ->relationship('warehouse', 'name')
                     ->searchable()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('book_id')
-                    ->label(InventoryFilamentLabels::attribute('book_id'))
+                    ->label('Sách')
                     ->relationship('book', 'name')
                     ->searchable()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('stock_status')
-                    ->label(InventoryFilamentLabels::attribute('stock_status'))
+                    ->label('Trạng thái tồn')
                     ->options([
                         'in_stock' => 'Còn hàng',
                         'out_of_stock' => 'Hết hàng',
