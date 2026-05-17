@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\Publisher;
 use App\Models\Supplier;
 use App\Traits\GeneratesUniqueSlug;
+use App\Services\Media\BookImageStorageService;
 use Filament\Actions\Imports\Exceptions\RowImportFailedException;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
@@ -16,6 +17,7 @@ use Filament\Actions\Imports\Models\Import;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class BookImporter extends Importer
@@ -256,24 +258,26 @@ class BookImporter extends Importer
 
         if (filled($this->data['thumbnail_url'] ?? null)) {
             try {
-                $slug = $this->record->slug;
                 $urls = preg_split('/\s+/', trim((string) $this->data['thumbnail_url']));
+                $storage = app(BookImageStorageService::class);
 
                 foreach ($urls as $index => $url) {
                     if (blank($url)) {
                         continue;
                     }
 
-                    $filename = "{$slug}-".now()->valueOf()."-{$index}";
+                    $publicId = $storage->newBookImagePublicId((string) $this->record->slug);
+                    $options = $storage->cloudinaryUploadOptionsForImageAtPath($publicId);
 
-                    \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload($url, [
-                        'folder' => "books/{$slug}",
-                        'public_id' => $filename,
-                        'resource_type' => 'image',
-                    ]);
+                    $response = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload($url, $options);
+
+                    $returnedPublicId = $response['public_id'] ?? null;
+                    if (blank($returnedPublicId)) {
+                        throw new RowImportFailedException('Cloudinary không trả về public_id sau khi upload.');
+                    }
 
                     $this->record->images()->create([
-                        'public_id' => "books/{$slug}/{$filename}.jpg",
+                        'public_id' => (string) $returnedPublicId,
                         'sort_order' => $index + 1,
                     ]);
                 }

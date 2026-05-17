@@ -5,14 +5,17 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BookResource\Pages;
 use App\Filament\Resources\BookResource\RelationManagers;
 use App\Models\Book;
+use App\Services\Media\BookImageStorageService;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components as Layout;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class BookResource extends Resource
 {
@@ -216,16 +219,28 @@ class BookResource extends Resource
                 Layout\Tabs\Tab::make('Hình ảnh')->components([
                     Field\Repeater::make('images')
                         ->relationship('images')
+                        ->orderColumn('sort_order')
                         ->schema([
                             Field\FileUpload::make('public_id')
                                 ->label('Ảnh')
                                 ->disk('cloudinary')
-                                ->directory(fn (\Filament\Schemas\Components\Utilities\Get $get) => 'books/'.($get('../../slug') ?? 'book'))
+                                ->directory(function (Get $get): string {
+                                    $slug = (string) ($get('../../slug') ?? 'book');
+
+                                    return app(BookImageStorageService::class)->bookImagesFolderForSlug($slug);
+                                })
+                                ->getUploadedFileNameForStorageUsing(
+                                    function (TemporaryUploadedFile $file, Get $get): string {
+                                        $slug = (string) ($get('../../slug') ?? 'book');
+
+                                        return app(BookImageStorageService::class)
+                                            ->newBookImageBasename($slug);
+                                    },
+                                )
                                 ->image()
                                 ->imageEditor()
                                 ->fetchFileInformation(false)
                                 ->required(),
-                            Field\Hidden::make('sort_order'),
                         ])
                         ->grid(4)
                         ->reorderable(true)
@@ -243,7 +258,6 @@ class BookResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make('thumbnail')
                     ->label('Ảnh bìa')
-                    ->disk('cloudinary')
                     ->square(),
                 Tables\Columns\TextColumn::make('name')
                     ->label('Tên sách')

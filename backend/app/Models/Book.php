@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 
 class Book extends Model
 {
@@ -94,7 +95,25 @@ class Book extends Model
     protected function thumbnail(): Attribute
     {
         return Attribute::make(
-            get: fn (mixed $value) => $value ?? $this->images->sortBy('sort_order')->first()?->public_id,
+            get: function (?string $value): ?string {
+                if ($value !== null && $value !== '') {
+                    if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+                        return $value;
+                    }
+
+                    return Storage::disk('cloudinary')->url($value);
+                }
+
+                if (! $this->relationLoaded('images')) {
+                    return BookImage::query()
+                        ->where('book_id', $this->id)
+                        ->orderBy('sort_order')
+                        ->orderBy('id')
+                        ->value('image_url');
+                }
+
+                return $this->images->sortBy('sort_order')->first()?->image_url;
+            },
         );
     }
 }

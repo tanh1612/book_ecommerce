@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Services\Media\BookImageStorageService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class BookImage extends Model
 {
@@ -16,15 +16,16 @@ class BookImage extends Model
 
     protected static function booted()
     {
-        static::creating(function ($image) {
-            if (is_null($image->sort_order)) {
-                $image->sort_order = static::where('book_id', $image->book_id)->max('sort_order') + 1;
+        static::creating(function (BookImage $image): void {
+            if ($image->sort_order === null) {
+                $max = static::query()->where('book_id', $image->book_id)->max('sort_order');
+                $image->sort_order = ($max ?? 0) + 1;
             }
         });
 
-        static::saving(function ($image) {
-            if ($image->isDirty('public_id') && ! empty($image->public_id)) {
-                $image->image_url = Storage::disk('cloudinary')->url($image->public_id);
+        static::saving(function (BookImage $image): void {
+            if ($image->isDirty('public_id') && $image->public_id !== null && $image->public_id !== '') {
+                $image->image_url = app(BookImageStorageService::class)->deliveryUrlFromPublicId((string) $image->public_id);
             }
         });
     }

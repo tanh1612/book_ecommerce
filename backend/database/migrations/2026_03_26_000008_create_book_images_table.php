@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('book_id')->constrained('books')->cascadeOnDelete();
             $table->string('public_id');
-            $table->string('image_url');
+            $table->text('image_url');
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamp('created_at')->nullable();
         });

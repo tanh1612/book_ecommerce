@@ -35,7 +35,6 @@ class BooksRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\ImageColumn::make('thumbnail')
                     ->label('Ảnh bìa')
-                    ->disk('cloudinary')
                     ->square(),
                 Tables\Columns\TextColumn::make('name')
                     ->label('Tên sách')

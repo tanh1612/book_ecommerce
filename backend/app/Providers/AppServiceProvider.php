@@ -2,7 +2,13 @@
 
 namespace App\Providers;
 
+use App\Services\Media\BookImageStorageService;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use League\Flysystem\Config;
+use League\Flysystem\UnableToDeleteFile;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -30,9 +36,82 @@ class AppServiceProvider extends ServiceProvider
                 public function getUrl(string $path): string
                 {
                     $cloudName = explode('@', explode(':', env('CLOUDINARY_URL', ''))[2] ?? '')[1] ?? 'dlphkbwji';
-                    [$id, $type] = $this->prepareResource($path);
+                    $id = $this->extractPublicId($path);
 
                     return "https://res.cloudinary.com/{$cloudName}/image/upload/{$id}";
+                }
+
+                public function write(string $path, string $contents, Config $config): void
+                {
+                    $id = $this->extractPublicId($path);
+                    $options = app(BookImageStorageService::class)->cloudinaryUploadOptionsForImageAtPath($id);
+
+                    try {
+                        Cloudinary::uploadApi()->upload($contents, $options);
+                    } catch (Throwable $e) {
+                        Log::error('Cloudinary disk write failed', [
+                            'public_id' => $id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        throw $e;
+                    }
+                }
+
+                public function writeStream(string $path, $contents, Config $config): void
+                {
+                    $id = $this->extractPublicId($path);
+                    $options = app(BookImageStorageService::class)->cloudinaryUploadOptionsForImageAtPath($id);
+
+                    try {
+                        Cloudinary::uploadApi()->upload($contents, $options);
+                    } catch (Throwable $e) {
+                        Log::error('Cloudinary disk writeStream failed', [
+                            'public_id' => $id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        throw $e;
+                    }
+                }
+
+                public function delete(string $path): void
+                {
+                    $id = $this->extractPublicId($path);
+
+                    try {
+                        $result = Cloudinary::uploadApi()->destroy($id, ['resource_type' => 'image']);
+                        $status = $result['result'] ?? '';
+
+                        if ($status !== 'ok' && $status !== 'not found') {
+                            throw UnableToDeleteFile::atLocation($path, (string) ($result['error'] ?? $status));
+                        }
+                    } catch (Throwable $e) {
+                        Log::error('Cloudinary disk delete failed', [
+                            'public_id' => $id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        if ($e instanceof UnableToDeleteFile) {
+                            throw $e;
+                        }
+
+                        throw UnableToDeleteFile::atLocation($path, $e->getMessage(), $e);
+                    }
+                }
+
+                /**
+                 * Extract clean public_id (folder/name, no leading slash, no extension) from a storage path.
+                 */
+                private function extractPublicId(string $path): string
+                {
+                    $path = str_replace('\\', '/', $path);
+                    $info = pathinfo($path);
+
+                    $dirname = ($info['dirname'] !== '' && $info['dirname'] !== '.') ? $info['dirname'] : '';
+                    $id = $dirname !== '' ? $dirname.'/'.$info['filename'] : $info['filename'];
+
+                    return ltrim($id, '/');
                 }
             };
 
