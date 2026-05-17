@@ -5,12 +5,17 @@ namespace App\Observers;
 use App\Enums\Review\ReviewStatus;
 use App\Models\Book;
 use App\Models\Review;
+use App\Services\Catalog\CatalogCacheService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class ReviewObserver
 {
+    public function __construct(
+        private CatalogCacheService $catalogCache,
+    ) {}
+
     public function saved(Review $review): void
     {
         $this->recalculateForBookId((int) $review->book_id);
@@ -47,6 +52,8 @@ class ReviewObserver
                     'average_rating' => round((float) $stats->avg_rating, 2),
                 ]);
             });
+
+            $this->catalogCache->forgetBookById($bookId);
         } catch (Throwable $e) {
             Log::error('Failed to recalculate book rating aggregates', [
                 'book_id' => $bookId,

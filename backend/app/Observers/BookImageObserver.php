@@ -4,12 +4,14 @@ namespace App\Observers;
 
 use App\Models\Book;
 use App\Models\BookImage;
+use App\Services\Catalog\CatalogCacheService;
 use App\Services\Media\BookImageStorageService;
 
 class BookImageObserver
 {
     public function __construct(
         private BookImageStorageService $bookImageStorage,
+        private CatalogCacheService $catalogCache,
     ) {}
 
     /**
@@ -38,6 +40,7 @@ class BookImageObserver
     public function saved(BookImage $bookImage): void
     {
         $this->updateBookThumbnail($bookImage->book);
+        $this->catalogCache->forgetBookById((int) $bookImage->book_id);
     }
 
     /**
@@ -59,6 +62,7 @@ class BookImageObserver
 
         $this->bookImageStorage->normalizeSortOrdersForBook($book);
         $this->updateBookThumbnail($book);
+        $this->catalogCache->forgetBookById((int) $bookId);
     }
 
     /**

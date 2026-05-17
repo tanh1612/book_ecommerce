@@ -18,7 +18,16 @@ class LocationService
      */
     public function invalidateCaches(): int
     {
-        return (int) Cache::increment(self::CACHE_BUST_KEY);
+        try {
+            return (int) Cache::increment(self::CACHE_BUST_KEY);
+        } catch (Throwable $e) {
+            Log::warning('locations:cache_bust increment failed', [
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            return 0;
+        }
     }
 
     /**
@@ -34,9 +43,19 @@ class LocationService
 
         $cacheKey = $this->cacheKey('new_provinces', $query);
 
-        return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($query): array {
+        try {
+            return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($query): array {
+                return $this->getJson('new-provinces', $query);
+            });
+        } catch (Throwable $e) {
+            Log::warning('Location provinces cache read failed', [
+                'key' => $cacheKey,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
             return $this->getJson('new-provinces', $query);
-        });
+        }
     }
 
     /**
@@ -52,9 +71,19 @@ class LocationService
 
         $cacheKey = $this->cacheKey('new_wards', array_merge(['province' => $provinceCode], $query));
 
-        return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($provinceCode, $query): array {
+        try {
+            return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($provinceCode, $query): array {
+                return $this->getJson("new-provinces/{$provinceCode}/wards", $query);
+            });
+        } catch (Throwable $e) {
+            Log::warning('Location wards cache read failed', [
+                'key' => $cacheKey,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
             return $this->getJson("new-provinces/{$provinceCode}/wards", $query);
-        });
+        }
     }
 
     /**
@@ -69,9 +98,19 @@ class LocationService
 
         $cacheKey = $this->cacheKey('new_full_address', $query);
 
-        return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($query): array {
+        try {
+            return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($query): array {
+                return $this->getJson('new-full-address', $query);
+            });
+        } catch (Throwable $e) {
+            Log::warning('Location full address cache read failed', [
+                'key' => $cacheKey,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
             return $this->getJson('new-full-address', $query);
-        });
+        }
     }
 
     /**
@@ -129,14 +168,25 @@ class LocationService
     private function cacheKey(string $type, array $parts): string
     {
         $version = config('tinh_thanh_pho.cache_key_version', 'v2025');
-        $bust = (int) Cache::get(self::CACHE_BUST_KEY, 0);
+
+        $bust = 0;
+        try {
+            $bust = (int) Cache::get(self::CACHE_BUST_KEY, 0);
+        } catch (Throwable $e) {
+            Log::warning('locations:cache_bust read failed', [
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+
+        ksort($parts);
 
         return sprintf(
             'locations:%s:%d:%s:%s',
             $version,
             $bust,
             $type,
-            md5((string) json_encode($parts))
+            md5((string) json_encode($parts, JSON_THROW_ON_ERROR))
         );
     }
 

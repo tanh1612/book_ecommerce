@@ -4,6 +4,7 @@ namespace App\Services\Auth;
 
 use App\Mail\PasswordResetOtpMail;
 use App\Models\Account;
+use Illuminate\Cache\RedisStore;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -41,9 +42,15 @@ class PasswordResetService
         return strtolower(trim($email));
     }
 
+    private function emailCacheId(string $email): string
+    {
+        return hash('sha256', $this->normalizedEmailKey($email));
+    }
+
     public function sendOtp(string $email): void
     {
         $keyEmail = $this->normalizedEmailKey($email);
+        $cacheId = $this->emailCacheId($email);
 
         try {
             $account = $this->findActiveAccountByEmail($keyEmail);
@@ -52,7 +59,7 @@ class PasswordResetService
                 return;
             }
 
-            $cooldownKey = self::COOLDOWN_PREFIX.$keyEmail;
+            $cooldownKey = self::COOLDOWN_PREFIX.$cacheId;
 
             if ($this->store()->has($cooldownKey)) {
                 throw ValidationException::withMessages([
@@ -61,9 +68,9 @@ class PasswordResetService
             }
 
             $otp = (string) random_int(100_000, 999_999);
-            $otpKey = self::OTP_PREFIX.$keyEmail;
+            $otpKey = self::OTP_PREFIX.$cacheId;
 
-            $this->store()->forget($this->otpAttemptKey($keyEmail));
+            $this->store()->forget($this->otpAttemptKey($cacheId));
             $this->store()->put($otpKey, $otp, self::OTP_TTL_SECONDS);
             $this->store()->put($cooldownKey, '1', self::COOLDOWN_TTL_SECONDS);
 
@@ -97,8 +104,9 @@ class PasswordResetService
     public function verifyOtp(string $email, string $otp): string
     {
         $keyEmail = $this->normalizedEmailKey($email);
-        $otpKey = self::OTP_PREFIX.$keyEmail;
-        $attemptKey = $this->otpAttemptKey($keyEmail);
+        $cacheId = $this->emailCacheId($email);
+        $otpKey = self::OTP_PREFIX.$cacheId;
+        $attemptKey = $this->otpAttemptKey($cacheId);
 
         try {
             $stored = $this->store()->get($otpKey);
@@ -110,8 +118,20 @@ class PasswordResetService
             }
 
             if (! hash_equals((string) $stored, $otp)) {
-                $attempts = (int) ($this->store()->get($attemptKey) ?? 0) + 1;
-                $this->store()->put($attemptKey, $attempts, self::OTP_TTL_SECONDS);
+                $incremented = $this->store()->increment($attemptKey);
+                $attempts = is_numeric($incremented) ? (int) $incremented : 0;
+
+                if ($attempts <= 0) {
+                    Log::error('Password reset OTP attempt counter increment failed', [
+                        'email' => $email,
+                    ]);
+
+                    throw ValidationException::withMessages([
+                        'otp' => ['Mã xác nhận không đúng hoặc đã hết hạn.'],
+                    ]);
+                }
+
+                $this->refreshPasswordResetOtpAttemptTtl($attemptKey);
 
                 if ($attempts >= self::MAX_OTP_ATTEMPTS) {
                     $this->store()->forget($otpKey);
@@ -131,7 +151,7 @@ class PasswordResetService
             $this->store()->forget($attemptKey);
 
             $resetToken = Str::random(60);
-            $tokenKey = self::RESET_TOKEN_PREFIX.$keyEmail;
+            $tokenKey = self::RESET_TOKEN_PREFIX.$cacheId;
             $this->store()->put($tokenKey, $resetToken, self::RESET_TOKEN_TTL_SECONDS);
 
             return $resetToken;
@@ -153,7 +173,8 @@ class PasswordResetService
     public function resetPassword(array $data): void
     {
         $keyEmail = $this->normalizedEmailKey($data['email']);
-        $tokenKey = self::RESET_TOKEN_PREFIX.$keyEmail;
+        $cacheId = $this->emailCacheId($data['email']);
+        $tokenKey = self::RESET_TOKEN_PREFIX.$cacheId;
 
         try {
             $stored = $this->store()->get($tokenKey);
@@ -210,8 +231,43 @@ class PasswordResetService
             ->first();
     }
 
-    private function otpAttemptKey(string $keyEmail): string
+    private function otpAttemptKey(string $cacheId): string
     {
-        return self::OTP_ATTEMPT_PREFIX.$keyEmail;
+        return self::OTP_ATTEMPT_PREFIX.$cacheId;
+    }
+
+    /**
+     * INCR is atomic on Redis; EXPIRE keeps the counter bounded without a separate read-modify-write race.
+     */
+    private function refreshPasswordResetOtpAttemptTtl(string $attemptKey): void
+    {
+        $repo = $this->store();
+        $store = $repo->getStore();
+
+        if ($store instanceof RedisStore) {
+            try {
+                $fullKey = $store->getPrefix().$attemptKey;
+                $store->connection()->expire($fullKey, self::OTP_TTL_SECONDS);
+            } catch (Throwable $e) {
+                Log::warning('Password reset OTP attempt TTL refresh failed (redis)', [
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ]);
+            }
+
+            return;
+        }
+
+        try {
+            $current = $repo->get($attemptKey);
+            if ($current !== null) {
+                $repo->put($attemptKey, (int) $current, self::OTP_TTL_SECONDS);
+            }
+        } catch (Throwable $e) {
+            Log::warning('Password reset OTP attempt TTL refresh failed (non-redis)', [
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
     }
 }

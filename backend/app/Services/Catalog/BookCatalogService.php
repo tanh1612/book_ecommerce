@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 class BookCatalogService
 {
+    public function __construct(
+        private CatalogCacheService $catalogCache,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -74,9 +78,11 @@ class BookCatalogService
             abort(404);
         }
 
-        return $this->baseDetailQuery()
-            ->where('slug', $slug)
-            ->firstOrFail();
+        return $this->catalogCache->rememberBookDetail($slug, function () use ($slug): Book {
+            return $this->baseDetailQuery()
+                ->where('slug', $slug)
+                ->firstOrFail();
+        });
     }
 
     /**

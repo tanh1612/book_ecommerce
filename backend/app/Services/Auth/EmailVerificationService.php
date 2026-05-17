@@ -29,16 +29,21 @@ class EmailVerificationService
     {
         return Cache::store(config('registration.cache_store', 'redis'));
     }
-    
+
     private function normalizedEmailKey(string $email): string
     {
         return strtolower(trim($email));
     }
 
+    private function emailCacheId(string $email): string
+    {
+        return hash('sha256', $this->normalizedEmailKey($email));
+    }
+
     public function sendOtp(string $email): void
     {
-        $keyEmail = $this->normalizedEmailKey($email);
-        $cooldownKey = self::COOLDOWN_PREFIX.$keyEmail;
+        $cacheId = $this->emailCacheId($email);
+        $cooldownKey = self::COOLDOWN_PREFIX.$cacheId;
 
         try {
             if ($this->store()->has($cooldownKey)) {
@@ -48,7 +53,7 @@ class EmailVerificationService
             }
 
             $otp = (string) random_int(100_000, 999_999);
-            $otpKey = self::OTP_PREFIX.$keyEmail;
+            $otpKey = self::OTP_PREFIX.$cacheId;
 
             $this->store()->put($otpKey, $otp, self::OTP_TTL_SECONDS);
             $this->store()->put($cooldownKey, '1', self::COOLDOWN_TTL_SECONDS);
@@ -82,8 +87,8 @@ class EmailVerificationService
      */
     public function verifyOtp(string $email, string $otp): string
     {
-        $keyEmail = $this->normalizedEmailKey($email);
-        $otpKey = self::OTP_PREFIX.$keyEmail;
+        $cacheId = $this->emailCacheId($email);
+        $otpKey = self::OTP_PREFIX.$cacheId;
 
         try {
             $stored = $this->store()->get($otpKey);
@@ -97,7 +102,7 @@ class EmailVerificationService
             $this->store()->forget($otpKey);
 
             $registerToken = Str::random(60);
-            $tokenKey = self::TOKEN_PREFIX.$keyEmail;
+            $tokenKey = self::TOKEN_PREFIX.$cacheId;
             $this->store()->put($tokenKey, $registerToken, self::REGISTER_TOKEN_TTL_SECONDS);
 
             return $registerToken;
@@ -115,8 +120,8 @@ class EmailVerificationService
 
     public function validateRegisterToken(string $email, string $token): bool
     {
-        $keyEmail = $this->normalizedEmailKey($email);
-        $tokenKey = self::TOKEN_PREFIX.$keyEmail;
+        $cacheId = $this->emailCacheId($email);
+        $tokenKey = self::TOKEN_PREFIX.$cacheId;
 
         try {
             $stored = $this->store()->get($tokenKey);
@@ -138,8 +143,8 @@ class EmailVerificationService
 
     public function deleteRegisterToken(string $email): void
     {
-        $keyEmail = $this->normalizedEmailKey($email);
-        $tokenKey = self::TOKEN_PREFIX.$keyEmail;
+        $cacheId = $this->emailCacheId($email);
+        $tokenKey = self::TOKEN_PREFIX.$cacheId;
 
         try {
             $this->store()->forget($tokenKey);

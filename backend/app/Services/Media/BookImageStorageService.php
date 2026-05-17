@@ -70,6 +70,23 @@ class BookImageStorageService
     }
 
     /**
+     * Xóa thư mục ảnh của một sách trên Cloudinary (chỉ khi folder rỗng asset; API Cloudinary từ chối nếu còn file).
+     */
+    public function deleteEmptyBookFolderForSlug(string $slug): void
+    {
+        $folder = $this->bookImagesFolderForSlug($slug);
+
+        try {
+            Cloudinary::adminApi()->deleteFolder($folder);
+        } catch (Throwable $e) {
+            Log::error('Cloudinary deleteFolder failed', [
+                'folder' => $folder,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Re-number sort_order to 1..n after delete/reorder drift (no model events).
      */
     public function normalizeSortOrdersForBook(Book $book): void

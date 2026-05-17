@@ -33,3 +33,4 @@ alwaysApply: false
 
 - `destroy` cần đúng full logical `public_id` (đã strip extension nếu có); có thể truyền `resource_type` => `image` cho nhất quán.
 - Xóa sách: duyệt `book_images` trong `BookObserver::deleting` — **CASCADE DB không bắn** `deleted` trên từng `BookImage`.
+- **`deleteFolder` (thư mục `book_ecommerce/books/{slug}`)**: chỉ gọi khi **xóa bản ghi sách** (`BookObserver::deleting`), sau khi đã `destroy` hết ảnh. **Không** gọi khi admin chỉ xóa hết ảnh trong form (sách vẫn tồn tại — có thể upload lại vào cùng folder).

@@ -8,6 +8,10 @@ use App\Models\Supplier;
 
 class BookFilterService
 {
+    public function __construct(
+        private CatalogCacheService $catalogCache,
+    ) {}
+
     /**
      * Metadata cho UI bộ lọc; không thay thế logic lọc trong {@see BookCatalogService::paginateBooks()}.
      *
@@ -15,34 +19,36 @@ class BookFilterService
      */
     public function getMetadata(): array
     {
-        $categories = Category::query()
-            ->whereNull('parent_id')
-            ->where('is_active', true)
-            ->with([
-                'children' => function ($query): void {
-                    $query->where('is_active', true)
-                        ->orderBy('name');
-                },
-            ])
-            ->orderBy('name')
-            ->get(['id', 'name', 'slug', 'parent_id', 'is_active']);
+        return $this->catalogCache->rememberFiltersMetadata(function (): array {
+            $categories = Category::query()
+                ->whereNull('parent_id')
+                ->where('is_active', true)
+                ->with([
+                    'children' => function ($query): void {
+                        $query->where('is_active', true)
+                            ->orderBy('name');
+                    },
+                ])
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'parent_id', 'is_active']);
 
-        $publishers = Publisher::query()
-            ->whereHas('books', fn ($q) => $q->active())
-            ->orderBy('name')
-            ->get(['id', 'name']);
+            $publishers = Publisher::query()
+                ->whereHas('books', fn ($q) => $q->active())
+                ->orderBy('name')
+                ->get(['id', 'name']);
 
-        $suppliers = Supplier::query()
-            ->whereHas('books', fn ($q) => $q->active())
-            ->orderBy('name')
-            ->get(['id', 'name', 'slug']);
+            $suppliers = Supplier::query()
+                ->whereHas('books', fn ($q) => $q->active())
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug']);
 
-        return [
-            'categories' => $categories,
-            'publishers' => $publishers,
-            'suppliers' => $suppliers,
-            'suggested_price_ranges' => $this->suggestedPriceRanges(),
-        ];
+            return [
+                'categories' => $categories,
+                'publishers' => $publishers,
+                'suppliers' => $suppliers,
+                'suggested_price_ranges' => $this->suggestedPriceRanges(),
+            ];
+        });
     }
 
     /**
