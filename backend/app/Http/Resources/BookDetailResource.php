@@ -27,6 +27,7 @@ class BookDetailResource extends JsonResource
             'selling_price' => $this->selling_price,
             'average_rating' => $this->average_rating,
             'review_count' => $this->review_count,
+            'is_active' => (bool) $this->is_active,
             'available_stock' => $availableStock,
             'in_stock' => $availableStock > 0,
             'authors' => $this->whenLoaded('authors', fn () => $this->authors->map(fn ($author) => [

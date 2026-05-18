@@ -11,7 +11,7 @@ return new class extends Migration
         DB::statement('ALTER TABLE promotion_items ADD CONSTRAINT promotion_items_sold_within_stock_check CHECK (stock_limit IS NULL OR sold_quantity <= stock_limit)');
         DB::statement('ALTER TABLE reviews ADD CONSTRAINT reviews_rating_range_check CHECK (rating BETWEEN 1 AND 5)');
         DB::statement('ALTER TABLE inventories ADD CONSTRAINT inventories_reserved_within_quantity_check CHECK (reserved_quantity <= quantity)');
-        DB::statement("ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_gender_enum_check CHECK (gender IS NULL OR gender IN ('male', 'female'))");
+        DB::statement('ALTER TABLE books ADD CONSTRAINT books_prices CHECK (original_price > 0 AND selling_price > 0)');
     }
 
     public function down(): void
@@ -20,6 +20,6 @@ return new class extends Migration
         DB::statement('ALTER TABLE promotion_items DROP CONSTRAINT promotion_items_sold_within_stock_check');
         DB::statement('ALTER TABLE reviews DROP CONSTRAINT reviews_rating_range_check');
         DB::statement('ALTER TABLE inventories DROP CONSTRAINT inventories_reserved_within_quantity_check');
-        DB::statement('ALTER TABLE user_profiles DROP CONSTRAINT user_profiles_gender_enum_check');
+        DB::statement('ALTER TABLE books DROP CONSTRAINT books_prices');
     }
 };

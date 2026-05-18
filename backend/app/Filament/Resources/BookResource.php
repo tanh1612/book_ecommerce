@@ -53,6 +53,7 @@ class BookResource extends Resource
                         ->columnSpanFull(),
                     Field\TextInput::make('sku')
                         ->label('SKU')
+                        ->required()
                         ->unique(ignoreRecord: true)
                         ->columnSpanFull(),
 
@@ -61,12 +62,14 @@ class BookResource extends Resource
                             ->label('Giá gốc')
                             ->default(0)
                             ->numeric()
-                            ->required(),
+                            ->required()
+                            ->rules(['gt:0']),
                         Field\TextInput::make('selling_price')
                             ->label('Giá bán')
                             ->default(0)
                             ->numeric()
-                            ->required(),
+                            ->required()
+                            ->rules(['gt:0']),
                         Field\Toggle::make('is_active')
                             ->label('Đang hoạt động')
                             ->inline(false)
@@ -104,6 +107,7 @@ class BookResource extends Resource
                         ->relationship('authors', 'name')
                         ->label('Tác giả')
                         ->multiple()
+                        ->required()
                         ->preload()
                         ->columnSpanFull(),
                     Field\Select::make('categories')
@@ -111,6 +115,7 @@ class BookResource extends Resource
                         ->getOptionLabelFromRecordUsing(fn ($record) => $record->getBreadcrumb())
                         ->label('Danh mục')
                         ->multiple()
+                        ->required()
                         ->preload()
                         ->searchable()
                         ->columnSpanFull(),
@@ -239,8 +244,7 @@ class BookResource extends Resource
                                 )
                                 ->image()
                                 ->imageEditor()
-                                ->fetchFileInformation(false)
-                                ->required(),
+                                ->fetchFileInformation(false),
                         ])
                         ->grid(4)
                         ->reorderable(true)

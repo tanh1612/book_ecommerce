@@ -19,7 +19,7 @@ test('books index defaults to 40 items per page', function (): void {
     expect($response->json('meta.total'))->toBe(45);
 });
 
-test('books index excludes inactive books', function (): void {
+test('books index includes inactive books with is_active field', function (): void {
     Book::factory()->count(2)->create();
     Book::factory()->inactive()->create(['slug' => 'hidden-book']);
 
@@ -27,13 +27,18 @@ test('books index excludes inactive books', function (): void {
 
     $response->assertOk();
     $slugs = collect($response->json('data'))->pluck('slug')->all();
-    expect($slugs)->not->toContain('hidden-book');
+    expect($slugs)->toContain('hidden-book');
+    $hidden = collect($response->json('data'))->firstWhere('slug', 'hidden-book');
+    expect($hidden['is_active'])->toBeFalse();
 });
 
-test('book show returns 404 for inactive slug', function (): void {
+test('book show returns inactive book detail', function (): void {
     Book::factory()->inactive()->create(['slug' => 'inactive-book']);
 
-    $this->getJson('/api/v1/books/inactive-book')->assertNotFound();
+    $this->getJson('/api/v1/books/inactive-book')
+        ->assertOk()
+        ->assertJsonPath('data.slug', 'inactive-book')
+        ->assertJsonPath('data.is_active', false);
 });
 
 test('book show returns detail for active slug', function (): void {
@@ -140,4 +145,33 @@ test('books filters endpoint returns metadata', function (): void {
 
 test('books filters route is not captured by slug route', function (): void {
     $this->getJson('/api/v1/books/filters')->assertOk();
+});
+
+test('book detail omits inactive categories from payload', function (): void {
+    $inactive = Category::factory()->create(['slug' => 'off-leaf', 'is_active' => false]);
+    $book = Book::factory()->create(['slug' => 'cat-payload']);
+    $book->categories()->attach($inactive);
+
+    $this->getJson('/api/v1/books/cat-payload')
+        ->assertOk()
+        ->assertJsonPath('data.categories', []);
+});
+
+test('books index returns 404 for inactive category slug filter', function (): void {
+    $inactive = Category::factory()->create(['slug' => 'off-cat', 'is_active' => false]);
+    $book = Book::factory()->create(['slug' => 'orphan']);
+    $book->categories()->attach($inactive);
+
+    $this->getJson('/api/v1/books?category=off-cat')->assertNotFound();
+});
+
+test('books filters exclude inactive root categories', function (): void {
+    Category::factory()->create(['slug' => 'active-root', 'is_active' => true]);
+    Category::factory()->create(['slug' => 'inactive-root', 'is_active' => false]);
+
+    $response = $this->getJson('/api/v1/books/filters');
+
+    $response->assertOk();
+    $slugs = collect($response->json('data.categories'))->pluck('slug')->all();
+    expect($slugs)->toContain('active-root')->not->toContain('inactive-root');
 });

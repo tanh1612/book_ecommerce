@@ -33,12 +33,12 @@ class BookFilterService
                 ->get(['id', 'name', 'slug', 'parent_id', 'is_active']);
 
             $publishers = Publisher::query()
-                ->whereHas('books', fn ($q) => $q->active())
+                ->whereHas('books')
                 ->orderBy('name')
                 ->get(['id', 'name']);
 
             $suppliers = Supplier::query()
-                ->whereHas('books', fn ($q) => $q->active())
+                ->whereHas('books')
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug']);
 

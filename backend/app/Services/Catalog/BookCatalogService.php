@@ -91,7 +91,6 @@ class BookCatalogService
     private function baseListQuery(): Builder
     {
         return Book::query()
-            ->active()
             ->with([
                 'authors',
                 'categories' => function ($query): void {
@@ -116,6 +115,7 @@ class BookCatalogService
                 'selling_price',
                 'review_count',
                 'average_rating',
+                'is_active',
                 'created_at',
             ]);
     }
@@ -126,7 +126,6 @@ class BookCatalogService
     private function baseDetailQuery(): Builder
     {
         return Book::query()
-            ->active()
             ->with([
                 'detail',
                 'images' => function ($query): void {
@@ -151,6 +150,7 @@ class BookCatalogService
                 'selling_price',
                 'review_count',
                 'average_rating',
+                'is_active',
             ]);
     }
 }

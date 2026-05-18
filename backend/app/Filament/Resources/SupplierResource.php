@@ -12,6 +12,7 @@ use Filament\Schemas\Components as Layout;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
 
 class SupplierResource extends Resource
 {
@@ -39,7 +40,9 @@ class SupplierResource extends Resource
                     ->label('Tên nhà cung cấp')
                     ->required()
                     ->maxLength(255)
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (string $operation, $state, \Filament\Schemas\Components\Utilities\Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
                 Field\TextInput::make('slug')
                     ->label('Slug')
                     ->required()

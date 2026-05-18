@@ -101,9 +101,51 @@ class CategoryResource extends Resource
                 Field\Toggle::make('is_active')
                     ->label('Đang hoạt động')
                     ->inline(false)
-                    ->default(true),
+                    ->default(true)
+                    ->live()
+                    ->afterStateUpdated(function ($state, \Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set): void {
+                        if (! $state || ! self::hasInactiveAncestor((int) $get('parent_id'))) {
+                            return;
+                        }
+
+                        $set('is_active', false);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Không thể bật danh mục')
+                            ->body('Không cho phép bật danh mục này vì danh mục cha đang tắt.')
+                            ->danger()
+                            ->send();
+                    })
+                    ->rules([
+                        fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get): void {
+                            if (! $value) {
+                                return;
+                            }
+
+                            if (self::hasInactiveAncestor((int) $get('parent_id'))) {
+                                $fail('Không cho phép bật danh mục này vì danh mục cha đang tắt.');
+                            }
+                        },
+                    ]),
             ])->columnSpanFull(),
         ]);
+    }
+
+    private static function hasInactiveAncestor(int $parentId): bool
+    {
+        while ($parentId > 0) {
+            $parent = Category::query()
+                ->whereKey($parentId)
+                ->first(['id', 'parent_id', 'is_active']);
+
+            if ($parent === null || ! $parent->is_active) {
+                return true;
+            }
+
+            $parentId = (int) $parent->parent_id;
+        }
+
+        return false;
     }
 
     public static function table(Table $table): Table

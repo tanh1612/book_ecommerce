@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('publisher_id')->nullable()->constrained('publishers')->nullOnDelete();
             $table->string('name');
             $table->string('slug')->unique();
-            $table->string('sku')->unique()->nullable();
+            $table->string('sku')->unique();
             $table->text('thumbnail')->nullable();
             $table->decimal('original_price', 10, 2);
             $table->decimal('selling_price', 10, 2);
