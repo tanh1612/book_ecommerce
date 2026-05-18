@@ -1,29 +1,40 @@
 // src/components/Layout/Header.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiSearch, FiShoppingCart, FiUser, FiHeart, FiMapPin, FiMenu, FiChevronRight } from 'react-icons/fi';
-import { CATEGORIES_DB } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import bookApi from '../../services/bookApi';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const parentCategories = CATEGORIES_DB.filter(cat => cat.parent_id === null && cat.is_active);
-  const [activeMenuId, setActiveMenuId] = useState(parentCategories[0]?.id || null);
-  const subCategories = CATEGORIES_DB.filter(cat => cat.parent_id === activeMenuId && cat.is_active);
+  const [parentCategories, setParentCategories] = useState([]);
+  const [activeMenuId, setActiveMenuId] = useState(null);
 
+  useEffect(() => {
+    bookApi.getFilters().then(res => {
+      const allCats = res.data?.data?.categories || res.data?.categories || [];
+      const targetNames = ["Hư cấu", "Phi hư cấu", "Phân loại khác"];
+      const filteredParents = allCats.filter(cat => targetNames.includes(cat.name));
+      const displayParents = filteredParents.length > 0 ? filteredParents : allCats;
+      
+      setParentCategories(displayParents);
+      if (displayParents.length > 0) setActiveMenuId(displayParents[0].id);
+    }).catch(err => console.error("Lỗi tải danh mục:", err));
+  }, []);
+
+  const subCategories = parentCategories.find(cat => cat.id === activeMenuId)?.children || [];
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  // Dùng Context thay vì localStorage/Redux
   const { user, logout } = useAuth();
   const { totalQuantity } = useCart();
   const { wishlistItems } = useWishlist();
 
   const handleSearch = () => {
     if (searchTerm.trim() !== '') {
-      navigate(`/search?keyword=${encodeURIComponent(searchTerm.trim())}`);
+      navigate(`/catalog?keyword=${encodeURIComponent(searchTerm.trim())}`);
       setIsMenuOpen(false);
     }
   };
@@ -34,7 +45,6 @@ const Header = () => {
 
   return (
     <header className="bg-white relative z-50">
-      {/* TẦNG 1: TOP BAR */}
       <div className="bg-[#157a2c] text-white text-sm hidden md:block">
         <div className="container mx-auto px-4 py-1.5 flex justify-between items-center">
           <ul className="flex gap-6">
@@ -51,7 +61,6 @@ const Header = () => {
         </div>
       </div>
 
-      {/* TẦNG 2: MAIN HEADER */}
       <div className="container mx-auto px-4 py-5 flex items-center justify-between gap-8 border-b border-gray-100">
         <Link to="/" className="flex-shrink-0 flex items-center gap-2 text-[#157a2c]">
           <div className="font-extrabold text-2xl tracking-tighter flex flex-col items-center leading-none">
@@ -86,7 +95,7 @@ const Header = () => {
               </span>
             )}
           </Link>
-        {/* NÚT YÊU THÍCH ĐÃ ĐƯỢC CẬP NHẬT */}
+          
           <Link to="/wishlist" className="flex flex-col items-center text-gray-600 hover:text-[#157a2c] relative transition-colors">
             <FiHeart size={22} strokeWidth={1.5} />
             <span className="text-[11px] mt-1">Yêu thích</span>
@@ -110,10 +119,7 @@ const Header = () => {
               </div>
               <div className="absolute top-full pt-2 right-0 hidden group-hover:block z-50">
                 <button 
-                  onClick={() => {
-                    logout();
-                    navigate('/'); 
-                  }}
+                  onClick={() => { logout(); navigate('/'); }}
                   className="bg-white border border-gray-200 shadow-lg rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap"
                 >
                   Đăng xuất
@@ -129,7 +135,6 @@ const Header = () => {
         </div>
       </div>
 
-      {/* TẦNG 3: MENU ĐIỀU HƯỚNG & MEGA MENU */}
       <div className="border-b border-gray-200 relative">
         <div className="container mx-auto px-4 flex items-center gap-8">
           <div 
@@ -138,8 +143,7 @@ const Header = () => {
             onMouseLeave={() => setIsMenuOpen(false)}
           >
             <button className={`flex items-center gap-2 font-bold py-3 px-6 border-x border-gray-100 transition-colors ${isMenuOpen ? 'text-[#157a2c] bg-gray-50' : 'text-[#157a2c] bg-white'}`}>
-              <FiMenu size={20} />
-              DANH MỤC
+              <FiMenu size={20} /> DANH MỤC
             </button>
 
             {isMenuOpen && (
@@ -150,10 +154,12 @@ const Header = () => {
                       <li 
                         key={category.id}
                         onMouseEnter={() => setActiveMenuId(category.id)}
+                        onClick={() => {
+                          navigate(`/catalog?category=${category.slug}`);
+                          setIsMenuOpen(false);
+                        }}
                         className={`px-4 py-3 cursor-pointer border-b border-gray-50 flex justify-between items-center transition-colors ${
-                          activeMenuId === category.id 
-                            ? 'bg-[#157a2c] text-white font-medium' 
-                            : 'text-gray-700 hover:bg-gray-100'
+                          activeMenuId === category.id ? 'bg-[#157a2c] text-white font-medium' : 'text-gray-700 hover:bg-gray-100'
                         }`}
                       >
                         {category.name}
@@ -168,9 +174,9 @@ const Header = () => {
                       {subCategories.map((sub) => (
                         <Link 
                           key={sub.id} 
-                          to={`/category/${sub.slug}`} 
+                          to={`/catalog?category=${sub.slug}`} 
+                          onClick={() => setIsMenuOpen(false)}
                           className="bg-white px-3 py-2 text-sm text-gray-700 rounded border border-gray-100 shadow-sm hover:text-[#157a2c] hover:border-[#157a2c] transition-colors truncate"
-                          title={sub.name}
                         >
                           {sub.name}
                         </Link>
@@ -185,11 +191,9 @@ const Header = () => {
           </div>
 
           <ul className="flex items-center gap-6 text-sm text-gray-800 font-medium">
-            <li><Link to="/sach-moi" className="hover:text-[#157a2c] transition">Sách mới</Link></li>
-            <li><Link to="/sach-ban-chay" className="hover:text-[#157a2c] transition">Sách bán chạy</Link></li>
-            <li><Link to="/sach-xu-huong" className="text-[#157a2c] transition">Sách xu hướng</Link></li>
-            <li><Link to="/an-pham-dac-biet" className="hover:text-[#157a2c] transition">Ấn phẩm đặc biệt</Link></li>
-            <li><Link to="/sach-dat-truoc" className="hover:text-[#157a2c] transition">Sách Đặt Trước</Link></li>
+            <li><Link to="/catalog?sort=newest" className="hover:text-[#157a2c] transition">Sách mới</Link></li>
+            <li><Link to="/catalog?sort=best_selling" className="hover:text-[#157a2c] transition">Sách bán chạy</Link></li>
+            <li><Link to="/catalog?sort=rating_desc" className="text-[#157a2c] transition">Sách xu hướng</Link></li>
           </ul>
         </div>
       </div>

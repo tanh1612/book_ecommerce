@@ -9,9 +9,9 @@ import "swiper/css/navigation";
 
 // Dữ liệu tạm: Link ảnh các banner (Kích thước ngang tỷ lệ 840x320 giống Fahasa)
 const bannerImages = [
-  "https://placehold.co/840x320/C92127/FFF?text=Khuyen+Mai+Sach+Moi+Thang+Nay",
-  "https://placehold.co/840x320/F59E0B/FFF?text=Giam+Gia+Dac+Biet+Manga",
-  "https://placehold.co/840x320/10B981/FFF?text=Freeship+Don+Tu+150k",
+  "https://cdn1.fahasa.com/media/wysiwyg/Thang-05-2026/Trangthang5_web.png",
+  "https://cdn1.fahasa.com/media/wysiwyg/Thang-04-2026/thieu-nhi/Trangthieunhi_web.png",
+  "https://cdn1.fahasa.com/media/wysiwyg/Thang-05-2026/Deli_KC_LDP_Mainbanner.png",
 ];
 
 const BannerSlider = () => {
