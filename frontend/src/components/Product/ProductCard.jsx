@@ -7,15 +7,19 @@ import { useCart } from '../../context/CartContext';
 const ProductCard = ({ book }) => {
   const { addToCart } = useCart();
 
-  // Đồng bộ hóa tên trường từ API
-  const title = book.title || book.name;
-  const salePrice = book.price || book.selling_price || 0;
+  // ĐỒNG BỘ CHÍNH XÁC VỚI API.PDF [cite: 26, 28, 29, 30]
+  const title = book.name || "Đang cập nhật";
+  const salePrice = book.selling_price || 0;
   const originalPrice = book.original_price || salePrice;
-  const thumbnail = book.thumbnail || book.image_url;
-  const author = book.authors?.[0]?.name || book.author_name || "Nhiều tác giả";
+  const thumbnail = book.thumbnail_url || "https://placehold.co/300x400/EEE/31343C?text=No+Image";
+  
+  const author = Array.isArray(book.authors) 
+    ? book.authors.map(a => a.name).join(', ') 
+    : "Nhiều tác giả";
 
-  const discountPercent = book.discount_percent || 
-    (originalPrice > salePrice ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) : 0);
+  const discountPercent = originalPrice > salePrice 
+    ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) 
+    : 0;
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -25,11 +29,7 @@ const ProductCard = ({ book }) => {
   return (
     <div className="bg-white rounded border border-gray-100 hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full overflow-hidden p-4">
       <Link to={`/book/${book.slug}`} className="block overflow-hidden mb-4 flex-shrink-0">
-        <img 
-          src={thumbnail} 
-          alt={title} 
-          className="w-full h-52 object-contain group-hover:scale-105 transition-transform duration-500" 
-        />
+        <img src={thumbnail} alt={title} className="w-full h-52 object-contain group-hover:scale-105 transition-transform duration-500" />
       </Link>
 
       <div className="flex flex-col flex-grow text-left">
@@ -41,22 +41,15 @@ const ProductCard = ({ book }) => {
         <p className="text-xs text-gray-500 mb-3 line-clamp-1">{author}</p>
 
         <div className="mt-auto flex items-center gap-2 flex-wrap">
-          <span className="text-[#157a2c] font-bold text-[16px]">
-            {formatCurrency(salePrice)}
-          </span>
+          <span className="text-[#157a2c] font-bold text-[16px]">{formatCurrency(salePrice)}</span>
           {discountPercent > 0 && (
-            <span className="bg-[#ff424e] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-              -{discountPercent}%
-            </span>
+            <span className="bg-[#ff424e] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">-{discountPercent}%</span>
           )}
         </div>
       </div>
 
       <div className="absolute inset-x-0 -bottom-16 group-hover:bottom-0 bg-white p-3 transition-all duration-300 flex justify-between gap-2 border-t border-gray-100">
-        <button 
-          onClick={handleAddToCart}
-          className="bg-white border border-[#157a2c] text-[#157a2c] w-10 h-10 rounded flex items-center justify-center hover:bg-[#157a2c] hover:text-white transition-colors"
-        >
+        <button onClick={handleAddToCart} className="bg-white border border-[#157a2c] text-[#157a2c] w-10 h-10 rounded flex items-center justify-center hover:bg-[#157a2c] hover:text-white transition-colors" title="Thêm vào giỏ">
           <FiShoppingCart size={18} />
         </button>
         <button className="flex-grow bg-[#157a2c] text-white h-10 rounded text-sm font-bold hover:bg-green-800 transition-colors">

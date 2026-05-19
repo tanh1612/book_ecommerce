@@ -1,5 +1,5 @@
 // src/pages/Cart/CartPage.jsx
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiTrash2, FiMinus, FiPlus, FiChevronRight } from 'react-icons/fi';
 import { formatCurrency } from '../../utils/formatters';
@@ -7,23 +7,39 @@ import { useCart } from '../../context/CartContext';
 
 const CartPage = () => {
   const navigate = useNavigate();
-  const { cartItems, updateQuantity, removeFromCart, toggleSelect, toggleAll } = useCart();
+  const { cartItems, isLoadingCart, updateQuantity, removeFromCart, toggleSelect, toggleAll, fetchCart } = useCart();
 
-  const handleUpdateQuantity = (id, newQuantity, inStock) => {
-    if (newQuantity >= 1 && newQuantity <= inStock) {
-      updateQuantity(id, newQuantity);
+  // Đảm bảo giỏ hàng luôn mới nhất khi vào trang
+  useEffect(() => {
+    fetchCart();
+  }, []);
+
+  const handleUpdateQuantity = (cartItemId, newQuantity, inStock) => {
+    if (newQuantity >= 1 && newQuantity <= (inStock || 999)) {
+      updateQuantity(cartItemId, newQuantity);
     }
   };
 
+  // Kiểm tra xem tất cả các item có đang được select không
   const isAllSelected = cartItems.length > 0 && cartItems.every(item => item.selected);
   
- const cartSummary = useMemo(() => {
+  const cartSummary = useMemo(() => {
     const selectedItems = cartItems.filter(item => item.selected);
-    const totalItems = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-    // Thay đổi salePrice thành price (trường từ API)
-    const totalPrice = selectedItems.reduce((sum, item) => sum + ((item.price || item.selling_price) * item.quantity), 0);
+    const totalItems = selectedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    
+    const totalPrice = selectedItems.reduce((sum, item) => {
+      // API thường lồng thông tin sách vào thuộc tính "book"
+      const bookData = item.book || item; 
+      const price = bookData.selling_price || bookData.price || 0;
+      return sum + (price * (item.quantity || 1));
+    }, 0);
+    
     return { totalItems, totalPrice };
   }, [cartItems]);
+
+  if (isLoadingCart && cartItems.length === 0) {
+    return <div className="py-20 flex justify-center"><div className="w-10 h-10 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>;
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen pb-12">
@@ -41,7 +57,7 @@ const CartPage = () => {
         {cartItems.length === 0 ? (
           <div className="bg-white p-10 rounded-lg shadow-sm text-center">
             <p className="text-gray-500 mb-4">Giỏ hàng của bạn đang trống.</p>
-            <Link to="/" className="inline-block bg-[#157a2c] text-white px-6 py-2 rounded-md hover:bg-green-800 transition">Tiếp tục mua sắm</Link>
+            <Link to="/catalog" className="inline-block bg-[#157a2c] text-white px-6 py-2 rounded-md hover:bg-green-800 transition">Tiếp tục mua sắm</Link>
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-8">
@@ -52,7 +68,7 @@ const CartPage = () => {
                     type="checkbox" 
                     className="w-4 h-4 text-[#157a2c] rounded border-gray-300"
                     checked={isAllSelected}
-                    onChange={() => toggleAll(!isAllSelected)}
+                    onChange={(e) => toggleAll(e.target.checked)}
                   />
                   <span>Chọn tất cả ({cartItems.length} sản phẩm)</span>
                 </div>
@@ -62,46 +78,56 @@ const CartPage = () => {
               </div>
 
               <div className="bg-white rounded-lg shadow-sm flex flex-col">
-                {cartItems.map((item, index) => (
-                  <div key={item.id} className={`p-4 flex items-center border-gray-100 ${index !== cartItems.length - 1 ? 'border-b' : ''}`}>
-                    <div className="w-1/2 flex items-center gap-4">
-                      <input 
-                        type="checkbox" 
-                        className="w-4 h-4 text-[#157a2c] rounded border-gray-300"
-                        checked={item.selected}
-                        onChange={() => toggleSelect(item.id)}
-                      />
-                      <img src={item.thumbnail} alt={item.name} className="w-20 h-28 object-cover border border-gray-200 rounded" />
-                      <div className="flex flex-col">
-                        <Link to={`/book/${item.bookId}`} className="text-[15px] font-medium text-gray-800 hover:text-[#157a2c] line-clamp-2">{item.name}</Link>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="font-bold text-black">{formatCurrency(item.salePrice)}</span>
-                          {item.originalPrice > item.salePrice && (
-                            <span className="text-gray-400 line-through text-xs">{formatCurrency(item.originalPrice)}</span>
-                          )}
+                {cartItems.map((item, index) => {
+                  // Trích xuất thông tin sách từ API (thường backend sẽ trả lồng vào object book)
+                  const bookData = item.book || item;
+                  const itemPrice = bookData.selling_price || bookData.price || 0;
+                  const itemOriginal = bookData.original_price || itemPrice;
+                  const itemTitle = bookData.name || bookData.title || "Đang cập nhật";
+                  const itemThumbnail = bookData.thumbnail_url || bookData.thumbnail || "https://placehold.co/100x150";
+                  const availableStock = bookData.available_stock || bookData.in_stock || 999;
+
+                  return (
+                    <div key={item.id} className={`p-4 flex items-center border-gray-100 ${index !== cartItems.length - 1 ? 'border-b' : ''}`}>
+                      <div className="w-1/2 flex items-center gap-4">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 text-[#157a2c] rounded border-gray-300 cursor-pointer"
+                          checked={!!item.selected}
+                          onChange={() => toggleSelect(item.id, item.selected)}
+                        />
+                        <img src={itemThumbnail} alt={itemTitle} className="w-20 h-28 object-cover border border-gray-200 rounded" />
+                        <div className="flex flex-col">
+                          <Link to={`/book/${bookData.slug}`} className="text-[15px] font-medium text-gray-800 hover:text-[#157a2c] line-clamp-2">{itemTitle}</Link>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="font-bold text-black">{formatCurrency(itemPrice)}</span>
+                            {itemOriginal > itemPrice && (
+                              <span className="text-gray-400 line-through text-xs">{formatCurrency(itemOriginal)}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="w-1/6 flex justify-center">
-                      <div className="flex items-center border border-gray-300 rounded overflow-hidden h-8 w-24">
-                        <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1, item.inStock)} className="px-2 hover:bg-gray-100 text-gray-600 h-full transition flex items-center justify-center"><FiMinus size={14} /></button>
-                        <input type="text" value={item.quantity} readOnly className="w-full text-center border-x border-gray-300 h-full text-sm font-medium outline-none" />
-                        <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1, item.inStock)} className="px-2 hover:bg-gray-100 text-gray-600 h-full transition flex items-center justify-center"><FiPlus size={14} /></button>
+                      <div className="w-1/6 flex justify-center">
+                        <div className="flex items-center border border-gray-300 rounded overflow-hidden h-8 w-24">
+                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1, availableStock)} className="px-2 hover:bg-gray-100 text-gray-600 h-full transition flex items-center justify-center"><FiMinus size={14} /></button>
+                          <input type="text" value={item.quantity} readOnly className="w-full text-center border-x border-gray-300 h-full text-sm font-medium outline-none" />
+                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1, availableStock)} className="px-2 hover:bg-gray-100 text-gray-600 h-full transition flex items-center justify-center"><FiPlus size={14} /></button>
+                        </div>
+                      </div>
+
+                      <div className="w-1/4 text-right font-bold text-[#157a2c] text-lg">
+                        {formatCurrency(itemPrice * item.quantity)}
+                      </div>
+
+                      <div className="w-1/12 flex justify-center">
+                        <button onClick={() => { if(window.confirm('Bỏ sản phẩm này?')) removeFromCart(item.id); }} className="text-gray-400 hover:text-red-500 transition p-2">
+                          <FiTrash2 size={20} />
+                        </button>
                       </div>
                     </div>
-
-                    <div className="w-1/4 text-right font-bold text-[#157a2c] text-lg">
-                      {formatCurrency(item.salePrice * item.quantity)}
-                    </div>
-
-                    <div className="w-1/12 flex justify-center">
-                      <button onClick={() => { if(window.confirm('Bỏ sản phẩm này?')) removeFromCart(item.id); }} className="text-gray-400 hover:text-red-500 transition p-2">
-                        <FiTrash2 size={20} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
