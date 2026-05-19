@@ -16,6 +16,11 @@ class EditInventory extends EditRecord
         return 'Sửa tồn kho';
     }
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

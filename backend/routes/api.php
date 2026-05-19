@@ -7,7 +7,10 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V1\Cart\CartController;
 use App\Http\Controllers\Api\V1\Catalog\BookController;
+use App\Http\Controllers\Api\V1\Checkout\CheckoutController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
+use App\Http\Controllers\Api\V1\Payment\VnPayReturnController;
+use App\Http\Controllers\Api\V1\Shipping\ShippingQuoteController;
 use Illuminate\Support\Facades\Route;
 
 // Auth routes
@@ -48,6 +51,12 @@ Route::prefix('v1/locations')->middleware('throttle:120,1')->group(function (): 
 
     // Get wards by province code
     Route::get('provinces/{provinceCode}/wards', [LocationController::class, 'wards']);
+});
+
+// VNPay payment
+Route::prefix('v1/payments/vnpay')->middleware('throttle:120,1')->group(function (): void {
+    // VNPay return
+    Route::get('return', VnPayReturnController::class);
 });
 
 // Public catalog
@@ -103,3 +112,11 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function
     // Delete address
     Route::delete('addresses/{address}', [AddressController::class, 'destroy']);
 });
+
+// Checkout
+Route::post('v1/checkout', [CheckoutController::class, 'store'])
+    ->middleware(['web', 'auth:sanctum', 'throttle:30,1']);
+
+// Shipping quote
+Route::post('v1/shipping/quote', [ShippingQuoteController::class, 'store'])
+    ->middleware(['web', 'auth:sanctum', 'throttle:60,1']);

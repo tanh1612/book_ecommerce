@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('account_id')->constrained('accounts')->restrictOnDelete();
+            $table->string('checkout_idempotency_key', 36)->nullable();
             $table->foreignId('shipping_method_id')->constrained('shipping_methods')->restrictOnDelete();
             $table->decimal('total_amount', 15, 2);
             $table->decimal('shipping_fee', 15, 2);
@@ -20,10 +21,12 @@ return new class extends Migration
             $table->text('shipping_address');
             $table->string('payment_method', 50)->nullable();
             $table->string('payment_status', 50)->nullable();
+            $table->timestamp('payment_expires_at')->nullable();
             $table->text('note')->nullable();
-            $table->string('tracking_number', 50)->nullable();
             $table->string('current_status', 50);
             $table->timestamps();
+
+            $table->unique(['account_id', 'checkout_idempotency_key'], 'orders_account_checkout_idempotency_unique');
         });
     }
 

@@ -7,13 +7,13 @@ use Filament\Support\Contracts\HasLabel;
 enum PaymentMethod: string implements HasLabel
 {
     case COD = 'cod';
-    case VIETQR = 'vietqr';
+    case VNPAY = 'vnpay';
 
     public function getLabel(): ?string
     {
         return match ($this) {
             self::COD => 'Thanh toán khi nhận hàng (COD)',
-            self::VIETQR => 'Chuyển khoản VietQR',
+            self::VNPAY => 'Thanh toán VNPay',
         };
     }
 }

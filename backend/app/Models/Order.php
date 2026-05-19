@@ -10,6 +10,7 @@ class Order extends Model
 {
     protected $fillable = [
         'account_id',
+        'checkout_idempotency_key',
         'shipping_method_id',
         'total_amount',
         'shipping_fee',
@@ -19,8 +20,8 @@ class Order extends Model
         'shipping_address',
         'payment_method',
         'payment_status',
+        'payment_expires_at',
         'note',
-        'tracking_number',
         'current_status',
     ];
 
@@ -33,6 +34,7 @@ class Order extends Model
             'current_status' => \App\Enums\Order\OrderStatus::class,
             'payment_method' => \App\Enums\Order\PaymentMethod::class,
             'payment_status' => \App\Enums\Order\PaymentStatus::class,
+            'payment_expires_at' => 'datetime',
         ];
     }
 
@@ -54,5 +56,10 @@ class Order extends Model
     public function timelines(): HasMany
     {
         return $this->hasMany(OrderTimeline::class)->orderBy('created_at');
+    }
+
+    public function paymentTransactions(): HasMany
+    {
+        return $this->hasMany(PaymentTransaction::class);
     }
 }

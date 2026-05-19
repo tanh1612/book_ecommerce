@@ -3,8 +3,11 @@
 namespace App\Observers;
 
 use App\Models\Book;
+use App\Models\CartItem;
 use App\Services\Catalog\CatalogCacheService;
 use App\Services\Media\BookImageStorageService;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class BookObserver
 {
@@ -26,6 +29,22 @@ class BookObserver
 
         if ($book->wasRecentlyCreated || $book->wasChanged(['is_active', 'supplier_id', 'publisher_id'])) {
             $this->catalogCache->forgetFiltersMetadata();
+        }
+
+        if ($book->wasChanged('is_active') && ! $book->is_active) {
+            $this->removeBookFromAllCarts($book);
+        }
+    }
+
+    private function removeBookFromAllCarts(Book $book): void
+    {
+        try {
+            CartItem::query()->where('book_id', $book->id)->delete();
+        } catch (Throwable $e) {
+            Log::error('Remove inactive book from carts failed', [
+                'book_id' => $book->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

@@ -14,4 +14,9 @@ class CreateInventory extends CreateRecord
     {
         return 'Thêm tồn kho';
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

@@ -1,8 +1,10 @@
 ---
+
 -- Host: 127.0.0.1
 -- Server version: 8.4.3 - MySQL Community Server - GPL
 -- Server OS: Win64
 -- HeidiSQL Version: 12.8.0.6908
+
 ---
 
 /_!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT _/;
@@ -28,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `accounts` (
 `deleted_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 UNIQUE KEY `accounts_email_unique` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -71,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `books` (
 `publisher_id` bigint unsigned DEFAULT NULL,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-`sku` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+`sku` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
 `thumbnail` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
 `original_price` decimal(10,2) NOT NULL,
 `selling_price` decimal(10,2) NOT NULL,
@@ -90,8 +92,9 @@ KEY `books_selling_price_index` (`selling_price`),
 KEY `books_average_rating_index` (`average_rating`),
 KEY `books_created_at_index` (`created_at`),
 CONSTRAINT `books_publisher_id_foreign` FOREIGN KEY (`publisher_id`) REFERENCES `publishers` (`id`) ON DELETE SET NULL,
-CONSTRAINT `books_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CONSTRAINT `books_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT,
+CONSTRAINT `books_prices` CHECK (((`original_price` > 0) and (`selling_price` > 0)))
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -147,7 +150,7 @@ CREATE TABLE IF NOT EXISTS `book_images` (
 PRIMARY KEY (`id`),
 KEY `book_images_book_id_foreign` (`book_id`),
 CONSTRAINT `book_images_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -185,7 +188,7 @@ PRIMARY KEY (`id`),
 UNIQUE KEY `carts_account_id_unique` (`account_id`),
 UNIQUE KEY `carts_guest_token_hash_unique` (`guest_token_hash`),
 CONSTRAINT `carts_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -203,7 +206,7 @@ UNIQUE KEY `cart_items_cart_id_book_id_unique` (`cart_id`,`book_id`),
 KEY `cart_items_book_id_foreign` (`book_id`),
 CONSTRAINT `cart_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
 CONSTRAINT `cart_items_cart_id_foreign` FOREIGN KEY (`cart_id`) REFERENCES `carts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -291,7 +294,7 @@ KEY `inventories_warehouse_id_foreign` (`warehouse_id`),
 CONSTRAINT `inventories_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
 CONSTRAINT `inventories_warehouse_id_foreign` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`) ON DELETE RESTRICT,
 CONSTRAINT `inventories_reserved_within_quantity_check` CHECK ((`reserved_quantity` <= `quantity`))
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -357,6 +360,7 @@ KEY `notifications_notifiable_type_notifiable_id_index` (`notifiable_type`,`noti
 CREATE TABLE IF NOT EXISTS `orders` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `account_id` bigint unsigned NOT NULL,
+`checkout_idempotency_key` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT '',
 `shipping_method_id` bigint unsigned NOT NULL,
 `total_amount` decimal(15,2) NOT NULL,
 `shipping_fee` decimal(15,2) NOT NULL,
@@ -366,12 +370,13 @@ CREATE TABLE IF NOT EXISTS `orders` (
 `shipping_address` text COLLATE utf8mb4_unicode_ci NOT NULL,
 `payment_method` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
 `payment_status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+`payment_expires_at` timestamp NULL DEFAULT NULL,
 `note` text COLLATE utf8mb4_unicode_ci,
-`tracking_number` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
 `current_status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
 `created_at` timestamp NULL DEFAULT NULL,
 `updated_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
+UNIQUE KEY `orders_account_checkout_idempotency_unique` (`account_id`,`checkout_idempotency_key`),
 KEY `orders_shipping_method_id_foreign` (`shipping_method_id`),
 KEY `orders_current_status_index` (`current_status`),
 KEY `orders_payment_status_index` (`payment_status`),
@@ -379,7 +384,7 @@ KEY `orders_created_at_index` (`created_at`),
 KEY `orders_account_id_current_status_index` (`account_id`,`current_status`),
 CONSTRAINT `orders_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE RESTRICT,
 CONSTRAINT `orders_shipping_method_id_foreign` FOREIGN KEY (`shipping_method_id`) REFERENCES `shipping_methods` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -404,7 +409,7 @@ KEY `order_items_is_reviewed_index` (`is_reviewed`),
 CONSTRAINT `order_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE RESTRICT,
 CONSTRAINT `order_items_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
 CONSTRAINT `order_items_promotion_id_foreign` FOREIGN KEY (`promotion_id`) REFERENCES `promotions` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -418,7 +423,7 @@ CREATE TABLE IF NOT EXISTS `order_timelines` (
 PRIMARY KEY (`id`),
 KEY `order_timelines_order_id_foreign` (`order_id`),
 CONSTRAINT `order_timelines_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 
@@ -449,7 +454,7 @@ PRIMARY KEY (`id`),
 UNIQUE KEY `payment_transactions_gateway_gateway_txn_id_unique` (`gateway`,`gateway_txn_id`),
 KEY `payment_transactions_order_id_status_index` (`order_id`,`status`),
 CONSTRAINT `payment_transactions_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 

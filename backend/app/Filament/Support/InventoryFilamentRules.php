@@ -26,6 +26,21 @@ final class InventoryFilamentRules
         };
     }
 
+    /**
+     * When reserved_quantity is read-only on edit, validate quantity against it instead.
+     *
+     * @return \Closure(Get): \Closure(string, mixed, \Closure): void
+     */
+    public static function quantityGteReserved(): \Closure
+    {
+        return fn (Get $get): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($get): void {
+            $reserved = (int) $get('reserved_quantity');
+            if ((int) $value < $reserved) {
+                $fail('Số lượng tồn không được nhỏ hơn số đang giữ.');
+            }
+        };
+    }
+
     public static function uniqueBookIdForInventory(?Model $record): \Illuminate\Validation\Rules\Unique
     {
         $ignoreId = $record instanceof Inventory ? $record->getKey() : null;

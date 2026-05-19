@@ -38,8 +38,10 @@ class InventoryResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+        $readOnlyOnEdit = fn (string $operation): bool => $operation === 'edit';
+
         return $schema->columns(1)->components([
-            Layout\Section::make('Thông tin tồn kho')
+            Layout\Section::make('Sách & kho')
                 ->columns(1)
                 ->components([
                     Layout\Grid::make(12)
@@ -51,60 +53,71 @@ class InventoryResource extends Resource
                                 ->searchable()
                                 ->preload()
                                 ->required()
+                                ->disabled($readOnlyOnEdit)
+                                ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
                                 ->rule(fn (Get $get, ?Inventory $record) => InventoryFilamentRules::uniqueBookIdForInventory($record))
-                                ->columnSpan(['default' => 'full', 'lg' => 6]),
+                                ->columnSpan(['default' => 'full', 'lg' => 4]),
                             Field\Select::make('warehouse_id')
                                 ->label('Kho')
                                 ->relationship('warehouse', 'name', fn (Builder $query) => $query->where('is_active', true))
                                 ->searchable()
                                 ->preload()
                                 ->required()
-                                ->columnSpan(['default' => 'full', 'lg' => 6]),
-                        ]),
-                    Layout\Grid::make(3)
-                        ->columnSpanFull()
-                        ->components([
-                            Field\TextInput::make('quantity')
-                                ->label('Số lượng tồn')
-                                ->numeric()
-                                ->minValue(0)
-                                ->default(0)
-                                ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
-                                ->rules(['integer', 'min:0'])
-                                ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state))),
-                            Field\TextInput::make('sold_quantity')
-                                ->label('Đã bán')
-                                ->numeric()
-                                ->minValue(0)
-                                ->default(0)
-                                ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
-                                ->rules(['integer', 'min:0'])
-                                ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state))),
-                            Field\TextInput::make('reserved_quantity')
-                                ->label('Đang giữ')
-                                ->numeric()
-                                ->minValue(0)
-                                ->default(0)
-                                ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
-                                ->rules(['integer', 'min:0'])
-                                ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state)))
-                                ->rule(InventoryFilamentRules::reservedQuantityLteOnHand()),
-                        ]),
-                    Layout\Grid::make(12)
-                        ->columnSpanFull()
-                        ->components([
-                            Field\TextInput::make('location_code')
-                                ->label('Mã vị trí')
-                                ->maxLength(50)
-                                ->mutateStateForValidationUsing(fn (mixed $state): string => $state === null ? '' : trim((string) $state))
-                                ->rules(['string', 'max:50'])
-                                ->dehydrateStateUsing(fn (mixed $state): string => $state === null ? '' : trim((string) $state))
-                                ->columnSpan(['default' => 'full', 'lg' => 6]),
+                                ->disabled($readOnlyOnEdit)
+                                ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
+                                ->columnSpan(['default' => 'full', 'lg' => 4]),
                             Field\DateTimePicker::make('last_restocked_at')
                                 ->label('Nhập kho gần nhất')
                                 ->seconds(false)
-                                ->columnSpan(['default' => 'full', 'lg' => 6]),
+                                ->disabled($readOnlyOnEdit)
+                                ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
+                                ->columnSpan(['default' => 'full', 'lg' => 4]),
                         ]),
+                ]),
+            Layout\Section::make('Thống kê bán hàng')
+                ->columns(2)
+                ->components([
+                    Field\TextInput::make('sold_quantity')
+                        ->label('Đã bán')
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(0)
+                        ->disabled($readOnlyOnEdit)
+                        ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
+                        ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
+                        ->rules(['integer', 'min:0'])
+                        ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state))),
+                    Field\TextInput::make('reserved_quantity')
+                        ->label('Đang giữ')
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(0)
+                        ->disabled($readOnlyOnEdit)
+                        ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
+                        ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
+                        ->rules(['integer', 'min:0'])
+                        ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state)))
+                        ->rule(InventoryFilamentRules::reservedQuantityLteOnHand()),
+                ]),
+            Layout\Section::make('Cập nhật tồn kho')
+                ->columns(2)
+                ->components([
+                    Field\TextInput::make('quantity')
+                        ->label('Số lượng tồn')
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(0)
+                        ->required()
+                        ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
+                        ->rules(['integer', 'min:0'])
+                        ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state)))
+                        ->rule(InventoryFilamentRules::quantityGteReserved()),
+                    Field\TextInput::make('location_code')
+                        ->label('Mã vị trí')
+                        ->maxLength(50)
+                        ->mutateStateForValidationUsing(fn (mixed $state): string => $state === null ? '' : trim((string) $state))
+                        ->rules(['string', 'max:50'])
+                        ->dehydrateStateUsing(fn (mixed $state): string => $state === null ? '' : trim((string) $state)),
                 ]),
         ]);
     }
