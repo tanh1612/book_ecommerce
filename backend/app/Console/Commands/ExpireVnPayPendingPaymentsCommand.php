@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\OrderTimeline;
 use App\Models\PaymentTransaction;
 use App\Services\Order\OrderInventoryService;
+use App\Services\Order\OrderStatusTransitionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -76,7 +77,7 @@ class ExpireVnPayPendingPaymentsCommand extends Command
                     OrderTimeline::query()->create([
                         'order_id' => $locked->id,
                         'status' => OrderStatus::CANCELLED->value,
-                        'note' => 'VNPay payment window expired.',
+                        'note' => OrderStatusTransitionService::TIMELINE_NOTE_VNPAY_EXPIRED,
                     ]);
                 });
                 $count++;

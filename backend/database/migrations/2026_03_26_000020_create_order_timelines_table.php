@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
             $table->string('status', 50);
             $table->string('note')->nullable();
+            $table->string('actor', 255)->nullable();
             $table->timestamp('created_at')->nullable();
         });
     }

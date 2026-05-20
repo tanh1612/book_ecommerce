@@ -14,17 +14,25 @@ class InventoryObserver
         private CatalogCacheService $catalogCache,
     ) {}
 
-    public function saved(Inventory $inventory): void
+    public function created(Inventory $inventory): void
     {
-        $bookId = (int) $inventory->book_id;
-        $this->catalogCache->forgetBookById($bookId);
-        $this->syncBookInactiveWhenOutOfStock($bookId);
+        $this->onInventoryChanged($inventory);
+    }
+
+    public function updated(Inventory $inventory): void
+    {
+        $this->onInventoryChanged($inventory);
     }
 
     public function deleted(Inventory $inventory): void
     {
+        $this->onInventoryChanged($inventory);
+    }
+
+    private function onInventoryChanged(Inventory $inventory): void
+    {
         $bookId = (int) $inventory->book_id;
-        $this->catalogCache->forgetBookById($bookId);
+        $this->catalogCache->forgetBookStock($bookId);
         $this->syncBookInactiveWhenOutOfStock($bookId);
     }
 

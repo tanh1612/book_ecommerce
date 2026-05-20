@@ -11,12 +11,39 @@ use App\Models\ShippingRate;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->withoutMiddleware(VerifyCsrfToken::class);
+    Http::fake(function (\Illuminate\Http\Client\Request $request) {
+        if (! str_contains($request->url(), 'new-full-address')) {
+            return Http::response([], 404);
+        }
+
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+        $provinceCode = (string) ($query['provinceCode'] ?? '01');
+        $wardCode = (string) ($query['wardCode'] ?? '00070');
+
+        return Http::response([
+            'success' => true,
+            'data' => [
+                'province' => [
+                    'code' => $provinceCode,
+                    'name' => $provinceCode === '01' ? 'Hà Nội' : 'Tỉnh test',
+                    'type' => $provinceCode === '01' ? 'Thành phố' : 'Tỉnh',
+                ],
+                'ward' => [
+                    'code' => $wardCode,
+                    'name' => $wardCode === '00070' ? 'Hoàn Kiếm' : 'Phúc Xá',
+                    'type' => 'Phường',
+                    'province_code' => $provinceCode,
+                ],
+            ],
+        ], 200);
+    });
     config([
         'vnpay.tmn_code' => 'TESTTMN01',
         'vnpay.hash_secret' => 'test-secret-key-32chars-minimum',
@@ -105,7 +132,7 @@ test('cod checkout with manual shipping creates order and clears selected cart l
     expect($order->checkout_idempotency_key)->toBe($idem)
         ->and($order->current_status)->toBe(\App\Enums\Order\OrderStatus::CONFIRMED)
         ->and($order->payment_status)->toBe(\App\Enums\Order\PaymentStatus::PENDING)
-        ->and($order->shipping_address)->toContain('1 Test St')
+        ->and($order->shipping_address)->toBe('1 Test St, phường Hoàn Kiếm, Thành phố Hà Nội')
         ->and((float) $order->final_amount)->toBe(230000.0);
 });
 
@@ -140,7 +167,7 @@ test('checkout with address_id snapshots address onto order', function (): void 
         ->assertJsonPath('data.order.shipping_phone', '0911111111');
 
     $order = Order::query()->where('account_id', $account->id)->firstOrFail();
-    expect($order->shipping_address)->toContain('99 Lane');
+    expect($order->shipping_address)->toBe('99 Lane, phường Hoàn Kiếm, Thành phố Hà Nội');
 });
 
 test('idempotent checkout returns same order', function (): void {

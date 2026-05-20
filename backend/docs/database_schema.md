@@ -419,6 +419,7 @@ CREATE TABLE IF NOT EXISTS `order_timelines` (
 `order_id` bigint unsigned NOT NULL,
 `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
 `note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+`actor` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
 `created_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 KEY `order_timelines_order_id_foreign` (`order_id`),

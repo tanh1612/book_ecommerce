@@ -138,7 +138,6 @@ class BookCatalogService
                     $query->where('categories.is_active', true);
                 },
                 'publisher:id,name',
-                'inventories:id,book_id,quantity,reserved_quantity',
             ])
             ->select([
                 'id',

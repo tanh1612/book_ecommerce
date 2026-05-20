@@ -13,6 +13,7 @@ class OrderTimeline extends Model
         'order_id',
         'status',
         'note',
+        'actor',
     ];
 
     public function order(): BelongsTo

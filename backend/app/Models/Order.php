@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -61,5 +63,11 @@ class Order extends Model
     public function paymentTransactions(): HasMany
     {
         return $this->hasMany(PaymentTransaction::class);
+    }
+
+    public function isAdminDeletable(): bool
+    {
+        return $this->current_status === OrderStatus::CONFIRMED
+            && $this->payment_status === PaymentStatus::PENDING;
     }
 }

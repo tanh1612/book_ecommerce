@@ -9,12 +9,14 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Catalog read-through cache. Invalidation is wired from {@see \App\Providers\AppServiceProvider::boot()}
- * model observers and {@see \App\Models\BookCategory} / {@see \App\Models\BookAuthor} pivot hooks — avoid raw DB writes that bypass them.
+ * Catalog read-through cache. Book detail excludes live stock; use {@see rememberBookStock()} for availability.
+ * Invalidation is wired from observers and pivot hooks — avoid raw DB writes that bypass them.
  */
 class CatalogCacheService
 {
     private const BOOK_DETAIL_TTL_SECONDS = 900;
+
+    private const BOOK_STOCK_TTL_SECONDS = 30;
 
     private const FILTERS_METADATA_TTL_SECONDS = 7200;
 
@@ -26,6 +28,11 @@ class CatalogCacheService
     public function filtersMetadataCacheKey(): string
     {
         return 'catalog:filters:v1';
+    }
+
+    public function bookStockCacheKey(int $bookId): string
+    {
+        return 'catalog:book:stock:'.$bookId;
     }
 
     /**
@@ -75,6 +82,55 @@ class CatalogCacheService
             ]);
 
             return $resolver();
+        }
+    }
+
+    /**
+     * @param  callable(): array{available_stock: int, in_stock: bool}  $resolver
+     * @return array{available_stock: int, in_stock: bool}
+     */
+    public function rememberBookStock(int $bookId, callable $resolver): array
+    {
+        if ($bookId <= 0) {
+            return $resolver();
+        }
+
+        $key = $this->bookStockCacheKey($bookId);
+
+        try {
+            /** @var array{available_stock: int, in_stock: bool} $stock */
+            $stock = Cache::remember($key, self::BOOK_STOCK_TTL_SECONDS, $resolver);
+
+            return $stock;
+        } catch (Throwable $e) {
+            Log::warning('Catalog book stock cache read failed', [
+                'key' => $key,
+                'book_id' => $bookId,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            return $resolver();
+        }
+    }
+
+    public function forgetBookStock(int $bookId): void
+    {
+        if ($bookId <= 0) {
+            return;
+        }
+
+        $key = $this->bookStockCacheKey($bookId);
+
+        try {
+            Cache::forget($key);
+        } catch (Throwable $e) {
+            Log::warning('Catalog book stock cache forget failed', [
+                'key' => $key,
+                'book_id' => $bookId,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
         }
     }
 

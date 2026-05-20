@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Book;
+use App\Services\Catalog\BookStockAvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,7 +17,7 @@ class BookDetailResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $availableStock = $this->availableStock();
+        $availability = $this->resolveAvailability();
 
         return [
             'id' => $this->id,
@@ -28,8 +29,8 @@ class BookDetailResource extends JsonResource
             'average_rating' => $this->average_rating,
             'review_count' => $this->review_count,
             'is_active' => (bool) $this->is_active,
-            'available_stock' => $availableStock,
-            'in_stock' => $availableStock > 0,
+            'available_stock' => $availability['available_stock'],
+            'in_stock' => $availability['in_stock'],
             'authors' => $this->whenLoaded('authors', fn () => $this->authors->map(fn ($author) => [
                 'id' => $author->id,
                 'name' => $author->name,
@@ -74,14 +75,22 @@ class BookDetailResource extends JsonResource
         return $raw !== null && $raw !== '' ? (string) $raw : null;
     }
 
-    private function availableStock(): int
+    /**
+     * @return array{available_stock: int, in_stock: bool}
+     */
+    private function resolveAvailability(): array
     {
-        if (! $this->relationLoaded('inventories')) {
-            return 0;
+        if ($this->relationLoaded('inventories')) {
+            $availableStock = (int) $this->inventories->sum(function ($inventory): int {
+                return max(0, (int) $inventory->quantity - (int) $inventory->reserved_quantity);
+            });
+
+            return [
+                'available_stock' => $availableStock,
+                'in_stock' => $availableStock > 0,
+            ];
         }
 
-        return (int) $this->inventories->sum(function ($inventory): int {
-            return max(0, (int) $inventory->quantity - (int) $inventory->reserved_quantity);
-        });
+        return app(BookStockAvailabilityService::class)->getAvailability((int) $this->id);
     }
 }

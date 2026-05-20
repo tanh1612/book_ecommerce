@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\OrderResource\RelationManagers;
 
 use App\Enums\Order\OrderStatus;
-use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -56,6 +55,9 @@ class OrderTimelinesRelationManager extends RelationManager
                             default => $state,
                         };
                     }),
+                Tables\Columns\TextColumn::make('actor')
+                    ->label('Người thực hiện')
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('note')
                     ->label('Ghi chú')
                     ->limit(50),
@@ -65,10 +67,7 @@ class OrderTimelinesRelationManager extends RelationManager
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
-            ->headerActions([
-                Actions\CreateAction::make()
-                    ->label('Thêm trạng thái'),
-            ])
+            ->headerActions([])
             ->actions([])
             ->bulkActions([]);
     }

@@ -6,6 +6,7 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class OrderInventoryService
@@ -48,6 +49,71 @@ class OrderInventoryService
             }
         } catch (Throwable $e) {
             Log::error('Release reserved inventory for order failed', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Commit reserved stock to sold when an order is delivered.
+     * Caller should run inside a DB transaction with the order status update.
+     */
+    public function fulfillDeliveredOrder(Order $order): void
+    {
+        try {
+            $items = OrderItem::query()
+                ->where('order_id', $order->id)
+                ->get(['book_id', 'quantity']);
+
+            foreach ($items as $item) {
+                $bookId = (int) $item->book_id;
+                $qty = (int) $item->quantity;
+
+                if ($qty <= 0) {
+                    continue;
+                }
+
+                $inventory = Inventory::query()
+                    ->where('book_id', $bookId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($inventory === null) {
+                    throw ValidationException::withMessages([
+                        'inventory' => ["Không tìm thấy tồn kho cho sách #{$bookId}."],
+                    ]);
+                }
+
+                $reserved = (int) $inventory->reserved_quantity;
+                $onHand = (int) $inventory->quantity;
+
+                if ($qty > $reserved) {
+                    throw ValidationException::withMessages([
+                        'inventory' => [
+                            "Số lượng giữ hàng không đủ cho sách #{$bookId} (cần {$qty}, đang giữ {$reserved}).",
+                        ],
+                    ]);
+                }
+
+                if ($qty > $onHand) {
+                    throw ValidationException::withMessages([
+                        'inventory' => [
+                            "Tồn kho không đủ cho sách #{$bookId} (cần {$qty}, còn {$onHand}).",
+                        ],
+                    ]);
+                }
+
+                $inventory->decrement('reserved_quantity', $qty);
+                $inventory->decrement('quantity', $qty);
+                $inventory->increment('sold_quantity', $qty);
+            }
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('Fulfill delivered order inventory failed', [
                 'order_id' => $order->id,
                 'error' => $e->getMessage(),
             ]);

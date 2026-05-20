@@ -71,7 +71,7 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
     Route::get('{slug}', [BookController::class, 'show']);
 });
 
-// Cart (HttpOnly guest cart token cookie for guests; Sanctum session for members)
+// Cart
 Route::prefix('v1/cart')->middleware(['web', 'throttle:120,1'])->group(function (): void {
     // Get cart
     Route::get('', [CartController::class, 'show']);

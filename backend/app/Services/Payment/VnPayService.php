@@ -11,6 +11,7 @@ use App\Enums\Payment\PaymentTransactionType;
 use App\Models\Order;
 use App\Models\OrderTimeline;
 use App\Models\PaymentTransaction;
+use App\Services\Order\OrderStatusTransitionService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -240,13 +241,13 @@ class VnPayService
                         OrderTimeline::query()->create([
                             'order_id' => $order->id,
                             'status' => OrderStatus::CONFIRMED->value,
-                            'note' => 'VNPay payment succeeded.',
+                            'note' => OrderStatusTransitionService::TIMELINE_NOTE_VNPAY_PAID,
                         ]);
                     } else {
                         OrderTimeline::query()->create([
                             'order_id' => $order->id,
                             'status' => $order->current_status->value,
-                            'note' => 'VNPay payment succeeded.',
+                            'note' => OrderStatusTransitionService::TIMELINE_NOTE_VNPAY_PAID,
                         ]);
                     }
 
@@ -271,7 +272,7 @@ class VnPayService
                 OrderTimeline::query()->create([
                     'order_id' => $order->id,
                     'status' => $order->current_status->value,
-                    'note' => 'VNPay payment failed.',
+                    'note' => OrderStatusTransitionService::TIMELINE_NOTE_VNPAY_FAILED,
                 ]);
 
                 return [

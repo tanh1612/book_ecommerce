@@ -8,7 +8,9 @@ use App\Enums\Order\PaymentStatus;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Filament\Resources\OrderResource\RelationManagers;
 use App\Models\Order;
+use App\Services\Order\OrderInventoryService;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Forms\Components as Field;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components as Layout;
@@ -40,7 +42,7 @@ class OrderResource extends Resource
                 Field\Select::make('current_status')->label('Trạng thái đơn')->options(OrderStatus::class)->required(),
                 Field\Select::make('payment_method')->label('Phương thức thanh toán')->options(PaymentMethod::class),
                 Field\Select::make('payment_status')->label('Trạng thái thanh toán')->options(PaymentStatus::class),
-            ])->columns(3),
+            ])->columns(2),
             Layout\Section::make('Giao hàng & tổng tiền')->components([
                 Field\TextInput::make('shipping_name')->label('Tên người nhận')->maxLength(255),
                 Field\TextInput::make('shipping_phone')->label('Số điện thoại')->maxLength(20),
@@ -65,8 +67,14 @@ class OrderResource extends Resource
                 Tables\Filters\SelectFilter::make('current_status')->label('Trạng thái đơn')->options(OrderStatus::class),
                 Tables\Filters\SelectFilter::make('payment_status')->label('Trạng thái thanh toán')->options(PaymentStatus::class),
             ])
-            ->actions([Actions\EditAction::make()])
-            ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);
+            ->actions([
+                Actions\ViewAction::make()->label('Xem'),
+            ])
+            ->bulkActions([
+                Actions\BulkActionGroup::make([
+                    static::configureOrderDeleteBulkAction(Actions\DeleteBulkAction::make()),
+                ]),
+            ]);
     }
 
     public static function getRelations(): array
@@ -77,13 +85,52 @@ class OrderResource extends Resource
         ];
     }
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return $record instanceof Order && $record->isAdminDeletable();
+    }
+
+    public static function configureOrderDeleteBulkAction(Actions\DeleteBulkAction $action): Actions\DeleteBulkAction
+    {
+        return $action
+            ->before(function (\Illuminate\Database\Eloquent\Collection $records, Actions\DeleteBulkAction $action): void {
+                foreach ($records as $record) {
+                    if (! $record instanceof Order || ! $record->isAdminDeletable()) {
+                        Notification::make()
+                            ->title('Không thể xóa')
+                            ->body('Chỉ xóa được đơn Đã xác nhận với trạng thái thanh toán Chờ thanh toán.')
+                            ->danger()
+                            ->send();
+                        $action->halt();
+
+                        return;
+                    }
+                }
+
+                $inventory = app(OrderInventoryService::class);
+                foreach ($records as $record) {
+                    if ($record instanceof Order) {
+                        $inventory->releaseReservedForOrder($record);
+                    }
+                }
+            });
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListOrders::route('/'),
-            'create' => Pages\CreateOrder::route('/create'),
             'view' => Pages\ViewOrder::route('/{record}'),
-            'edit' => Pages\EditOrder::route('/{record}/edit'),
         ];
     }
 }

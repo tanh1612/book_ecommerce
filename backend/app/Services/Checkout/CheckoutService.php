@@ -15,7 +15,9 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderTimeline;
 use App\Models\ShippingMethod;
+use App\Services\Order\OrderStatusTransitionService;
 use App\Services\Payment\VnPayService;
+use App\Services\Shipping\ShippingAddressSnapshotFormatter;
 use App\Services\Shipping\ShippingQuoteService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +30,7 @@ class CheckoutService
     public function __construct(
         private VnPayService $vnPayService,
         private ShippingQuoteService $shippingQuoteService,
+        private ShippingAddressSnapshotFormatter $addressSnapshotFormatter,
     ) {}
 
     /**
@@ -208,8 +211,8 @@ class CheckoutService
                     'order_id' => $order->id,
                     'status' => $initialOrderStatus->value,
                     'note' => $isCod
-                        ? 'COD order confirmed at checkout.'
-                        : 'Order created from checkout.',
+                        ? OrderStatusTransitionService::TIMELINE_NOTE_CHECKOUT_COD
+                        : OrderStatusTransitionService::TIMELINE_NOTE_CHECKOUT_VNPAY_PENDING,
                 ]);
 
                 foreach ($cartItems as $line) {
@@ -301,7 +304,11 @@ class CheckoutService
             return [
                 $address->recipient_name,
                 $address->recipient_phone,
-                $this->formatAddressSnapshot($address->detail_address, $address->ward_code, $address->province_code),
+                $this->addressSnapshotFormatter->format(
+                    $address->detail_address,
+                    (string) $address->ward_code,
+                    (string) $address->province_code,
+                ),
                 (string) $address->province_code,
             ];
         }
@@ -311,13 +318,12 @@ class CheckoutService
         return [
             (string) $s['recipient_name'],
             (string) $s['recipient_phone'],
-            $this->formatAddressSnapshot((string) $s['detail_address'], (string) $s['ward_code'], (string) $s['province_code']),
+            $this->addressSnapshotFormatter->format(
+                (string) $s['detail_address'],
+                (string) $s['ward_code'],
+                (string) $s['province_code'],
+            ),
             (string) $s['province_code'],
         ];
-    }
-
-    private function formatAddressSnapshot(string $detail, string $wardCode, string $provinceCode): string
-    {
-        return $detail.', Phường/Xã mã: '.$wardCode.', Tỉnh/TP mã: '.$provinceCode;
     }
 }
