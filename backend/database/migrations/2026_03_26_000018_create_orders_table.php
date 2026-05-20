@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('payment_method', 50)->nullable();
             $table->string('payment_status', 50)->nullable();
             $table->timestamp('payment_expires_at')->nullable();
+            $table->timestamp('refund_deadline_at')->nullable();
             $table->text('note')->nullable();
             $table->string('current_status', 50);
             $table->timestamps();

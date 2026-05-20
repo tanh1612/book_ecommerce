@@ -10,8 +10,8 @@ use App\Filament\Resources\OrderResource\RelationManagers;
 use App\Models\Order;
 use App\Services\Order\OrderInventoryService;
 use Filament\Actions;
-use Filament\Notifications\Notification;
 use Filament\Forms\Components as Field;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components as Layout;
 use Filament\Schemas\Schema;
@@ -67,9 +67,11 @@ class OrderResource extends Resource
                 Tables\Filters\SelectFilter::make('current_status')->label('Trạng thái đơn')->options(OrderStatus::class),
                 Tables\Filters\SelectFilter::make('payment_status')->label('Trạng thái thanh toán')->options(PaymentStatus::class),
             ])
-            ->actions([
+            ->recordActions([
                 Actions\ViewAction::make()->label('Xem'),
             ])
+            ->recordActionsColumnLabel('Thao tác')
+            ->recordUrl(fn (Order $record): string => static::getUrl('view', ['record' => $record]))
             ->bulkActions([
                 Actions\BulkActionGroup::make([
                     static::configureOrderDeleteBulkAction(Actions\DeleteBulkAction::make()),

@@ -28,7 +28,7 @@ class DownloadOrderInvoiceController extends Controller
         if (! in_array($order->current_status, [
             OrderStatus::PROCESSING,
             OrderStatus::SHIPPING,
-            OrderStatus::DELIVERED,
+            OrderStatus::COMPLETED,
         ], true)) {
             abort(HttpResponse::HTTP_FORBIDDEN, 'Đơn chưa ở giai đoạn cho phép xuất hóa đơn.');
         }

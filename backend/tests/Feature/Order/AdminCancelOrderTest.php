@@ -95,6 +95,6 @@ test('cannot cancel order that is not confirmed', function (OrderStatus $status)
         OrderStatus::PENDING,
         OrderStatus::PROCESSING,
         OrderStatus::SHIPPING,
-        OrderStatus::DELIVERED,
+        OrderStatus::COMPLETED,
         OrderStatus::CANCELLED,
     ]);

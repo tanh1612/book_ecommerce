@@ -1,9 +1,9 @@
 <?php
 
+use App\Enums\Account\AccountRole;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentMethod;
 use App\Enums\Order\PaymentStatus;
-use App\Enums\Account\AccountRole;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Inventory;
@@ -128,7 +128,7 @@ test('admin can deliver paid shipping order and updates inventory sold quantity'
 
     $updated = app(OrderStatusTransitionService::class)->deliverOrder($order, $admin);
 
-    expect($updated->current_status)->toBe(OrderStatus::DELIVERED);
+    expect($updated->current_status)->toBe(OrderStatus::COMPLETED);
 
     $inventory = Inventory::query()->where('book_id', $book->id)->firstOrFail();
     expect((int) $inventory->quantity)->toBe(8)
@@ -137,7 +137,7 @@ test('admin can deliver paid shipping order and updates inventory sold quantity'
 
     $timeline = OrderTimeline::query()
         ->where('order_id', $order->id)
-        ->where('status', OrderStatus::DELIVERED->value)
+        ->where('status', OrderStatus::COMPLETED->value)
         ->latest('id')
         ->first();
 
@@ -155,7 +155,7 @@ test('vnpay paid order can be delivered without cod confirmation', function (): 
 
     $updated = app(OrderStatusTransitionService::class)->deliverOrder($order, $admin);
 
-    expect($updated->current_status)->toBe(OrderStatus::DELIVERED);
+    expect($updated->current_status)->toBe(OrderStatus::COMPLETED);
 });
 
 test('cod order cannot be delivered before payment confirmation', function (): void {

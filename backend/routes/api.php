@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Account\AddressController;
+use App\Http\Controllers\Api\V1\Account\OrderController;
+use App\Http\Controllers\Api\V1\Account\OrderRefundBankInfoController;
 use App\Http\Controllers\Api\V1\Account\PasswordController;
 use App\Http\Controllers\Api\V1\Account\ProfileController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
@@ -111,6 +113,20 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function
 
     // Delete address
     Route::delete('addresses/{address}', [AddressController::class, 'destroy']);
+
+    // Get order details
+    Route::get('orders/{order}', [OrderController::class, 'show']);
+
+    // Get refund banks
+    Route::get('refund-banks', [OrderRefundBankInfoController::class, 'banks']);
+
+    // Verify refund bank info
+    Route::post('orders/{order}/refund-bank-info/verify', [OrderRefundBankInfoController::class, 'verify'])
+        ->middleware('throttle:20,1');
+
+    // Submit refund bank info
+    Route::post('orders/{order}/refund-bank-info', [OrderRefundBankInfoController::class, 'store'])
+        ->middleware('throttle:10,1');
 });
 
 // Checkout

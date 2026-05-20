@@ -10,7 +10,9 @@ use App\Models\Account;
 use App\Models\Order;
 use App\Services\Order\OrderStatusTransitionService;
 use Filament\Actions;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Validation\ValidationException;
@@ -46,7 +48,7 @@ class ViewOrder extends ViewRecord
                 ->visible(fn (): bool => $this->orderIs(
                     OrderStatus::PROCESSING,
                     OrderStatus::SHIPPING,
-                    OrderStatus::DELIVERED,
+                    OrderStatus::COMPLETED,
                 ))
                 ->url(fn (): string => route('admin.orders.invoice', ['order' => $this->getRecord()]))
                 ->openUrlInNewTab(),
@@ -90,23 +92,104 @@ class ViewOrder extends ViewRecord
                     'Đã xác nhận thu tiền COD',
                 )),
             Actions\Action::make('deliverOrder')
-                ->label('Xác nhận đã giao')
+                ->label('Hoàn tất đơn hàng')
                 ->color('success')
                 ->icon('heroicon-o-check-circle')
                 ->visible(fn (): bool => $this->orderIs(OrderStatus::SHIPPING)
                     && $this->orderHasPayment(null, PaymentStatus::PAID))
                 ->requiresConfirmation()
-                ->modalHeading('Xác nhận đã giao hàng')
-                ->modalDescription('Hoàn tất giao hàng và chuyển đơn sang trạng thái Đã giao hàng.')
-                ->schema($this->transitionNoteSchema(OrderStatusTransitionService::TIMELINE_NOTE_DELIVERED))
+                ->modalHeading('Hoàn tất đơn hàng')
+                ->modalDescription('Xác nhận giao hàng thành công và chuyển đơn sang trạng thái Hoàn tất.')
+                ->schema($this->transitionNoteSchema(OrderStatusTransitionService::TIMELINE_NOTE_COMPLETED))
                 ->action(fn (array $data) => $this->runTransition(
                     fn (OrderStatusTransitionService $service, Order $order, Account $actor) => $service->deliverOrder(
                         $order,
                         $actor,
                         $data['note'] ?? null,
                     ),
-                    'Đã xác nhận giao hàng thành công',
+                    'Đã hoàn tất đơn hàng',
                 )),
+            Actions\Action::make('deliveryFailed')
+                ->label('Giao hàng thất bại')
+                ->color('danger')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->visible(fn (): bool => $this->orderIs(OrderStatus::SHIPPING)
+                    && (
+                        $this->orderHasPayment(PaymentMethod::COD, PaymentStatus::PENDING)
+                        || $this->orderHasPayment(PaymentMethod::VNPAY, PaymentStatus::PAID)
+                    ))
+                ->requiresConfirmation()
+                ->modalHeading('Giao hàng thất bại')
+                ->schema($this->transitionNoteSchema(OrderStatusTransitionService::TIMELINE_NOTE_DELIVERY_FAILED_SHORT))
+                ->action(fn (array $data) => $this->runTransition(
+                    fn (OrderStatusTransitionService $service, Order $order, Account $actor) => $service->markDeliveryFailed(
+                        $order,
+                        $actor,
+                        $data['note'] ?? null,
+                    ),
+                    'Đã ghi nhận giao hàng thất bại',
+                )),
+            Actions\Action::make('confirmManualRefund')
+                ->label('Xác nhận đã chuyển khoản')
+                ->color('success')
+                ->icon('heroicon-o-banknotes')
+                ->visible(fn (): bool => $this->orderIs(OrderStatus::CANCELLED)
+                    && $this->orderHasPayment(null, PaymentStatus::REFUNDING)
+                    && $this->getRecord() instanceof Order
+                    && $this->getRecord()->verifiedRefundBankInfo() !== null)
+                ->modalHeading('Xác nhận đã chuyển khoản hoàn tiền')
+                ->modalDescription(fn (): string => $this->manualRefundConfirmationDescription())
+                ->schema([
+                    TextInput::make('reference_code')
+                        ->label('Mã chứng từ / giao dịch')
+                        ->required()
+                        ->maxLength(255),
+                    DatePicker::make('transferred_at')
+                        ->label('Ngày chuyển khoản')
+                        ->required()
+                        ->maxDate(now())
+                        ->native(false)
+                        ->displayFormat('d/m/Y'),
+                    Textarea::make('note')
+                        ->label('Ghi chú')
+                        ->maxLength(500),
+                ])
+                ->action(function (array $data): void {
+                    $record = $this->getRecord();
+                    if (! $record instanceof Order) {
+                        return;
+                    }
+
+                    $actor = auth()->user();
+                    if (! $actor instanceof Account) {
+                        return;
+                    }
+
+                    try {
+                        $updated = app(OrderStatusTransitionService::class)->confirmManualRefundCompleted(
+                            $record,
+                            $actor,
+                            $data['reference_code'],
+                            $data['transferred_at'],
+                            $data['note'] ?? null,
+                        );
+                    } catch (ValidationException $e) {
+                        Notification::make()
+                            ->title('Không thể thực hiện')
+                            ->body(collect($e->errors())->flatten()->first() ?? 'Dữ liệu không hợp lệ.')
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Đã xác nhận chuyển khoản hoàn tiền')
+                        ->success()
+                        ->send();
+
+                    $this->redirect(OrderResource::getUrl('view', ['record' => $updated]));
+                }),
             Actions\Action::make('cancelOrder')
                 ->label('Hủy đơn')
                 ->color('danger')
@@ -125,6 +208,35 @@ class ViewOrder extends ViewRecord
                     'Đã hủy đơn hàng',
                 )),
         ];
+    }
+
+    private function manualRefundConfirmationDescription(): string
+    {
+        $record = $this->getRecord();
+
+        if (! $record instanceof Order) {
+            return 'Xác nhận đã chuyển khoản hoàn tiền cho khách.';
+        }
+
+        $bankInfo = $record->verifiedRefundBankInfo();
+
+        if ($bankInfo === null) {
+            return 'Khách chưa cung cấp thông tin hoàn tiền đã xác minh.';
+        }
+
+        $amount = number_format((float) $record->final_amount, 0, ',', '.');
+        $accountNumber = (string) ($bankInfo['account_number'] ?? '');
+        $masked = strlen($accountNumber) > 4
+            ? '•••'.substr($accountNumber, -4)
+            : $accountNumber;
+
+        return sprintf(
+            'Chuyển khoản %s ₫ tới %s — %s (%s). Sau khi chuyển, nhập mã giao dịch và ngày chuyển.',
+            $amount,
+            (string) ($bankInfo['bank_name'] ?? ''),
+            (string) ($bankInfo['account_holder'] ?? ''),
+            $masked,
+        );
     }
 
     /**

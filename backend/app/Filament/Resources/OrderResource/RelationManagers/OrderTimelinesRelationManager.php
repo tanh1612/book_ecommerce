@@ -41,7 +41,7 @@ class OrderTimelinesRelationManager extends RelationManager
                         'confirmed' => 'info',
                         'processing' => 'info',
                         'shipping' => 'primary',
-                        'delivered' => 'success',
+                        'completed' => 'success',
                         'cancelled' => 'danger',
                         'returned' => 'gray',
                         'refund_closed' => 'gray',

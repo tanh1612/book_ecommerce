@@ -11,7 +11,7 @@ enum OrderStatus: string implements HasColor, HasLabel
     case CONFIRMED = 'confirmed';
     case PROCESSING = 'processing';
     case SHIPPING = 'shipping';
-    case DELIVERED = 'delivered';
+    case COMPLETED = 'completed';
     case CANCELLED = 'cancelled';
     case REFUND_CLOSED = 'refund_closed';
 
@@ -22,7 +22,7 @@ enum OrderStatus: string implements HasColor, HasLabel
             self::CONFIRMED => 'Đã xác nhận',
             self::PROCESSING => 'Đang xử lý',
             self::SHIPPING => 'Đang giao hàng',
-            self::DELIVERED => 'Đã giao hàng',
+            self::COMPLETED => 'Hoàn tất',
             self::CANCELLED => 'Đã hủy',
             self::REFUND_CLOSED => 'Đóng - Không hoàn tiền',
         };
@@ -35,7 +35,7 @@ enum OrderStatus: string implements HasColor, HasLabel
             self::CONFIRMED => 'info',
             self::PROCESSING => 'primary',
             self::SHIPPING => 'gray',
-            self::DELIVERED => 'success',
+            self::COMPLETED => 'success',
             self::CANCELLED => 'danger',
             self::REFUND_CLOSED => 'gray',
         };

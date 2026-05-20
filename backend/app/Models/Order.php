@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentStatus;
+use App\Enums\Payment\PaymentTransactionStatus;
+use App\Enums\Payment\PaymentTransactionType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -23,6 +25,7 @@ class Order extends Model
         'payment_method',
         'payment_status',
         'payment_expires_at',
+        'refund_deadline_at',
         'note',
         'current_status',
     ];
@@ -37,6 +40,7 @@ class Order extends Model
             'payment_method' => \App\Enums\Order\PaymentMethod::class,
             'payment_status' => \App\Enums\Order\PaymentStatus::class,
             'payment_expires_at' => 'datetime',
+            'refund_deadline_at' => 'datetime',
         ];
     }
 
@@ -69,5 +73,54 @@ class Order extends Model
     {
         return $this->current_status === OrderStatus::CONFIRMED
             && $this->payment_status === PaymentStatus::PENDING;
+    }
+
+    public function pendingRefundTransaction(): ?PaymentTransaction
+    {
+        return $this->paymentTransactions()
+            ->where('type', PaymentTransactionType::REFUND)
+            ->where('status', PaymentTransactionStatus::PENDING)
+            ->first();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function verifiedRefundBankInfo(): ?array
+    {
+        $txn = $this->pendingRefundTransaction()
+            ?? $this->paymentTransactions()
+                ->where('type', PaymentTransactionType::REFUND)
+                ->latest('id')
+                ->first();
+
+        if ($txn === null) {
+            return null;
+        }
+
+        $bankInfo = $txn->payload['bank_info'] ?? null;
+
+        if (! is_array($bankInfo) || ($bankInfo['verification']['status'] ?? null) !== 'verified') {
+            return null;
+        }
+
+        return $bankInfo;
+    }
+
+    public function canSubmitRefundBankInfo(): bool
+    {
+        if ($this->payment_status !== PaymentStatus::REFUNDING) {
+            return false;
+        }
+
+        if ($this->refund_deadline_at !== null && $this->refund_deadline_at->isPast()) {
+            return false;
+        }
+
+        if ($this->pendingRefundTransaction() === null) {
+            return false;
+        }
+
+        return $this->verifiedRefundBankInfo() === null;
     }
 }

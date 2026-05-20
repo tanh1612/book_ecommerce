@@ -33,25 +33,7 @@ class LatestOrders extends BaseWidget
                     ->money('VND'),
                 Tables\Columns\TextColumn::make('current_status')
                     ->label('Trạng thái')
-                    ->badge()
-                    ->color(fn (?string $state): string => match ($state) {
-                        'pending' => 'warning',
-                        'confirmed', 'processing' => 'info',
-                        'shipping' => 'primary',
-                        'delivered' => 'success',
-                        'cancelled' => 'danger',
-                        default => 'secondary',
-                    })
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'pending' => 'Chờ xử lý',
-                        'confirmed' => 'Đã xác nhận',
-                        'processing' => 'Đang xử lý',
-                        'shipping' => 'Đang giao hàng',
-                        'delivered' => 'Đã giao hàng',
-                        'cancelled' => 'Đã hủy',
-                        'returned' => 'Trả hàng',
-                        default => $state ?? '—',
-                    }),
+                    ->badge(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Ngày đặt')
                     ->dateTime('d/m/Y H:i')
