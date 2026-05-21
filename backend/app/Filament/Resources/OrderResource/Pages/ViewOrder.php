@@ -15,11 +15,17 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Validation\ValidationException;
 
 class ViewOrder extends ViewRecord
 {
     protected static string $resource = OrderResource::class;
+
+    public function getTitle(): string|Htmlable
+    {
+        return 'Xem đơn hàng #'.$this->getRecord()->getKey();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -29,6 +35,8 @@ class ViewOrder extends ViewRecord
                 ->color('primary')
                 ->icon('heroicon-o-cog-6-tooth')
                 ->visible(fn (): bool => $this->orderIs(OrderStatus::CONFIRMED))
+                ->disabled(fn (): bool => $this->isCodProcessingGraceActive())
+                ->tooltip(fn (): ?string => $this->codProcessingGraceTooltip())
                 ->requiresConfirmation()
                 ->modalHeading('Xử lý đơn hàng')
                 ->modalDescription('Chuyển đơn sang trạng thái Đang xử lý để chuẩn bị và xuất hóa đơn.')
@@ -136,7 +144,7 @@ class ViewOrder extends ViewRecord
                 ->visible(fn (): bool => $this->orderIs(OrderStatus::CANCELLED)
                     && $this->orderHasPayment(null, PaymentStatus::REFUNDING)
                     && $this->getRecord() instanceof Order
-                    && $this->getRecord()->verifiedRefundBankInfo() !== null)
+                    && $this->getRecord()->submittedRefundBankInfo() !== null)
                 ->modalHeading('Xác nhận đã chuyển khoản hoàn tiền')
                 ->modalDescription(fn (): string => $this->manualRefundConfirmationDescription())
                 ->schema([
@@ -218,24 +226,21 @@ class ViewOrder extends ViewRecord
             return 'Xác nhận đã chuyển khoản hoàn tiền cho khách.';
         }
 
-        $bankInfo = $record->verifiedRefundBankInfo();
+        $bankInfo = $record->submittedRefundBankInfo();
 
         if ($bankInfo === null) {
-            return 'Khách chưa cung cấp thông tin hoàn tiền đã xác minh.';
+            return 'Khách chưa cung cấp thông tin hoàn tiền.';
         }
 
         $amount = number_format((float) $record->final_amount, 0, ',', '.');
         $accountNumber = (string) ($bankInfo['account_number'] ?? '');
-        $masked = strlen($accountNumber) > 4
-            ? '•••'.substr($accountNumber, -4)
-            : $accountNumber;
 
         return sprintf(
-            'Chuyển khoản %s ₫ tới %s — %s (%s). Sau khi chuyển, nhập mã giao dịch và ngày chuyển.',
+            'Chuyển khoản %s ₫ tới %s — %s (STK: %s). Sau khi chuyển, nhập mã giao dịch và ngày chuyển.',
             $amount,
             (string) ($bankInfo['bank_name'] ?? ''),
             (string) ($bankInfo['account_holder'] ?? ''),
-            $masked,
+            $accountNumber !== '' ? $accountNumber : '—',
         );
     }
 
@@ -258,6 +263,31 @@ class ViewOrder extends ViewRecord
 
         return $record instanceof Order
             && in_array($record->current_status, $statuses, true);
+    }
+
+    private function isCodProcessingGraceActive(): bool
+    {
+        $record = $this->getRecord();
+
+        if (! $record instanceof Order) {
+            return false;
+        }
+
+        return app(OrderStatusTransitionService::class)->isCodWithinProcessingGrace($record);
+    }
+
+    private function codProcessingGraceTooltip(): ?string
+    {
+        if (! $this->isCodProcessingGraceActive()) {
+            return null;
+        }
+
+        $minutes = max(1, (int) config('order.cod_processing_grace_minutes', 30));
+
+        return sprintf(
+            'Đơn COD cần ở trạng thái "Đã xác nhận" ít nhất %d phút trước khi chuyển sang trạng thái "Đang xử lý".',
+            $minutes,
+        );
     }
 
     private function orderHasPayment(?PaymentMethod $method, PaymentStatus $paymentStatus): bool

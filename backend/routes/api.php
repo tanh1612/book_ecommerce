@@ -117,12 +117,12 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function
     // Get order details
     Route::get('orders/{order}', [OrderController::class, 'show']);
 
+    // Cancel order (customer)
+    Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])
+        ->middleware('throttle:10,1');
+
     // Get refund banks
     Route::get('refund-banks', [OrderRefundBankInfoController::class, 'banks']);
-
-    // Verify refund bank info
-    Route::post('orders/{order}/refund-bank-info/verify', [OrderRefundBankInfoController::class, 'verify'])
-        ->middleware('throttle:20,1');
 
     // Submit refund bank info
     Route::post('orders/{order}/refund-bank-info', [OrderRefundBankInfoController::class, 'store'])

@@ -12,6 +12,11 @@ class CreateWarehouse extends CreateRecord
 {
     protected static string $resource = WarehouseResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function beforeCreate(): void
     {
         if (Warehouse::query()->exists()) {

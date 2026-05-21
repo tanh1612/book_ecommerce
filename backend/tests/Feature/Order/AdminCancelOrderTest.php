@@ -69,7 +69,8 @@ test('admin can cancel confirmed order and release reserved inventory', function
         'Khách yêu cầu hủy',
     );
 
-    expect($updated->current_status)->toBe(OrderStatus::CANCELLED);
+    expect($updated->current_status)->toBe(OrderStatus::CANCELLED)
+        ->and($updated->payment_status)->toBe(PaymentStatus::CANCELLED);
 
     $inventory = Inventory::query()->where('book_id', $book->id)->first();
     expect($inventory->reserved_quantity)->toBe(0);

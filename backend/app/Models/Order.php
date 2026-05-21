@@ -86,7 +86,7 @@ class Order extends Model
     /**
      * @return array<string, mixed>|null
      */
-    public function verifiedRefundBankInfo(): ?array
+    public function submittedRefundBankInfo(): ?array
     {
         $txn = $this->pendingRefundTransaction()
             ?? $this->paymentTransactions()
@@ -100,7 +100,7 @@ class Order extends Model
 
         $bankInfo = $txn->payload['bank_info'] ?? null;
 
-        if (! is_array($bankInfo) || ($bankInfo['verification']['status'] ?? null) !== 'verified') {
+        if (! is_array($bankInfo)) {
             return null;
         }
 
@@ -121,6 +121,6 @@ class Order extends Model
             return false;
         }
 
-        return $this->verifiedRefundBankInfo() === null;
+        return $this->submittedRefundBankInfo() === null;
     }
 }

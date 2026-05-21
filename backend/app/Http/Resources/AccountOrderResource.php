@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Enums\Order\PaymentStatus;
 use App\Models\Order;
+use App\Services\Order\OrderStatusTransitionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,7 +21,9 @@ class AccountOrderResource extends JsonResource
         /** @var Order $order */
         $order = $this->resource;
         $items = $order->relationLoaded('items') ? $order->items : collect();
-        $bankInfo = $order->verifiedRefundBankInfo();
+        $bankInfo = $order->submittedRefundBankInfo();
+
+        $cancelEligibility = app(OrderStatusTransitionService::class)->customerCancelEligibility($order);
 
         $manualRefund = null;
         if ($order->payment_status === PaymentStatus::REFUNDING) {
@@ -45,6 +48,8 @@ class AccountOrderResource extends JsonResource
             'payment_method' => $order->payment_method?->value,
             'payment_status' => $order->payment_status?->value,
             'current_status' => $order->current_status?->value,
+            'can_cancel' => $cancelEligibility['can_cancel'],
+            'cancel_block_reason' => $cancelEligibility['cancel_block_reason'],
             'refund_deadline_at' => $order->refund_deadline_at?->toIso8601String(),
             'manual_refund' => $manualRefund,
             'items' => $items->map(function ($item): array {
@@ -74,7 +79,6 @@ class AccountOrderResource extends JsonResource
             'account_number_masked' => $this->maskAccountNumber($accountNumber),
             'account_holder' => $bankInfo['account_holder'] ?? null,
             'submitted_at' => $bankInfo['submitted_at'] ?? null,
-            'verified' => ($bankInfo['verification']['status'] ?? null) === 'verified',
         ];
     }
 

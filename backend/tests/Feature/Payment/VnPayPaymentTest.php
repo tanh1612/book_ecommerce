@@ -145,7 +145,7 @@ test('expire command cancels unpaid vnpay orders past expiry', function (): void
 
     $order->refresh();
     expect($order->current_status)->toBe(OrderStatus::CANCELLED)
-        ->and($order->payment_status)->toBe(PaymentStatus::FAILED);
+        ->and($order->payment_status)->toBe(PaymentStatus::CANCELLED);
 
     $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
     expect($txn->status)->toBe(PaymentTransactionStatus::EXPIRED);

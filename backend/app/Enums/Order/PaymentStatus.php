@@ -10,6 +10,7 @@ enum PaymentStatus: string implements HasColor, HasLabel
     case PENDING = 'pending';
     case PAID = 'paid';
     case FAILED = 'failed';
+    case CANCELLED = 'cancelled';
     case REFUNDING = 'refunding';
     case REFUNDED = 'refunded';
     case REFUND_EXPIRED = 'refund_expired';
@@ -20,6 +21,7 @@ enum PaymentStatus: string implements HasColor, HasLabel
             self::PENDING => 'Chờ thanh toán',
             self::PAID => 'Đã thanh toán',
             self::FAILED => 'Thanh toán lỗi',
+            self::CANCELLED => 'Đã hủy thanh toán',
             self::REFUNDING => 'Chờ hoàn tiền',
             self::REFUNDED => 'Đã hoàn trả tiền',
             self::REFUND_EXPIRED => 'Quá hạn hoàn tiền',
@@ -32,6 +34,7 @@ enum PaymentStatus: string implements HasColor, HasLabel
             self::PENDING => 'warning',
             self::PAID => 'success',
             self::FAILED => 'danger',
+            self::CANCELLED => 'gray',
             self::REFUNDING => 'info',
             self::REFUNDED => 'primary',
             self::REFUND_EXPIRED => 'danger',

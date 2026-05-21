@@ -2,6 +2,7 @@
 
 use App\Enums\Account\AccountRole;
 use App\Enums\Order\OrderStatus;
+use App\Filament\Resources\OrderResource\Pages\ViewOrder;
 use App\Enums\Order\PaymentMethod;
 use App\Enums\Order\PaymentStatus;
 use App\Models\Account;
@@ -16,8 +17,21 @@ use App\Services\Order\OrderInvoiceService;
 use App\Services\Order\OrderStatusTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+function fulfillmentConfirmedTimeline(Order $order, ?\Illuminate\Support\Carbon $createdAt = null): void
+{
+    OrderTimeline::query()->create([
+        'order_id' => $order->id,
+        'status' => OrderStatus::CONFIRMED->value,
+        'note' => OrderStatusTransitionService::TIMELINE_NOTE_CHECKOUT_COD,
+        'actor' => 'system',
+        'created_at' => $createdAt ?? now(),
+        'updated_at' => $createdAt ?? now(),
+    ]);
+}
 
 function fulfillmentTestOrder(
     OrderStatus $status,
@@ -50,6 +64,7 @@ function fulfillmentTestOrder(
 test('admin can process confirmed order', function (): void {
     $admin = Account::factory()->create();
     $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    fulfillmentConfirmedTimeline($order, now()->subMinutes(31));
 
     $updated = app(OrderStatusTransitionService::class)->processOrder($order, $admin, 'Bắt đầu đóng gói');
 
@@ -182,6 +197,86 @@ test('cannot process order that is not confirmed', function (): void {
 
     app(OrderStatusTransitionService::class)->processOrder($order, $admin);
 })->throws(ValidationException::class);
+
+test('admin cannot process cod confirmed order within grace period', function (): void {
+    $admin = Account::factory()->create();
+    $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    fulfillmentConfirmedTimeline($order, now()->subMinutes(10));
+
+    app(OrderStatusTransitionService::class)->processOrder($order, $admin);
+})->throws(ValidationException::class);
+
+test('admin can process cod confirmed order after grace period', function (): void {
+    $admin = Account::factory()->create();
+    $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    fulfillmentConfirmedTimeline($order, now()->subMinutes(31));
+
+    $updated = app(OrderStatusTransitionService::class)->processOrder($order, $admin);
+
+    expect($updated->current_status)->toBe(OrderStatus::PROCESSING);
+});
+
+test('admin cannot process cod confirmed order when confirmed timeline has null created_at within grace period', function (): void {
+    $admin = Account::factory()->create();
+    $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    $order->forceFill(['created_at' => now()->subMinutes(10)])->save();
+
+    OrderTimeline::query()->create([
+        'order_id' => $order->id,
+        'status' => OrderStatus::CONFIRMED->value,
+        'note' => OrderStatusTransitionService::TIMELINE_NOTE_CHECKOUT_COD,
+        'actor' => 'system',
+        'created_at' => null,
+        'updated_at' => null,
+    ]);
+
+    app(OrderStatusTransitionService::class)->processOrder($order->fresh(), $admin);
+})->throws(ValidationException::class);
+
+test('admin cannot process cod confirmed order without confirmed timeline within grace period', function (): void {
+    $admin = Account::factory()->create();
+    $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    $order->forceFill(['created_at' => now()->subMinutes(10)])->save();
+
+    expect(OrderTimeline::query()->where('order_id', $order->id)->where('status', OrderStatus::CONFIRMED->value)->exists())
+        ->toBeFalse();
+
+    app(OrderStatusTransitionService::class)->processOrder($order->fresh(), $admin);
+})->throws(ValidationException::class);
+
+test('admin can process cod confirmed order without confirmed timeline after grace period', function (): void {
+    $admin = Account::factory()->create();
+    $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    $order->forceFill(['created_at' => now()->subMinutes(31)])->save();
+
+    $updated = app(OrderStatusTransitionService::class)->processOrder($order->fresh(), $admin);
+
+    expect($updated->current_status)->toBe(OrderStatus::PROCESSING);
+});
+
+test('filament process order action is disabled for cod confirmed order within grace without timeline', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    $order->forceFill(['created_at' => now()->subMinutes(10)])->save();
+
+    Livewire::actingAs($admin)
+        ->test(ViewOrder::class, ['record' => $order->getKey()])
+        ->assertActionDisabled('processOrder');
+});
+
+test('filament process order action succeeds after grace without confirmed timeline', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $order = fulfillmentTestOrder(OrderStatus::CONFIRMED);
+    $order->forceFill(['created_at' => now()->subMinutes(31)])->save();
+
+    Livewire::actingAs($admin)
+        ->test(ViewOrder::class, ['record' => $order->getKey()])
+        ->assertActionEnabled('processOrder')
+        ->callAction('processOrder', data: ['note' => 'Bắt đầu xử lý'])
+        ->assertNotified();
+
+    expect($order->fresh()->current_status)->toBe(OrderStatus::PROCESSING);
+});
 
 test('admin can download invoice pdf route for processing order', function (): void {
     $admin = Account::factory()->create(['role' => AccountRole::Admin]);

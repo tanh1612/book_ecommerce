@@ -55,7 +55,6 @@ class InventoryResource extends Resource
                                 ->required()
                                 ->disabled($readOnlyOnEdit)
                                 ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
-                                ->rule(fn (Get $get, ?Inventory $record) => InventoryFilamentRules::uniqueBookIdForInventory($record))
                                 ->columnSpan(['default' => 'full', 'lg' => 4]),
                             Field\Select::make('warehouse_id')
                                 ->label('Kho')
@@ -69,12 +68,14 @@ class InventoryResource extends Resource
                             Field\DateTimePicker::make('last_restocked_at')
                                 ->label('Nhập kho gần nhất')
                                 ->seconds(false)
+                                ->maxDate(fn (): \Illuminate\Support\Carbon => now())
                                 ->disabled($readOnlyOnEdit)
                                 ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
                                 ->columnSpan(['default' => 'full', 'lg' => 4]),
                         ]),
                 ]),
             Layout\Section::make('Thống kê bán hàng')
+                ->visibleOn('edit')
                 ->columns(2)
                 ->components([
                     Field\TextInput::make('sold_quantity')
@@ -133,7 +134,8 @@ class InventoryResource extends Resource
                     ->limit(40),
                 Tables\Columns\TextColumn::make('warehouse.name')
                     ->label('Kho')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('Số lượng tồn')
                     ->sortable()

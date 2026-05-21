@@ -295,7 +295,10 @@ class BookResource extends Resource
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')->label('Trạng thái'),
             ])
-            ->actions([Actions\EditAction::make()])
+            ->actions([
+                Actions\ViewAction::make()->label('Xem'),
+                Actions\EditAction::make(),
+            ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
                     Actions\DeleteBulkAction::make()
@@ -331,6 +334,7 @@ class BookResource extends Resource
         return [
             'index' => Pages\ListBooks::route('/'),
             'create' => Pages\CreateBook::route('/create'),
+            'view' => Pages\ViewBook::route('/{record}'),
             'edit' => Pages\EditBook::route('/{record}/edit'),
         ];
     }

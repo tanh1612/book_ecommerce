@@ -14,6 +14,8 @@ use Throwable;
 
 class CartService
 {
+    private const RESOLVED_CART_ID_ATTRIBUTE = 'cart.resolved_id';
+
     public function __construct(
         private GuestCartTokenService $guestCartTokenService,
     ) {}
@@ -23,21 +25,26 @@ class CartService
      */
     public function getCurrentCart(): Cart
     {
+        $resolvedId = request()->attributes->get(self::RESOLVED_CART_ID_ATTRIBUTE);
+        if ($resolvedId !== null) {
+            return Cart::query()->findOrFail((int) $resolvedId);
+        }
+
         try {
             /** @var Account|null $account */
             $account = Auth::guard('web')->user();
 
             if ($account !== null) {
-                return Cart::query()->firstOrCreate(
+                return $this->rememberCart(Cart::query()->firstOrCreate(
                     ['account_id' => $account->id],
                     [
                         'guest_token_hash' => null,
                         'guest_token_expires_at' => null,
                     ],
-                );
+                ));
             }
 
-            return $this->guestCartTokenService->resolveOrCreateGuestCart();
+            return $this->rememberCart($this->guestCartTokenService->resolveOrCreateGuestCart());
         } catch (Throwable $e) {
             Log::error('Resolve current cart failed', [
                 'error' => $e->getMessage(),
@@ -54,16 +61,23 @@ class CartService
     {
         $cart = $this->getCurrentCart();
 
-        return $cart->load([
-            'items' => fn ($q) => $q->orderBy('id'),
-            'items.book' => fn ($q) => $q->with([
-                'authors',
-                'categories',
-                'publisher',
-                'images',
-                'inventories',
-            ]),
-        ]);
+        return Cart::query()
+            ->whereKey($cart->id)
+            ->with([
+                'items' => fn ($q) => $q->orderBy('id'),
+                'items.book' => fn ($q) => $q->with([
+                    'images',
+                    'inventories',
+                ]),
+            ])
+            ->firstOrFail();
+    }
+
+    private function rememberCart(Cart $cart): Cart
+    {
+        request()->attributes->set(self::RESOLVED_CART_ID_ATTRIBUTE, (int) $cart->id);
+
+        return $cart;
     }
 
     public function addItem(int $bookId, int $quantity): Cart

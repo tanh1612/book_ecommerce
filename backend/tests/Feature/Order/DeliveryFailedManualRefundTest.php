@@ -16,7 +16,6 @@ use App\Models\OrderTimeline;
 use App\Models\PaymentTransaction;
 use App\Models\ShippingMethod;
 use App\Models\Warehouse;
-use App\DataTransferObjects\Payment\VerifiedBankAccount;
 use App\Services\Order\OrderStatusTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -75,7 +74,7 @@ test('cod shipping pending delivery failed cancels order failed payment releases
     $updated = app(OrderStatusTransitionService::class)->markDeliveryFailed($order, $admin, null);
 
     expect($updated->current_status)->toBe(OrderStatus::CANCELLED)
-        ->and($updated->payment_status)->toBe(PaymentStatus::FAILED);
+        ->and($updated->payment_status)->toBe(PaymentStatus::CANCELLED);
 
     $inventory = Inventory::query()->where('book_id', $book->id)->firstOrFail();
     expect((int) $inventory->reserved_quantity)->toBe(0);
@@ -114,7 +113,7 @@ test('vnpay shipping paid delivery failed sets refunding pending transaction and
 });
 
 test('admin can confirm manual refund marks transaction refunded', function (): void {
-    config(['refund.manual_refund_deadline_days' => 15, 'refund.verification.driver' => 'log']);
+    config(['refund.manual_refund_deadline_days' => 15]);
 
     $admin = Account::factory()->create();
     $customer = Account::factory()->create();
@@ -123,16 +122,14 @@ test('admin can confirm manual refund marks transaction refunded', function (): 
 
     $order = app(OrderStatusTransitionService::class)->markDeliveryFailed($order, $admin);
 
-    $verified = new VerifiedBankAccount(
-        bankCode: 'VCB',
-        bankName: 'Vietcombank',
-        bankBin: 970436,
-        accountNumber: '123456789',
-        accountHolder: 'NGUYEN VAN A',
-        provider: 'log',
-        providerCode: '00',
-    );
-    app(OrderStatusTransitionService::class)->submitRefundBankInfo($order, $customer, $verified);
+    $bankInfo = [
+        'bank_code' => 'VCB',
+        'bank_name' => 'Vietcombank',
+        'bank_bin' => 970436,
+        'account_number' => '123456789',
+        'account_holder' => 'NGUYEN VAN A',
+    ];
+    app(OrderStatusTransitionService::class)->submitRefundBankInfo($order, $customer, $bankInfo);
 
     $updated = app(OrderStatusTransitionService::class)->confirmManualRefundCompleted(
         $order->fresh(),

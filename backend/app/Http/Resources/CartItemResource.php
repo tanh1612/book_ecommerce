@@ -32,7 +32,7 @@ class CartItemResource extends JsonResource
             'id' => $this->id,
             'book' => $this->when(
                 $this->relationLoaded('book') && $book !== null,
-                fn () => (new BookSummaryResource($book))->resolve()
+                fn () => (new CartBookResource($book))->resolve()
             ),
             'quantity' => $this->quantity,
             'selected' => $this->selected,

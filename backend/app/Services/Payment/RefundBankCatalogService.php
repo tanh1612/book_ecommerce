@@ -2,8 +2,8 @@
 
 namespace App\Services\Payment;
 
-use App\Exceptions\Payment\RefundBankCatalogUnavailableException;
 use Illuminate\Http\Client\ConnectionException;
+use RuntimeException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -13,13 +13,11 @@ use Throwable;
 
 class RefundBankCatalogService
 {
+    public const UNAVAILABLE_MESSAGE = 'Không thể tải danh sách ngân hàng. Vui lòng thử lại sau.';
+
     private const CACHE_KEY = 'refund:banks:v1';
 
     private const CACHE_BACKUP_KEY = 'refund:banks:v1:backup';
-
-    public function __construct(
-        private readonly AppotaPayBankCodeMapper $appotaPayBankCodeMapper,
-    ) {}
 
     /**
      * @return list<array{
@@ -29,8 +27,7 @@ class RefundBankCatalogService
      *     bin: int,
      *     logo: string|null,
      *     lookup_supported: bool,
-     *     transfer_supported: bool,
-     *     appotapay_bank_code: string|null
+     *     transfer_supported: bool
      * }>
      */
     public function banks(): array
@@ -54,7 +51,7 @@ class RefundBankCatalogService
                 return $stale;
             }
 
-            throw new RefundBankCatalogUnavailableException;
+            throw new RuntimeException(self::UNAVAILABLE_MESSAGE);
         }
     }
 
@@ -66,8 +63,7 @@ class RefundBankCatalogService
      *     bin: int,
      *     logo: string|null,
      *     lookup_supported: bool,
-     *     transfer_supported: bool,
-     *     appotapay_bank_code: string|null
+     *     transfer_supported: bool
      * }
      */
     public function findByCode(string $bankCode): array
@@ -122,7 +118,7 @@ class RefundBankCatalogService
                 'body' => $response->body(),
             ]);
 
-            throw new RefundBankCatalogUnavailableException('Không thể tải danh sách ngân hàng từ VietQR.');
+            throw new RuntimeException('Không thể tải danh sách ngân hàng từ VietQR.');
         }
 
         /** @var array<string, mixed>|null $body */
@@ -130,7 +126,7 @@ class RefundBankCatalogService
         $items = $body['data'] ?? [];
 
         if (! is_array($items)) {
-            throw new RefundBankCatalogUnavailableException('Dữ liệu danh sách ngân hàng không hợp lệ.');
+            throw new RuntimeException('Dữ liệu danh sách ngân hàng không hợp lệ.');
         }
 
         $banks = [];
@@ -149,7 +145,6 @@ class RefundBankCatalogService
 
             $lookupSupported = (int) ($item['lookupSupported'] ?? 0) === 1;
             $transferSupported = (int) ($item['transferSupported'] ?? 0) === 1;
-            $appotapayBankCode = $this->appotaPayBankCodeMapper->resolve($code);
 
             $banks[] = [
                 'code' => $code,
@@ -159,12 +154,11 @@ class RefundBankCatalogService
                 'logo' => isset($item['logo']) ? (string) $item['logo'] : null,
                 'lookup_supported' => $lookupSupported,
                 'transfer_supported' => $transferSupported,
-                'appotapay_bank_code' => $appotapayBankCode,
             ];
         }
 
         if ($banks === []) {
-            throw new RefundBankCatalogUnavailableException('Danh sách ngân hàng trống.');
+            throw new RuntimeException('Danh sách ngân hàng trống.');
         }
 
         usort($banks, fn (array $a, array $b): int => strcmp($a['short_name'], $b['short_name']));

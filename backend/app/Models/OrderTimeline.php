@@ -14,6 +14,7 @@ class OrderTimeline extends Model
         'status',
         'note',
         'actor',
+        'created_at',
     ];
 
     public function order(): BelongsTo

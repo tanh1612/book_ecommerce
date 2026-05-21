@@ -70,7 +70,7 @@ class ExpireVnPayPendingPaymentsCommand extends Command
                     $this->orderInventory->releaseReservedForOrder($locked);
 
                     $locked->update([
-                        'payment_status' => PaymentStatus::FAILED,
+                        'payment_status' => PaymentStatus::CANCELLED,
                         'current_status' => OrderStatus::CANCELLED,
                     ]);
 

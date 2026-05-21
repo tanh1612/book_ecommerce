@@ -2,19 +2,21 @@
 
 namespace App\Filament\Resources\BookResource\RelationManagers;
 
-use App\Filament\Support\InventoryFilamentRules;
+use App\Filament\Concerns\CreatesInventoryViaRestockService;
 use App\Models\Inventory;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class InventoriesRelationManager extends RelationManager
 {
+    use CreatesInventoryViaRestockService;
+
     protected static string $relationship = 'inventories';
 
     protected static ?string $title = 'Tồn kho';
@@ -28,33 +30,16 @@ class InventoriesRelationManager extends RelationManager
                     ->relationship('warehouse', 'name', fn (Builder $query) => $query->where('is_active', true))
                     ->searchable()
                     ->preload()
-                    ->required()
-                    ->rule(fn (Get $get, RelationManager $livewire, ?Inventory $record) => InventoryFilamentRules::assertOwnerBookHasAtMostOneInventoryRelation($livewire, $record)),
+                    ->required(),
                 Forms\Components\TextInput::make('quantity')
                     ->label('Số lượng tồn')
                     ->numeric()
                     ->minValue(0)
                     ->default(0)
+                    ->required()
                     ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
                     ->rules(['integer', 'min:0'])
                     ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state))),
-                Forms\Components\TextInput::make('sold_quantity')
-                    ->label('Đã bán')
-                    ->numeric()
-                    ->minValue(0)
-                    ->default(0)
-                    ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
-                    ->rules(['integer', 'min:0'])
-                    ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state))),
-                Forms\Components\TextInput::make('reserved_quantity')
-                    ->label('Đang giữ')
-                    ->numeric()
-                    ->minValue(0)
-                    ->default(0)
-                    ->mutateStateForValidationUsing(fn (mixed $state): int => $state === '' || $state === null ? 0 : (int) $state)
-                    ->rules(['integer', 'min:0'])
-                    ->dehydrateStateUsing(fn (mixed $state): int => max(0, (int) ($state === '' || $state === null ? 0 : $state)))
-                    ->rule(InventoryFilamentRules::reservedQuantityLteOnHand()),
                 Forms\Components\TextInput::make('location_code')
                     ->label('Mã vị trí')
                     ->maxLength(50)
@@ -63,7 +48,8 @@ class InventoriesRelationManager extends RelationManager
                     ->dehydrateStateUsing(fn (mixed $state): string => $state === null ? '' : trim((string) $state)),
                 Forms\Components\DateTimePicker::make('last_restocked_at')
                     ->label('Nhập kho gần nhất')
-                    ->seconds(false),
+                    ->seconds(false)
+                    ->maxDate(fn (): \Illuminate\Support\Carbon => now()),
             ]);
     }
 
@@ -98,7 +84,11 @@ class InventoriesRelationManager extends RelationManager
             ])
             ->headerActions([
                 Actions\CreateAction::make()
-                    ->visible(fn (RelationManager $livewire): bool => $livewire->getOwnerRecord()->inventories()->doesntExist()),
+                    ->using(function (array $data, RelationManager $livewire): Model {
+                        $data['book_id'] = $livewire->getOwnerRecord()->getKey();
+
+                        return $livewire->createInventoryViaRestock($data);
+                    }),
             ])
             ->actions([
                 Actions\EditAction::make(),

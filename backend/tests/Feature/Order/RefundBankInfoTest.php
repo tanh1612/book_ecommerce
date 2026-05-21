@@ -3,6 +3,7 @@
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentMethod;
 use App\Enums\Order\PaymentStatus;
+use App\Enums\Payment\PaymentGateway;
 use App\Enums\Payment\PaymentTransactionStatus;
 use App\Enums\Payment\PaymentTransactionType;
 use App\Models\Account;
@@ -58,16 +59,6 @@ function fakeVietQrBanksResponse(): void
                     'lookupSupported' => 1,
                 ],
                 [
-                    'id' => 25,
-                    'name' => 'Ngân hàng TMCP Tiên Phong',
-                    'code' => 'TPB',
-                    'bin' => '970423',
-                    'shortName' => 'TPBank',
-                    'logo' => 'https://cdn.vietqr.io/img/TPB.png',
-                    'transferSupported' => 1,
-                    'lookupSupported' => 1,
-                ],
-                [
                     'id' => 99,
                     'name' => 'Ngân hàng không tra cứu',
                     'code' => 'NOLOOKUP',
@@ -82,16 +73,24 @@ function fakeVietQrBanksResponse(): void
     ]);
 }
 
-test('customer can verify valid refund bank account before submit', function (): void {
+function refundBankSubmitPayload(array $overrides = []): array
+{
+    return array_merge([
+        'bank_code' => 'VCB',
+        'account_number' => '987654321',
+        'account_holder' => 'NGUYEN VAN A',
+    ], $overrides);
+}
+
+test('customer can submit manual refund bank info', function (): void {
     fakeVietQrBanksResponse();
-    config(['refund.verification.driver' => 'log']);
 
     $account = Account::factory()->create();
     $order = refundBankInfoTestOrder($account);
 
     PaymentTransaction::query()->create([
         'order_id' => $order->id,
-        'gateway' => \App\Enums\Payment\PaymentGateway::VNPAY,
+        'gateway' => PaymentGateway::VNPAY,
         'gateway_txn_id' => null,
         'type' => PaymentTransactionType::REFUND,
         'amount' => $order->final_amount,
@@ -100,84 +99,83 @@ test('customer can verify valid refund bank account before submit', function ():
     ]);
 
     $this->actingAs($account, 'sanctum')
-        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info/verify", [
-            'bank_code' => 'VCB',
-            'account_number' => '123456789',
-        ])
-        ->assertOk()
-        ->assertJsonPath('data.verified', true)
-        ->assertJsonPath('data.account_holder', 'NGUYEN VAN A')
-        ->assertJsonPath('data.bank_code', 'VCB');
-});
-
-test('customer cannot verify invalid refund bank account', function (): void {
-    fakeVietQrBanksResponse();
-    config(['refund.verification.driver' => 'log']);
-
-    $account = Account::factory()->create();
-    $order = refundBankInfoTestOrder($account);
-
-    PaymentTransaction::query()->create([
-        'order_id' => $order->id,
-        'gateway' => \App\Enums\Payment\PaymentGateway::VNPAY,
-        'gateway_txn_id' => null,
-        'type' => PaymentTransactionType::REFUND,
-        'amount' => $order->final_amount,
-        'status' => PaymentTransactionStatus::PENDING,
-        'payload' => [],
-    ]);
-
-    $this->actingAs($account, 'sanctum')
-        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info/verify", [
-            'bank_code' => 'VCB',
-            'account_number' => '12340000',
-        ])
-        ->assertStatus(422)
-        ->assertJsonPath('message', 'Số tài khoản không tồn tại hoặc ngân hàng không hỗ trợ tra cứu.');
-});
-
-test('customer can submit refund bank info after backend re-verification', function (): void {
-    fakeVietQrBanksResponse();
-    config(['refund.verification.driver' => 'log']);
-
-    $account = Account::factory()->create();
-    $order = refundBankInfoTestOrder($account);
-
-    PaymentTransaction::query()->create([
-        'order_id' => $order->id,
-        'gateway' => \App\Enums\Payment\PaymentGateway::VNPAY,
-        'gateway_txn_id' => null,
-        'type' => PaymentTransactionType::REFUND,
-        'amount' => $order->final_amount,
-        'status' => PaymentTransactionStatus::PENDING,
-        'payload' => [],
-    ]);
-
-    $this->actingAs($account, 'sanctum')
-        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", [
-            'bank_code' => 'VCB',
-            'account_number' => '987654321',
-        ])
+        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", refundBankSubmitPayload())
         ->assertCreated()
+        ->assertJsonPath('data.order_id', $order->id)
+        ->assertJsonPath('data.payment_status', PaymentStatus::REFUNDING->value)
+        ->assertJsonPath('data.current_status', OrderStatus::CANCELLED->value)
         ->assertJsonPath('data.manual_refund.needs_bank_info', false)
-        ->assertJsonPath('data.manual_refund.bank_info.verified', true)
-        ->assertJsonPath('data.manual_refund.bank_info.account_holder', 'NGUYEN VAN A');
+        ->assertJsonMissingPath('data.manual_refund.bank_info.verified')
+        ->assertJsonPath('data.manual_refund.bank_info.account_holder', 'NGUYEN VAN A')
+        ->assertJsonMissingPath('data.items')
+        ->assertJsonMissingPath('data.shipping_address')
+        ->assertJsonMissingPath('data.can_cancel')
+        ->assertJsonMissingPath('data.cancel_block_reason');
 
     $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
     expect($txn->payload['bank_info']['account_number'] ?? null)->toBe('987654321')
-        ->and($txn->payload['bank_info']['verification']['status'] ?? null)->toBe('verified');
+        ->and($txn->payload['bank_info']['account_holder'] ?? null)->toBe('NGUYEN VAN A')
+        ->and($txn->payload['bank_info']['verification']['status'] ?? null)->toBe('manual_unverified')
+        ->and($txn->payload['bank_info']['verification']['provider'] ?? null)->toBe('manual');
+});
+
+test('submit refund bank info validates account holder', function (): void {
+    fakeVietQrBanksResponse();
+
+    $account = Account::factory()->create();
+    $order = refundBankInfoTestOrder($account);
+
+    PaymentTransaction::query()->create([
+        'order_id' => $order->id,
+        'gateway' => PaymentGateway::VNPAY,
+        'gateway_txn_id' => null,
+        'type' => PaymentTransactionType::REFUND,
+        'amount' => $order->final_amount,
+        'status' => PaymentTransactionStatus::PENDING,
+        'payload' => [],
+    ]);
+
+    $this->actingAs($account, 'sanctum')
+        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", refundBankSubmitPayload([
+            'account_holder' => 'A',
+        ]))
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['account_holder']);
+});
+
+test('submit refund bank info validates account number format', function (): void {
+    fakeVietQrBanksResponse();
+
+    $account = Account::factory()->create();
+    $order = refundBankInfoTestOrder($account);
+
+    PaymentTransaction::query()->create([
+        'order_id' => $order->id,
+        'gateway' => PaymentGateway::VNPAY,
+        'gateway_txn_id' => null,
+        'type' => PaymentTransactionType::REFUND,
+        'amount' => $order->final_amount,
+        'status' => PaymentTransactionStatus::PENDING,
+        'payload' => [],
+    ]);
+
+    $this->actingAs($account, 'sanctum')
+        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", refundBankSubmitPayload([
+            'account_number' => '12ab',
+        ]))
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['account_number']);
 });
 
 test('customer cannot submit refund bank info twice', function (): void {
     fakeVietQrBanksResponse();
-    config(['refund.verification.driver' => 'log']);
 
     $account = Account::factory()->create();
     $order = refundBankInfoTestOrder($account);
 
     PaymentTransaction::query()->create([
         'order_id' => $order->id,
-        'gateway' => \App\Enums\Payment\PaymentGateway::VNPAY,
+        'gateway' => PaymentGateway::VNPAY,
         'gateway_txn_id' => null,
         'type' => PaymentTransactionType::REFUND,
         'amount' => $order->final_amount,
@@ -185,7 +183,7 @@ test('customer cannot submit refund bank info twice', function (): void {
         'payload' => [],
     ]);
 
-    $payload = ['bank_code' => 'VCB', 'account_number' => '987654321'];
+    $payload = refundBankSubmitPayload();
 
     $this->actingAs($account, 'sanctum')
         ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", $payload)
@@ -194,6 +192,34 @@ test('customer cannot submit refund bank info twice', function (): void {
     $this->actingAs($account, 'sanctum')
         ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", $payload)
         ->assertStatus(422);
+});
+
+test('customer can submit refund bank info when bank catalog is temporarily down', function (): void {
+    Cache::flush();
+
+    Http::fake([
+        'https://api.vietqr.io/v2/banks' => Http::response([], 500),
+    ]);
+
+    $account = Account::factory()->create();
+    $order = refundBankInfoTestOrder($account);
+
+    PaymentTransaction::query()->create([
+        'order_id' => $order->id,
+        'gateway' => PaymentGateway::VNPAY,
+        'gateway_txn_id' => null,
+        'type' => PaymentTransactionType::REFUND,
+        'amount' => $order->final_amount,
+        'status' => PaymentTransactionStatus::PENDING,
+        'payload' => [],
+    ]);
+
+    $this->actingAs($account, 'sanctum')
+        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", refundBankSubmitPayload([
+            'bank_code' => 'MB',
+        ]))
+        ->assertCreated()
+        ->assertJsonPath('data.manual_refund.bank_info.bank_name', 'MB');
 });
 
 test('authenticated customer can list refund banks from vietqr catalog', function (): void {
@@ -232,8 +258,6 @@ test('refund banks endpoint returns backup catalog when vietqr is temporarily do
         ->getJson('/api/v1/account/refund-banks')
         ->assertOk()
         ->assertJsonFragment(['code' => 'VCB']);
-
-    Http::assertSentCount(1);
 });
 
 test('refund banks endpoint returns 503 when vietqr fails and no cache exists', function (): void {
@@ -252,48 +276,28 @@ test('refund banks endpoint returns 503 when vietqr fails and no cache exists', 
         ->assertStatus(503);
 });
 
-test('customer cannot verify bank without lookup support', function (): void {
+test('customer cannot submit refund bank info without pending refund transaction', function (): void {
     fakeVietQrBanksResponse();
-    config(['refund.verification.driver' => 'log']);
 
     $account = Account::factory()->create();
     $order = refundBankInfoTestOrder($account);
 
-    PaymentTransaction::query()->create([
-        'order_id' => $order->id,
-        'gateway' => \App\Enums\Payment\PaymentGateway::VNPAY,
-        'gateway_txn_id' => null,
-        'type' => PaymentTransactionType::REFUND,
-        'amount' => $order->final_amount,
-        'status' => PaymentTransactionStatus::PENDING,
-        'payload' => [],
-    ]);
-
     $this->actingAs($account, 'sanctum')
-        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info/verify", [
-            'bank_code' => 'NOLOOKUP',
-            'account_number' => '123456789',
-        ])
+        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", refundBankSubmitPayload())
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['bank_code']);
+        ->assertJsonPath('message', 'Không thể gửi thông tin hoàn tiền cho đơn này.');
 });
 
-test('appotapay verifier returns account holder on success', function (): void {
+test('customer cannot submit refund bank info for another users order', function (): void {
     fakeVietQrBanksResponse();
-    config([
-        'refund.verification.driver' => 'appotapay',
-        'refund.verification.appotapay.base_url' => 'https://gateway.test.appotapay.com',
-        'refund.verification.appotapay.partner_code' => 'PARTNER',
-        'refund.verification.appotapay.api_key' => 'api-key',
-        'refund.verification.appotapay.secret_key' => 'secret-key',
-    ]);
 
-    $account = Account::factory()->create();
-    $order = refundBankInfoTestOrder($account);
+    $owner = Account::factory()->create();
+    $other = Account::factory()->create();
+    $order = refundBankInfoTestOrder($owner);
 
     PaymentTransaction::query()->create([
         'order_id' => $order->id,
-        'gateway' => \App\Enums\Payment\PaymentGateway::VNPAY,
+        'gateway' => PaymentGateway::VNPAY,
         'gateway_txn_id' => null,
         'type' => PaymentTransactionType::REFUND,
         'amount' => $order->final_amount,
@@ -301,83 +305,7 @@ test('appotapay verifier returns account holder on success', function (): void {
         'payload' => [],
     ]);
 
-    Http::fake([
-        'https://gateway.test.appotapay.com/api/v1/service/transfer/bank/account/info' => Http::response([
-            'errorCode' => 0,
-            'message' => 'Thành công',
-            'accountInfo' => [
-                'accountNo' => '13210013240000',
-                'accountName' => 'TRAN VAN B',
-                'bankCode' => 'TPBANK',
-                'accountType' => 'account',
-            ],
-            'signature' => 'ignored-in-test',
-        ]),
-    ]);
-
-    $this->actingAs($account, 'sanctum')
-        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info/verify", [
-            'bank_code' => 'TPB',
-            'account_number' => '13210013240000',
-        ])
-        ->assertOk()
-        ->assertJsonPath('data.account_holder', 'TRAN VAN B')
-        ->assertJsonPath('data.bank_code', 'TPB');
-
-    Http::assertSent(function ($request): bool {
-        $body = $request->data();
-
-        return str_contains($request->url(), '/api/v1/service/transfer/bank/account/info')
-            && ($body['bankCode'] ?? null) === 'TPBANK'
-            && ($body['accountNo'] ?? null) === '13210013240000'
-            && isset($body['signature']);
-    });
-});
-
-test('verify refund bank info returns 503 when bank catalog is unavailable', function (): void {
-    Cache::flush();
-
-    Http::fake(function ($request) {
-        if (str_contains($request->url(), 'api.vietqr.io/v2/banks')) {
-            return Http::response([], 500);
-        }
-    });
-
-    config(['refund.verification.driver' => 'log']);
-
-    $account = Account::factory()->create();
-    $order = refundBankInfoTestOrder($account);
-
-    PaymentTransaction::query()->create([
-        'order_id' => $order->id,
-        'gateway' => \App\Enums\Payment\PaymentGateway::VNPAY,
-        'gateway_txn_id' => null,
-        'type' => PaymentTransactionType::REFUND,
-        'amount' => $order->final_amount,
-        'status' => PaymentTransactionStatus::PENDING,
-        'payload' => [],
-    ]);
-
-    $this->actingAs($account, 'sanctum')
-        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info/verify", [
-            'bank_code' => 'VCB',
-            'account_number' => '123456789',
-        ])
-        ->assertStatus(503);
-});
-
-test('customer cannot verify refund bank info without pending refund transaction', function (): void {
-    fakeVietQrBanksResponse();
-    config(['refund.verification.driver' => 'log']);
-
-    $account = Account::factory()->create();
-    $order = refundBankInfoTestOrder($account);
-
-    $this->actingAs($account, 'sanctum')
-        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info/verify", [
-            'bank_code' => 'VCB',
-            'account_number' => '123456789',
-        ])
-        ->assertStatus(422)
-        ->assertJsonPath('message', 'Không thể xác minh thông tin hoàn tiền cho đơn này.');
+    $this->actingAs($other, 'sanctum')
+        ->postJson("/api/v1/account/orders/{$order->id}/refund-bank-info", refundBankSubmitPayload())
+        ->assertForbidden();
 });

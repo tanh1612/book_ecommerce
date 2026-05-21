@@ -2,7 +2,6 @@
 
 namespace App\Services\Order;
 
-use App\DataTransferObjects\Payment\VerifiedBankAccount;
 use App\Enums\Order\OrderStatus;
 use App\Enums\Order\PaymentMethod;
 use App\Enums\Order\PaymentStatus;
@@ -13,6 +12,7 @@ use App\Models\Account;
 use App\Models\Order;
 use App\Models\OrderTimeline;
 use App\Models\PaymentTransaction;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -37,6 +37,8 @@ class OrderStatusTransitionService
 
     public const TIMELINE_NOTE_CANCEL = 'Admin hủy đơn hàng.';
 
+    public const TIMELINE_NOTE_CANCEL_BY_CUSTOMER = 'Khách hàng hủy đơn hàng.';
+
     public const TIMELINE_NOTE_CHECKOUT_COD = 'Đơn thanh toán COD đã xác nhận khi đặt hàng.';
 
     public const TIMELINE_NOTE_CHECKOUT_VNPAY_PENDING = 'Đơn được tạo khi đặt hàng, chờ thanh toán VNPay.';
@@ -55,7 +57,7 @@ class OrderStatusTransitionService
 
     public const TIMELINE_NOTE_MANUAL_REFUND_CONFIRMED = 'Admin xác nhận đã hoàn tiền thủ công.';
 
-    public const TIMELINE_NOTE_REFUND_BANK_INFO_SUBMITTED = 'Khách đã cung cấp thông tin hoàn tiền, tài khoản đã được xác minh.';
+    public const TIMELINE_NOTE_REFUND_BANK_INFO_SUBMITTED = 'Khách đã cung cấp thông tin hoàn tiền.';
 
     public const TIMELINE_NOTE_REFUND_EXPIRED_NO_CONTACT = 'Đóng - Không hoàn tiền do quá hạn cung cấp thông tin.';
 
@@ -73,7 +75,148 @@ class OrderStatusTransitionService
             defaultNote: self::TIMELINE_NOTE_PROCESS,
             note: $note,
             logEvent: 'Order moved to processing by admin',
+            afterLockValidation: function (Order $locked): void {
+                $this->assertCodProcessingGraceElapsed($locked);
+            },
         );
+    }
+
+    public function isCodWithinProcessingGrace(Order $order): bool
+    {
+        if ($order->payment_method !== PaymentMethod::COD
+            || $order->current_status !== OrderStatus::CONFIRMED) {
+            return false;
+        }
+
+        $confirmedAt = $this->resolveConfirmedAt($order);
+
+        if ($confirmedAt === null) {
+            return false;
+        }
+
+        $graceMinutes = $this->codProcessingGraceMinutes();
+
+        return $confirmedAt->copy()->addMinutes($graceMinutes)->isFuture();
+    }
+
+    /**
+     * @return array{can_cancel: bool, cancel_block_reason: string|null}
+     */
+    public function customerCancelEligibility(Order $order): array
+    {
+        if ($order->current_status === OrderStatus::CANCELLED) {
+            return [
+                'can_cancel' => false,
+                'cancel_block_reason' => 'Đơn hàng đã được hủy.',
+            ];
+        }
+
+        if ($order->payment_method === PaymentMethod::COD) {
+            $blockedStatuses = [
+                OrderStatus::PROCESSING,
+                OrderStatus::SHIPPING,
+                OrderStatus::COMPLETED,
+            ];
+
+            if (in_array($order->current_status, $blockedStatuses, true)) {
+                return [
+                    'can_cancel' => false,
+                    'cancel_block_reason' => 'Đơn đang được xử lý hoặc đã giao, không thể hủy.',
+                ];
+            }
+
+            return ['can_cancel' => true, 'cancel_block_reason' => null];
+        }
+
+        if ($order->payment_method === PaymentMethod::VNPAY) {
+            if ($order->payment_status !== PaymentStatus::PENDING) {
+                return [
+                    'can_cancel' => false,
+                    'cancel_block_reason' => 'Đơn đã thanh toán hoặc không còn chờ thanh toán.',
+                ];
+            }
+
+            return ['can_cancel' => true, 'cancel_block_reason' => null];
+        }
+
+        return [
+            'can_cancel' => false,
+            'cancel_block_reason' => 'Phương thức thanh toán không hỗ trợ hủy đơn trực tuyến.',
+        ];
+    }
+
+    public function cancelByCustomer(Order $order, Account $account, ?string $note = null): Order
+    {
+        try {
+            return DB::transaction(function () use ($order, $account, $note): Order {
+                $locked = $this->lockOrder($order);
+
+                if ($locked->account_id !== $account->id) {
+                    throw ValidationException::withMessages([
+                        'order' => ['Bạn không có quyền hủy đơn hàng này.'],
+                    ]);
+                }
+
+                $eligibility = $this->customerCancelEligibility($locked);
+
+                if (! $eligibility['can_cancel']) {
+                    throw ValidationException::withMessages([
+                        'order' => [
+                            $eligibility['cancel_block_reason']
+                            ?? 'Không thể hủy đơn hàng ở trạng thái hiện tại.',
+                        ],
+                    ]);
+                }
+
+                if ($locked->payment_method === PaymentMethod::VNPAY) {
+                    PaymentTransaction::query()
+                        ->where('order_id', $locked->id)
+                        ->where('gateway', PaymentGateway::VNPAY)
+                        ->where('status', PaymentTransactionStatus::PENDING)
+                        ->update([
+                            'status' => PaymentTransactionStatus::CANCELLED,
+                            'completed_at' => now(),
+                        ]);
+                }
+
+                $this->orderInventory->releaseReservedForOrder($locked);
+
+                $updates = [
+                    'current_status' => OrderStatus::CANCELLED,
+                ];
+
+                if ($locked->payment_status === PaymentStatus::PENDING) {
+                    $updates['payment_status'] = PaymentStatus::CANCELLED;
+                }
+
+                $locked->update($updates);
+
+                $this->createTimeline(
+                    $locked,
+                    OrderStatus::CANCELLED,
+                    $account,
+                    $note,
+                    self::TIMELINE_NOTE_CANCEL_BY_CUSTOMER,
+                );
+
+                Log::info('Order cancelled by customer', [
+                    'order_id' => $locked->id,
+                    'account_id' => $account->id,
+                ]);
+
+                return $locked->fresh();
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('Customer order cancel failed', [
+                'order_id' => $order->id,
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 
     public function shipOrder(Order $order, Account $actor, ?string $note = null): Order
@@ -234,7 +377,7 @@ class OrderStatusTransitionService
 
                     $locked->update([
                         'current_status' => OrderStatus::CANCELLED,
-                        'payment_status' => PaymentStatus::FAILED,
+                        'payment_status' => PaymentStatus::CANCELLED,
                     ]);
 
                     $this->createTimeline(
@@ -335,13 +478,19 @@ class OrderStatusTransitionService
         }
     }
 
-    public function submitRefundBankInfo(
-        Order $order,
-        Account $account,
-        VerifiedBankAccount $verifiedBankAccount,
-    ): Order {
+    /**
+     * @param  array{
+     *     bank_code: string,
+     *     bank_name: string,
+     *     bank_bin: int|null,
+     *     account_number: string,
+     *     account_holder: string
+     * }  $bankInfo
+     */
+    public function submitRefundBankInfo(Order $order, Account $account, array $bankInfo): Order
+    {
         try {
-            return DB::transaction(function () use ($order, $account, $verifiedBankAccount): Order {
+            return DB::transaction(function () use ($order, $account, $bankInfo): Order {
                 $locked = $this->lockOrder($order);
 
                 if ($locked->account_id !== $account->id) {
@@ -384,17 +533,17 @@ class OrderStatusTransitionService
                     ]);
                 }
 
-                $payload['bank_info'] = $verifiedBankAccount->toBankInfoPayload($account->id);
+                $payload['bank_info'] = $this->makeRefundBankInfoPayload($bankInfo, $account->id);
 
                 $refundTxn->update([
                     'payload' => $payload,
                 ]);
 
-                $maskedAccount = $this->maskAccountNumber($verifiedBankAccount->accountNumber);
+                $maskedAccount = $this->maskAccountNumber($bankInfo['account_number']);
                 $timelineNote = sprintf(
                     '%s %s •••%s.',
                     self::TIMELINE_NOTE_REFUND_BANK_INFO_SUBMITTED,
-                    $verifiedBankAccount->bankName,
+                    $bankInfo['bank_name'],
                     $maskedAccount,
                 );
 
@@ -408,7 +557,7 @@ class OrderStatusTransitionService
                 Log::info('Refund bank info submitted by customer', [
                     'order_id' => $locked->id,
                     'account_id' => $account->id,
-                    'bank_code' => $verifiedBankAccount->bankCode,
+                    'bank_code' => $bankInfo['bank_code'],
                 ]);
 
                 return $locked->fresh();
@@ -470,9 +619,9 @@ class OrderStatusTransitionService
                 $payload = $refundTxn->payload ?? [];
                 $bankInfo = $payload['bank_info'] ?? null;
 
-                if (! is_array($bankInfo) || ($bankInfo['verification']['status'] ?? null) !== 'verified') {
+                if (! is_array($bankInfo) || trim((string) ($bankInfo['account_holder'] ?? '')) === '') {
                     throw ValidationException::withMessages([
-                        'bank_info' => ['Khách chưa cung cấp thông tin hoàn tiền đã xác minh.'],
+                        'bank_info' => ['Khách chưa cung cấp thông tin hoàn tiền.'],
                     ]);
                 }
 
@@ -560,9 +709,15 @@ class OrderStatusTransitionService
 
                 $this->orderInventory->releaseReservedForOrder($locked);
 
-                $locked->update([
+                $updates = [
                     'current_status' => OrderStatus::CANCELLED,
-                ]);
+                ];
+
+                if ($locked->payment_status === PaymentStatus::PENDING) {
+                    $updates['payment_status'] = PaymentStatus::CANCELLED;
+                }
+
+                $locked->update($updates);
 
                 $this->createTimeline(
                     $locked,
@@ -600,6 +755,7 @@ class OrderStatusTransitionService
         string $defaultNote,
         ?string $note,
         string $logEvent,
+        ?callable $afterLockValidation = null,
     ): Order {
         try {
             return DB::transaction(function () use (
@@ -610,6 +766,7 @@ class OrderStatusTransitionService
                 $defaultNote,
                 $note,
                 $logEvent,
+                $afterLockValidation,
             ): Order {
                 $locked = $this->lockOrder($order);
 
@@ -619,6 +776,10 @@ class OrderStatusTransitionService
                             "Chỉ thực hiện khi đơn đang ở trạng thái {$expectedStatus->getLabel()}.",
                         ],
                     ]);
+                }
+
+                if ($afterLockValidation !== null) {
+                    $afterLockValidation($locked);
                 }
 
                 $locked->update([
@@ -651,6 +812,38 @@ class OrderStatusTransitionService
         }
     }
 
+    /**
+     * @param  array{
+     *     bank_code: string,
+     *     bank_name: string,
+     *     bank_bin: int|null,
+     *     account_number: string,
+     *     account_holder: string
+     * }  $bankInfo
+     * @return array<string, mixed>
+     */
+    private function makeRefundBankInfoPayload(array $bankInfo, int $submittedByAccountId): array
+    {
+        $payload = [
+            'bank_code' => $bankInfo['bank_code'],
+            'bank_name' => $bankInfo['bank_name'],
+            'account_number' => $bankInfo['account_number'],
+            'account_holder' => $bankInfo['account_holder'],
+            'verification' => [
+                'provider' => 'manual',
+                'status' => 'manual_unverified',
+            ],
+            'submitted_at' => now()->toIso8601String(),
+            'submitted_by_account_id' => $submittedByAccountId,
+        ];
+
+        if ($bankInfo['bank_bin'] !== null) {
+            $payload['bank_bin'] = $bankInfo['bank_bin'];
+        }
+
+        return $payload;
+    }
+
     private function maskAccountNumber(string $accountNumber): string
     {
         $length = strlen($accountNumber);
@@ -674,6 +867,60 @@ class OrderStatusTransitionService
         }
 
         return $locked;
+    }
+
+    private function assertCodProcessingGraceElapsed(Order $order): void
+    {
+        if ($order->payment_method !== PaymentMethod::COD
+            || $order->current_status !== OrderStatus::CONFIRMED) {
+            return;
+        }
+
+        $confirmedAt = $this->resolveConfirmedAt($order);
+
+        if ($confirmedAt === null) {
+            return;
+        }
+
+        if ($this->isCodWithinProcessingGrace($order)) {
+            $graceMinutes = $this->codProcessingGraceMinutes();
+
+            throw ValidationException::withMessages([
+                'current_status' => [
+                    sprintf(
+                        'Đơn COD phải ở trạng thái Đã xác nhận ít nhất %d phút trước khi chuyển sang Đang xử lý.',
+                        $graceMinutes,
+                    ),
+                ],
+            ]);
+        }
+    }
+
+    private function resolveConfirmedAt(Order $order): ?Carbon
+    {
+        $timeline = OrderTimeline::query()
+            ->where('order_id', $order->id)
+            ->where('status', OrderStatus::CONFIRMED->value)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
+
+        if ($timeline?->created_at !== null) {
+            return $timeline->created_at;
+        }
+
+        // Legacy/manual rows may lack confirmed timeline or created_at; COD grace still applies from order creation.
+        if ($order->payment_method === PaymentMethod::COD
+            && $order->current_status === OrderStatus::CONFIRMED) {
+            return $order->created_at;
+        }
+
+        return null;
+    }
+
+    private function codProcessingGraceMinutes(): int
+    {
+        return max(1, (int) config('order.cod_processing_grace_minutes', 30));
     }
 
     private function createTimeline(
