@@ -12,12 +12,12 @@ export default defineConfig({
     proxy: {
       // Chuyển hướng các request có /api sang backend
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
       // Chuyển hướng request lấy cookie của Sanctum
       '/sanctum': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       }
     }

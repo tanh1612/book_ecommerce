@@ -2,21 +2,19 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import cartApi from '../services/cartApi';
 import { toast } from 'react-toastify';
-import { useAuth } from './AuthContext'; // Để biết user đã đăng nhập chưa (nếu có)
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [isLoadingCart, setIsLoadingCart] = useState(false);
-  const { user } = useAuth(); // Theo dõi trạng thái đăng nhập
+  const { user } = useAuth(); 
 
-  // 1. Hàm lấy giỏ hàng từ Server
   const fetchCart = async () => {
     setIsLoadingCart(true);
     try {
       const res = await cartApi.getCart();
-      // Giả định API trả về res.data.data chứa mảng items (bạn có thể log ra để chỉnh lại cho chuẩn với BE)
       const items = res.data?.data?.items || res.data?.items || res.data || [];
       setCartItems(Array.isArray(items) ? items : []);
     } catch (error) {
@@ -26,42 +24,44 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Tự động lấy giỏ hàng khi app chạy hoặc khi user thay đổi trạng thái đăng nhập
   useEffect(() => {
     fetchCart();
   }, [user]);
 
-  // Tính tổng số lượng hiển thị trên Header (Chỉ đếm các item có trong giỏ)
   const totalQuantity = useMemo(() => 
     cartItems.reduce((total, item) => total + (item.quantity || 1), 0)
   , [cartItems]);
 
-  // 2. Thêm vào giỏ hàng (Gọi API POST)
   const addToCart = async (book, qty = 1) => {
     try {
       await cartApi.addItem(book.id, qty);
-      await fetchCart(); // Lấy lại giỏ hàng mới nhất từ server
+      await fetchCart(); 
       toast.success(`Đã thêm ${qty} cuốn vào giỏ hàng`);
+      return true; // Trả về true để biết là thành công
     } catch (error) {
       toast.error(error.response?.data?.message || "Lỗi khi thêm vào giỏ hàng");
+      return false;
     }
   };
 
-  // 3. Cập nhật số lượng (Gọi API PATCH)
+  // 🔥 HÀM MỚI: Xử lý nút "Mua ngay"
+  const buyNow = async (book, qty = 1, navigate) => {
+    const isSuccess = await addToCart(book, qty);
+    if (isSuccess) {
+      navigate('/cart'); // Chuyển thẳng tới giỏ hàng nếu thêm thành công
+    }
+  };
+
   const updateQuantity = async (cartItemId, quantity) => {
     try {
-      // Cập nhật state UI trước cho mượt (Optimistic Update)
       setCartItems(prev => prev.map(item => item.id === cartItemId ? { ...item, quantity } : item));
       await cartApi.updateItem(cartItemId, { quantity });
-      // Lấy lại data chuẩn từ server (tùy chọn)
-      // fetchCart(); 
     } catch (error) {
       toast.error("Lỗi cập nhật số lượng");
-      fetchCart(); // Nếu lỗi thì rollback lại data cũ từ server
+      fetchCart(); 
     }
   };
 
-  // 4. Xóa khỏi giỏ (Gọi API DELETE)
   const removeFromCart = async (cartItemId) => {
     try {
       setCartItems(prev => prev.filter(item => item.id !== cartItemId));
@@ -73,7 +73,6 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // 5. Tick chọn 1 item (Gọi API PATCH)
   const toggleSelect = async (cartItemId, currentSelectedStatus) => {
     try {
       const newSelected = !currentSelectedStatus;
@@ -85,7 +84,6 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // 6. Tick chọn tất cả (Gọi API PATCH BULK)
   const toggleAll = async (isSelected) => {
     try {
       setCartItems(prev => prev.map(item => ({ ...item, selected: isSelected })));
@@ -103,6 +101,7 @@ export const CartProvider = ({ children }) => {
       isLoadingCart,
       fetchCart,
       addToCart, 
+      buyNow, // Export hàm buyNow
       updateQuantity, 
       removeFromCart, 
       toggleSelect, 
