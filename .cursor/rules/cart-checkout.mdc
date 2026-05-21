@@ -1,5 +1,5 @@
 ---
-description: Use when implementing cart, checkout, or payment logic — guest cart sync, inventory check, COD vs VietQR.
+description: Use when implementing cart, checkout, or payment logic — guest cart sync, inventory check, COD vs VNPay.
 alwaysApply: false
 ---
 
@@ -33,7 +33,7 @@ Khi guest đăng ký hoặc đăng nhập, backend **merge** giỏ guest (theo c
 ## Payment
 
 - **COD**: order status → `pending`, payment status → `pending_cod`.
-- **VietQR**: generate dynamic QR via VietQR API. Set order TTL **12 hours**. A scheduled job auto-cancels expired unpaid orders and restores inventory (see [queue-cronjob.mdc](.cursor/rules/queue-cronjob.mdc)).
+- **VNPay**: generate dynamic QR via VNPay API. Set order TTL **12 hours**. A scheduled job auto-cancels expired unpaid orders and restores inventory (see [queue-cronjob.mdc](.cursor/rules/queue-cronjob.mdc)).
 
 ## Idempotency
 

@@ -114,6 +114,9 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function
     // Delete address
     Route::delete('addresses/{address}', [AddressController::class, 'destroy']);
 
+    // List account orders
+    Route::get('orders', [OrderController::class, 'index']);
+
     // Get order details
     Route::get('orders/{order}', [OrderController::class, 'show']);
 
