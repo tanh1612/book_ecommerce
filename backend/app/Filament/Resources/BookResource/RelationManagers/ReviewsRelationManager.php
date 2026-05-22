@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\BookResource\RelationManagers;
 
 use App\Enums\Review\ReviewStatus;
+use App\Filament\Resources\ReviewResource;
+use App\Models\Review;
 use Filament\Actions;
-use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -16,27 +16,9 @@ class ReviewsRelationManager extends RelationManager
 
     protected static ?string $title = 'Đánh giá';
 
-    public function form(Schema $schema): Schema
+    public function isReadOnly(): bool
     {
-        return $schema
-            ->schema([
-                Forms\Components\TextInput::make('rating')
-                    ->label('Điểm số')
-                    ->numeric()
-                    ->minValue(1)
-                    ->maxValue(5)
-                    ->required(),
-                Forms\Components\Textarea::make('comment')
-                    ->label('Nội dung')
-                    ->columnSpanFull(),
-                Forms\Components\Select::make('status')
-                    ->label('Trạng thái')
-                    ->options(ReviewStatus::class)
-                    ->required(),
-                Forms\Components\Textarea::make('admin_reply')
-                    ->label('Phản hồi từ quản trị')
-                    ->columnSpanFull(),
-            ]);
+        return true;
     }
 
     public function table(Table $table): Table
@@ -51,12 +33,7 @@ class ReviewsRelationManager extends RelationManager
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label('Trạng thái')
-                    ->badge()
-                    ->color(fn (ReviewStatus $state): string => match ($state) {
-                        ReviewStatus::APPROVED => 'success',
-                        ReviewStatus::REJECTED => 'danger',
-                        default => 'warning',
-                    }),
+                    ->badge(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Ngày tạo')
                     ->dateTime('d/m/Y H:i')
@@ -70,12 +47,11 @@ class ReviewsRelationManager extends RelationManager
             ])
             ->headerActions([])
             ->actions([
-                Actions\EditAction::make(),
+                Actions\Action::make('view')
+                    ->label('Xem')
+                    ->icon('heroicon-o-eye')
+                    ->url(fn (Review $record): string => ReviewResource::getUrl('view', ['record' => $record])),
             ])
-            ->bulkActions([
-                Actions\BulkActionGroup::make([
-                    Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 }

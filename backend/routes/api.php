@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V1\Cart\CartController;
 use App\Http\Controllers\Api\V1\Catalog\BookController;
+use App\Http\Controllers\Api\V1\Catalog\BookReviewController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewEligibilityController;
 use App\Http\Controllers\Api\V1\Checkout\CheckoutController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
@@ -74,6 +75,9 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
     // Review eligibility for authenticated user on book detail page
     Route::get('{slug}/review-eligibility', [BookReviewEligibilityController::class, 'show'])
         ->middleware(['web', 'auth:sanctum', 'throttle:60,1']);
+
+    // Approved reviews for book detail page (public)
+    Route::get('{slug}/reviews', [BookReviewController::class, 'index']);
 
     // Get book
     Route::get('{slug}', [BookController::class, 'show']);

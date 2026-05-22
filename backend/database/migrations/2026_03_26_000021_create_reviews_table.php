@@ -16,7 +16,6 @@ return new class extends Migration
             $table->decimal('rating', 2, 1);
             $table->text('comment')->nullable();
             $table->string('status', 50)->nullable();
-            $table->text('admin_reply')->nullable();
             $table->timestamps();
         });
     }

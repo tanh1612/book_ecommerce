@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support;
 
+use App\Models\Inventory;
 use Filament\Schemas\Components\Utilities\Get;
 
 /**
@@ -9,6 +10,17 @@ use Filament\Schemas\Components\Utilities\Get;
  */
 final class InventoryFilamentRules
 {
+    public static function availableStockBadgeColor(Inventory $inventory): string
+    {
+        $stock = $inventory->available_stock;
+
+        return match (true) {
+            $stock <= 0 => 'danger',
+            $stock <= 5 => 'warning',
+            default => 'success',
+        };
+    }
+
     /**
      * @return \Closure(Get): \Closure(string, mixed, \Closure): void
      */

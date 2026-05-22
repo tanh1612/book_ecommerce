@@ -78,11 +78,7 @@ class AccountResource extends Resource
 
                 Columns\TextColumn::make('role')
                     ->label('Vai trò')
-                    ->badge()
-                    ->color(fn (AccountRole $state): string => match ($state) {
-                        AccountRole::Admin => 'danger',
-                        AccountRole::Customer => 'success',
-                    }),
+                    ->badge(),
 
                 Columns\IconColumn::make('is_active')
                     ->label('Hoạt động')

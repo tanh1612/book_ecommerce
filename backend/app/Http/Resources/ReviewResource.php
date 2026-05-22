@@ -23,8 +23,31 @@ class ReviewResource extends JsonResource
             'id' => $review->id,
             'rating' => (float) $review->rating,
             'comment' => $review->comment,
-            'status' => $review->status?->value,
             'created_at' => $review->created_at?->toIso8601String(),
+            'reviewer_name' => $this->reviewerName($review),
+            'status' => $this->when(
+                $request->is('api/v1/account/*'),
+                $review->status?->value,
+            ),
         ];
+    }
+
+    private function reviewerName(Review $review): ?string
+    {
+        if (! $review->relationLoaded('account') || $review->account === null) {
+            return null;
+        }
+
+        $profile = $review->account->relationLoaded('profile')
+            ? $review->account->profile
+            : null;
+
+        $fullName = $profile?->full_name ?? '';
+
+        if ($fullName !== '') {
+            return $fullName;
+        }
+
+        return 'Khách hàng';
     }
 }

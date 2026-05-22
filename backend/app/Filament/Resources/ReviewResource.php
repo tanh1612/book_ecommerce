@@ -37,11 +37,12 @@ class ReviewResource extends Resource
                 Field\Select::make('book_id')->label('Sách')->relationship('book', 'name')->disabled(),
                 Field\TextInput::make('rating')->label('Điểm số')->disabled(),
                 Field\Textarea::make('comment')->label('Nội dung')->disabled()->columnSpanFull(),
-            ])->columns(4),
-            Layout\Section::make('Quản lý')->components([
-                Field\Select::make('status')->label('Trạng thái')->options(ReviewStatus::class)->required(),
-                Field\Textarea::make('admin_reply')->label('Phản hồi từ quản trị')->columnSpanFull(),
-            ]),
+                Field\Select::make('status')->label('Trạng thái')->options(ReviewStatus::class)->disabled(),
+                Field\TextInput::make('created_at')
+                    ->label('Ngày tạo')
+                    ->disabled()
+                    ->formatStateUsing(fn (?Review $record): ?string => $record?->created_at?->format('d/m/Y H:i')),
+            ])->columns(2),
         ]);
     }
 
@@ -63,16 +64,7 @@ class ReviewResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
-                    ->color(fn (ReviewStatus $state): string => match ($state) {
-                        ReviewStatus::PENDING => 'warning',
-                        ReviewStatus::APPROVED => 'success',
-                        ReviewStatus::REJECTED => 'danger',
-                    })
-                    ->icon(fn (ReviewStatus $state): string => match ($state) {
-                        ReviewStatus::PENDING => 'heroicon-o-clock',
-                        ReviewStatus::APPROVED => 'heroicon-o-check-circle',
-                        ReviewStatus::REJECTED => 'heroicon-o-x-circle',
-                    }),
+                    ->icon(fn (ReviewStatus $state): string => $state->icon()),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Ngày tạo')
                     ->dateTime('d/m/Y H:i')
@@ -81,15 +73,28 @@ class ReviewResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->label('Trạng thái')->options(ReviewStatus::class),
             ])
-            ->actions([Actions\EditAction::make(), Actions\DeleteAction::make()])
-            ->bulkActions([Actions\BulkActionGroup::make([Actions\DeleteBulkAction::make()])]);
+            ->recordActions([
+                Actions\ViewAction::make()->label('Xem'),
+            ])
+            ->recordActionsColumnLabel('Thao tác')
+            ->recordUrl(fn (Review $record): string => static::getUrl('view', ['record' => $record]));
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
     }
 
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListReviews::route('/'),
-            'edit' => Pages\EditReview::route('/{record}/edit'),
+            'view' => Pages\ViewReview::route('/{record}'),
         ];
     }
 }

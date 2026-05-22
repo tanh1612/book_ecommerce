@@ -36,25 +36,11 @@ class OrderTimelinesRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'pending' => 'warning',
-                        'confirmed' => 'info',
-                        'processing' => 'info',
-                        'shipping' => 'primary',
-                        'completed' => 'success',
-                        'cancelled' => 'danger',
-                        'returned' => 'gray',
-                        'refund_closed' => 'gray',
-                        default => 'secondary',
+                    ->formatStateUsing(fn (string $state): string => OrderStatus::tryFrom($state)?->getLabel() ?? match ($state) {
+                        'returned' => 'Trả hàng',
+                        default => $state,
                     })
-                    ->formatStateUsing(function (string $state): string {
-                        $enum = OrderStatus::tryFrom($state);
-
-                        return $enum?->getLabel() ?? match ($state) {
-                            'returned' => 'Trả hàng',
-                            default => $state,
-                        };
-                    }),
+                    ->color(fn (string $state): ?string => OrderStatus::tryFrom($state)?->getColor() ?? 'gray'),
                 Tables\Columns\TextColumn::make('actor')
                     ->label('Người thực hiện')
                     ->placeholder('—'),

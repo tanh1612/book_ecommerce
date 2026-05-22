@@ -151,11 +151,7 @@ class InventoryResource extends Resource
 
                         return $query->orderByRaw('(quantity - reserved_quantity) '.$dir);
                     })
-                    ->color(fn (Inventory $record): string => match (true) {
-                        $record->available_stock <= 0 => 'danger',
-                        $record->available_stock <= 5 => 'warning',
-                        default => 'success',
-                    }),
+                    ->color(fn (Inventory $record): string => InventoryFilamentRules::availableStockBadgeColor($record)),
                 Tables\Columns\TextColumn::make('sold_quantity')
                     ->label('Đã bán')
                     ->sortable()
