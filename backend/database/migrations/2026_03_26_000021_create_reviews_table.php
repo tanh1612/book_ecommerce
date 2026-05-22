@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('account_id')->constrained('accounts')->cascadeOnDelete();
             $table->foreignId('book_id')->constrained('books')->cascadeOnDelete();
             $table->foreignId('order_item_id')->unique()->constrained('order_items')->cascadeOnDelete();
-            $table->unsignedTinyInteger('rating');
+            $table->decimal('rating', 2, 1);
             $table->text('comment')->nullable();
             $table->string('status', 50)->nullable();
             $table->text('admin_reply')->nullable();

@@ -2,9 +2,10 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\Order\OrderStatus;
 use App\Models\Book;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Services\Account\CreateReviewService;
 use App\Services\Order\OrderStatusTransitionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -24,6 +25,7 @@ class AccountOrderSummaryResource extends JsonResource
         $items = $order->relationLoaded('items') ? $order->items : collect();
 
         $cancelEligibility = app(OrderStatusTransitionService::class)->customerCancelEligibility($order);
+        $reviewService = app(CreateReviewService::class);
 
         return [
             'id' => $order->id,
@@ -31,13 +33,13 @@ class AccountOrderSummaryResource extends JsonResource
             'created_at' => $order->created_at?->toIso8601String(),
             'total_quantity' => (int) $items->sum('quantity'),
             'final_amount' => (float) $order->final_amount,
-            'items' => $items->map(fn ($item): array => [
+            'items' => $items->map(fn (OrderItem $item): array => [
+                'review_target_id' => $item->id,
                 'book_name' => $item->book?->name,
                 'thumbnail_url' => $this->bookThumbnailUrl($item->book),
+                'can_review' => $reviewService->canReviewOrderItem($order, $item),
             ])->values()->all(),
             'can_cancel' => $cancelEligibility['can_cancel'],
-            'can_review' => $order->current_status === OrderStatus::COMPLETED
-                && $items->contains(fn ($item): bool => ! $item->is_reviewed),
         ];
     }
 

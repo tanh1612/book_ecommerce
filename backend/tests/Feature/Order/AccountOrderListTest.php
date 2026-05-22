@@ -81,7 +81,6 @@ test('authenticated user can list own orders', function (): void {
                     'final_amount',
                     'items',
                     'can_cancel',
-                    'can_review',
                 ],
             ],
             'links',
@@ -129,8 +128,8 @@ test('order list item shape excludes sensitive and internal fields', function ()
         'final_amount',
         'items',
         'can_cancel',
-        'can_review',
     ])
+        ->and($row)->not->toHaveKey('can_review')
         ->and($row)->not->toHaveKeys([
             'shipping_phone',
             'shipping_address',
@@ -141,8 +140,8 @@ test('order list item shape excludes sensitive and internal fields', function ()
         ]);
 
     $item = $row['items'][0];
-    expect($item)->toHaveKeys(['book_name', 'thumbnail_url'])
-        ->and($item)->not->toHaveKeys(['book_id', 'order_item_id', 'id', 'quantity', 'price'])
+    expect($item)->toHaveKeys(['review_target_id', 'book_name', 'thumbnail_url', 'can_review'])
+        ->and($item)->not->toHaveKeys(['book_id', 'order_item_id', 'quantity', 'price'])
         ->and($item['thumbnail_url'])->toBe('https://cdn.example.test/cover.jpg');
 });
 
@@ -190,18 +189,30 @@ test('can cancel reflects customer cancel eligibility', function (): void {
         ->and($processingRow['can_cancel'])->toBeFalse();
 });
 
-test('can review is true when completed order has unreviewed item', function (): void {
+test('item can review is true when completed order has unreviewed item', function (): void {
     $account = Account::factory()->create();
     $order = accountOrderListOrder($account, OrderStatus::COMPLETED);
+    $item = accountOrderListItem($order, Book::factory()->create(), 1, false);
+
+    $this->actingAs($account, 'sanctum')
+        ->getJson('/api/v1/account/orders')
+        ->assertOk()
+        ->assertJsonPath('data.0.items.0.review_target_id', $item->id)
+        ->assertJsonPath('data.0.items.0.can_review', true);
+});
+
+test('item can review is false when order is not completed', function (): void {
+    $account = Account::factory()->create();
+    $order = accountOrderListOrder($account, OrderStatus::CONFIRMED);
     accountOrderListItem($order, Book::factory()->create(), 1, false);
 
     $this->actingAs($account, 'sanctum')
         ->getJson('/api/v1/account/orders')
         ->assertOk()
-        ->assertJsonPath('data.0.can_review', true);
+        ->assertJsonPath('data.0.items.0.can_review', false);
 });
 
-test('can review is false when all items are reviewed', function (): void {
+test('item can review is false when item already reviewed', function (): void {
     $account = Account::factory()->create();
     $order = accountOrderListOrder($account, OrderStatus::COMPLETED);
     accountOrderListItem($order, Book::factory()->create(), 1, true);
@@ -209,7 +220,7 @@ test('can review is false when all items are reviewed', function (): void {
     $this->actingAs($account, 'sanctum')
         ->getJson('/api/v1/account/orders')
         ->assertOk()
-        ->assertJsonPath('data.0.can_review', false);
+        ->assertJsonPath('data.0.items.0.can_review', false);
 });
 
 test('invalid status filter returns validation error', function (): void {

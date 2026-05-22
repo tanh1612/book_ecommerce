@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Account\AddressController;
 use App\Http\Controllers\Api\V1\Account\OrderController;
+use App\Http\Controllers\Api\V1\Account\ReviewController;
 use App\Http\Controllers\Api\V1\Account\OrderRefundBankInfoController;
 use App\Http\Controllers\Api\V1\Account\PasswordController;
 use App\Http\Controllers\Api\V1\Account\ProfileController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V1\Cart\CartController;
 use App\Http\Controllers\Api\V1\Catalog\BookController;
+use App\Http\Controllers\Api\V1\Catalog\BookReviewEligibilityController;
 use App\Http\Controllers\Api\V1\Checkout\CheckoutController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
 use App\Http\Controllers\Api\V1\Payment\VnPayReturnController;
@@ -68,6 +70,10 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
 
     // List books
     Route::get('', [BookController::class, 'index']);
+
+    // Review eligibility for authenticated user on book detail page
+    Route::get('{slug}/review-eligibility', [BookReviewEligibilityController::class, 'show'])
+        ->middleware(['web', 'auth:sanctum', 'throttle:60,1']);
 
     // Get book
     Route::get('{slug}', [BookController::class, 'show']);
@@ -129,6 +135,10 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum'])->group(function
 
     // Submit refund bank info
     Route::post('orders/{order}/refund-bank-info', [OrderRefundBankInfoController::class, 'store'])
+        ->middleware('throttle:10,1');
+
+    // Submit review for a purchased order item
+    Route::post('order-items/{orderItem}/review', [ReviewController::class, 'store'])
         ->middleware('throttle:10,1');
 });
 

@@ -18,9 +18,13 @@ class Review extends Model
         'admin_reply',
     ];
 
-    protected $casts = [
-        'status' => ReviewStatus::class,
-    ];
+    protected function casts(): array
+    {
+        return [
+            'rating' => 'decimal:1',
+            'status' => ReviewStatus::class,
+        ];
+    }
 
     public function account(): BelongsTo
     {
