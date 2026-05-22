@@ -1,16 +1,16 @@
 // src/components/Product/ProductCard.jsx
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiShoppingCart } from 'react-icons/fi';
 import { formatCurrency } from '../../utils/formatters';
 import { useCart } from '../../context/CartContext';
 
 const ProductCard = ({ book }) => {
-  const { addToCart } = useCart();
+  const navigate = useNavigate();
+  const { addToCart, buyNow } = useCart();
 
-  // ĐỒNG BỘ CHÍNH XÁC VỚI API.PDF [cite: 26, 28, 29, 30]
   const title = book.name || "Đang cập nhật";
-  const salePrice = book.selling_price || 0;
-  const originalPrice = book.original_price || salePrice;
+  const salePrice = Number(book.selling_price || 0); // Ép kiểu số
+  const originalPrice = Number(book.original_price || salePrice);
   const thumbnail = book.thumbnail_url || "https://placehold.co/300x400/EEE/31343C?text=No+Image";
   
   const author = Array.isArray(book.authors) 
@@ -24,6 +24,12 @@ const ProductCard = ({ book }) => {
   const handleAddToCart = (e) => {
     e.preventDefault();
     addToCart(book, 1);
+  };
+
+  // 🔥 Xử lý sự kiện Mua ngay
+  const handleBuyNow = (e) => {
+    e.preventDefault();
+    buyNow(book, 1, navigate);
   };
 
   return (
@@ -52,7 +58,7 @@ const ProductCard = ({ book }) => {
         <button onClick={handleAddToCart} className="bg-white border border-[#157a2c] text-[#157a2c] w-10 h-10 rounded flex items-center justify-center hover:bg-[#157a2c] hover:text-white transition-colors" title="Thêm vào giỏ">
           <FiShoppingCart size={18} />
         </button>
-        <button className="flex-grow bg-[#157a2c] text-white h-10 rounded text-sm font-bold hover:bg-green-800 transition-colors">
+        <button onClick={handleBuyNow} className="flex-grow bg-[#157a2c] text-white h-10 rounded text-sm font-bold hover:bg-green-800 transition-colors">
           Mua ngay
         </button>
       </div>

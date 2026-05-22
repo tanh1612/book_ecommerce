@@ -9,7 +9,6 @@ const CartPage = () => {
   const navigate = useNavigate();
   const { cartItems, isLoadingCart, updateQuantity, removeFromCart, toggleSelect, toggleAll, fetchCart } = useCart();
 
-  // Đảm bảo giỏ hàng luôn mới nhất khi vào trang
   useEffect(() => {
     fetchCart();
   }, []);
@@ -20,7 +19,6 @@ const CartPage = () => {
     }
   };
 
-  // Kiểm tra xem tất cả các item có đang được select không
   const isAllSelected = cartItems.length > 0 && cartItems.every(item => item.selected);
   
   const cartSummary = useMemo(() => {
@@ -28,9 +26,9 @@ const CartPage = () => {
     const totalItems = selectedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
     
     const totalPrice = selectedItems.reduce((sum, item) => {
-      // API thường lồng thông tin sách vào thuộc tính "book"
       const bookData = item.book || item; 
-      const price = bookData.selling_price || bookData.price || 0;
+      // 🔥 ÉP KIỂU SỐ ĐỂ TRÁNH LỖI KHI BE TRẢ VỀ CHUỖI
+      const price = Number(bookData.selling_price || bookData.price || 0);
       return sum + (price * (item.quantity || 1));
     }, 0);
     
@@ -79,13 +77,13 @@ const CartPage = () => {
 
               <div className="bg-white rounded-lg shadow-sm flex flex-col">
                 {cartItems.map((item, index) => {
-                  // Trích xuất thông tin sách từ API (thường backend sẽ trả lồng vào object book)
                   const bookData = item.book || item;
-                  const itemPrice = bookData.selling_price || bookData.price || 0;
-                  const itemOriginal = bookData.original_price || itemPrice;
+                  const itemPrice = Number(bookData.selling_price || bookData.price || 0); // Ép kiểu số
+                  const itemOriginal = Number(bookData.original_price || itemPrice);
                   const itemTitle = bookData.name || bookData.title || "Đang cập nhật";
                   const itemThumbnail = bookData.thumbnail_url || bookData.thumbnail || "https://placehold.co/100x150";
-                  const availableStock = bookData.available_stock || bookData.in_stock || 999;
+                  // 🔥 TRỎ ĐÚNG VỊ TRÍ AVAILABLE_STOCK TỪ POSTMAN
+                  const availableStock = item.available_stock ?? bookData.available_stock ?? 999;
 
                   return (
                     <div key={item.id} className={`p-4 flex items-center border-gray-100 ${index !== cartItems.length - 1 ? 'border-b' : ''}`}>

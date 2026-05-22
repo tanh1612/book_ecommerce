@@ -20,29 +20,47 @@ const CategoryPage = () => {
   const currentPriceMax = searchParams.get('price_max') || '';
   const currentSort = searchParams.get('sort') || 'newest';
   
+  // Tải bộ lọc tĩnh (Danh mục, NXB, Mức giá)
   useEffect(() => {
     bookApi.getFilters()
       .then(res => setFiltersData(res.data?.data || res.data || {}))
-      .catch(console.error);
+      .catch(err => console.error("Lỗi tải bộ lọc:", err));
   }, []);
 
-  const isRootCategory = filtersData.categories?.some(c => c.slug === currentCategory);
+  // Kiểm tra an toàn trước khi gọi .some() để tránh crash web
+  const safeCategories = Array.isArray(filtersData?.categories) ? filtersData.categories : [];
+  const isRootCategory = safeCategories.some(c => c.slug === currentCategory);
   const showCategoryFilter = currentCategory === '' || isRootCategory;
 
+  // Tải danh sách sách dựa theo URL params
   useEffect(() => {
     const fetchBooks = async () => {
       setIsLoading(true);
       try {
         const apiParams = Object.fromEntries([...searchParams]);
+        
+        // Đảm bảo sort hợp lệ, nếu không có thì mặc định là newest
         const validSorts = ['newest', 'price_asc', 'price_desc', 'rating_desc'];
         if (apiParams.sort && !validSorts.includes(apiParams.sort)) {
-          apiParams.sort = 'rating_desc'; 
+          apiParams.sort = 'newest'; 
         }
 
         const res = await bookApi.getBooks(apiParams);
-        setBooks(res.data?.data || res.data || []);
+        
+        // BỘ LỌC THÔNG MINH: Xử lý dữ liệu phân trang từ Laravel
+        let booksArray = [];
+        if (Array.isArray(res.data)) {
+          booksArray = res.data;
+        } else if (res.data?.data && Array.isArray(res.data.data)) {
+          booksArray = res.data.data;
+        } else if (res.data?.data?.data && Array.isArray(res.data.data.data)) {
+          booksArray = res.data.data.data;
+        }
+        
+        setBooks(booksArray);
       } catch (err) {
         toast.error("Lỗi tải danh sách sách!");
+        setBooks([]); // Set mảng rỗng để tránh crash khi lỗi
       } finally {
         setIsLoading(false);
       }
@@ -50,15 +68,20 @@ const CategoryPage = () => {
     fetchBooks();
   }, [searchParams]);
 
+  // Hàm cập nhật URL params mà không làm mất các param cũ
   const updateUrlParams = (newParams) => {
     const params = Object.fromEntries([...searchParams]);
     const finalParams = { ...params, ...newParams, page: 1 };
+    
+    // Xóa các param rỗng để URL sạch đẹp
     Object.keys(finalParams).forEach(key => (finalParams[key] === '' || finalParams[key] == null) && delete finalParams[key]);
     setSearchParams(finalParams);
   };
 
+  // Hàm đệ quy in ra danh mục cha con an toàn
   const renderCategories = (categories, level = 0) => {
-    if (!categories) return null;
+    if (!Array.isArray(categories) || categories.length === 0) return null;
+    
     return categories.map(item => (
       <div key={item.id} className={level > 0 ? 'ml-6 mt-3' : 'mt-3'}>
         <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer hover:text-[#157a2c]">
@@ -78,13 +101,18 @@ const CategoryPage = () => {
     ));
   };
 
+  // Đảm bảo biến books luôn là Array
+  const safeBooks = Array.isArray(books) ? books : [];
+
   return (
     <div className="bg-white min-h-screen pb-10">
       <div className="container mx-auto px-4 mt-6 flex flex-col md:flex-row gap-8">
         
+        {/* SIDEBAR BỘ LỌC */}
         <aside className="w-full md:w-64 flex-shrink-0">
           <h2 className="font-bold text-[#157a2c] text-lg mb-6 border-b pb-2">Bộ lọc tìm kiếm</h2>
 
+          {/* Khối Lọc Danh Mục */}
           {showCategoryFilter ? (
             <div className="mb-8">
               <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Danh mục</h3>
@@ -106,12 +134,13 @@ const CategoryPage = () => {
             <div className="mb-8">
               <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Danh mục đang chọn</h3>
               <div className="flex items-center justify-between bg-green-50 p-3 rounded border border-green-200">
-                <span className="text-sm font-bold text-[#157a2c] truncate pr-2">Sub: {currentCategory}</span>
+                <span className="text-sm font-bold text-[#157a2c] truncate pr-2">{currentCategory}</span>
                 <button onClick={() => updateUrlParams({ category: '' })} className="text-gray-400 hover:text-red-500 text-xs font-bold whitespace-nowrap">✕ Xóa</button>
               </div>
             </div>
           )}
 
+          {/* Khối Lọc Khoảng Giá */}
           <div className="mb-8">
             <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Khoảng giá</h3>
             <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer mb-3 hover:text-[#157a2c]">
@@ -123,7 +152,7 @@ const CategoryPage = () => {
               />
               Tất cả mức giá
             </label>
-            {filtersData.suggested_price_ranges?.map((range, idx) => (
+            {Array.isArray(filtersData.suggested_price_ranges) && filtersData.suggested_price_ranges.map((range, idx) => (
               <label key={idx} className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer mb-3 hover:text-[#157a2c]">
                 <input
                   type="radio" name="priceFilter"
@@ -136,22 +165,30 @@ const CategoryPage = () => {
             ))}
           </div>
 
+          {/* Khối Lọc Nhà Xuất Bản */}
           <div className="mb-8">
             <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Nhà xuất bản</h3>
             <select
-              className="w-full border border-gray-300 rounded p-2.5 text-sm outline-none focus:border-[#157a2c]"
+              className="w-full border border-gray-300 rounded p-2.5 text-sm outline-none focus:border-[#157a2c] bg-white"
               value={currentPublisher}
               onChange={(e) => updateUrlParams({ publisher: e.target.value })}
             >
               <option value="">Tất cả NXB</option>
-              {filtersData.publishers?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {Array.isArray(filtersData.publishers) && filtersData.publishers.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
             </select>
           </div>
         </aside>
 
+        {/* DANH SÁCH SÁCH BÊN PHẢI */}
         <div className="flex-grow">
           <div className="flex justify-between items-center mb-6 border-b pb-4">
-            <h1 className="text-xl font-bold text-gray-800">Sách đang bán</h1>
+            <h1 className="text-xl font-bold text-gray-800">
+              {keyword ? `Kết quả tìm kiếm cho: "${keyword}"` : 'Danh mục sách'}
+            </h1>
+            
+            {/* Thanh Sắp xếp */}
             <div className="relative">
               <select
                 className="appearance-none bg-[#157a2c] text-white text-sm font-medium pl-4 pr-10 py-2 rounded outline-none cursor-pointer"
@@ -167,11 +204,12 @@ const CategoryPage = () => {
             </div>
           </div>
 
+          {/* Vùng hiển thị sách */}
           {isLoading ? (
             <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>
-          ) : books.length > 0 ? (
+          ) : safeBooks.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {books.map((book) => (
+              {safeBooks.map((book) => (
                 <ProductCard key={book.id} book={book} />
               ))}
             </div>

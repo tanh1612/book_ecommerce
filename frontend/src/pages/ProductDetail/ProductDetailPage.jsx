@@ -1,7 +1,7 @@
 // src/pages/Product/ProductDetailPage.jsx
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { FiShoppingCart, FiMinus, FiPlus, FiChevronRight, FiHeart, FiFacebook, FiTwitter, FiLink, FiChevronDown } from 'react-icons/fi';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { FiShoppingCart, FiMinus, FiPlus, FiChevronRight, FiHeart, FiChevronDown } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import bookApi from '../../services/bookApi';
 import { formatCurrency } from '../../utils/formatters';
@@ -10,7 +10,8 @@ import { useWishlist } from '../../context/WishlistContext';
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
-  const { addToCart } = useCart();
+  const navigate = useNavigate();
+  const { addToCart, buyNow } = useCart();
   const { wishlistItems, toggleWishlist } = useWishlist(); 
 
   const [book, setBook] = useState(null);
@@ -37,9 +38,6 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, [slug]);
 
-  // 🔥 MẸO BYPASS TỒN KHO: 
-  // Nếu book.available_stock không có hoặc <= 0, ta ép nó thành 999 để test giỏ hàng.
-  // Khi nào làm xong API kho, bạn chỉ cần sửa lại thành: const stock = book?.available_stock || 0;
   const stock = book?.available_stock > 0 ? book.available_stock : 999;
 
   useEffect(() => {
@@ -50,7 +48,13 @@ const ProductDetailPage = () => {
     if (stock <= 0) return toast.error("Sản phẩm hiện đã hết hàng!");
     if (quantity > stock) return toast.error(`Chỉ còn ${stock} sản phẩm trong kho!`);
     addToCart(book, quantity);
-    toast.success(`Đã thêm ${quantity} cuốn vào giỏ hàng`);
+  };
+
+  // 🔥 Xử lý Mua ngay
+  const handleBuyNow = () => {
+    if (stock <= 0) return toast.error("Sản phẩm hiện đã hết hàng!");
+    if (quantity > stock) return toast.error(`Chỉ còn ${stock} sản phẩm trong kho!`);
+    buyNow(book, quantity, navigate);
   };
 
   const isFavorited = wishlistItems?.some(item => item.id === book?.id);
@@ -58,7 +62,6 @@ const ProductDetailPage = () => {
   const handleToggleWishlist = () => {
     if (!book) return;
     toggleWishlist(book);
-    
     if (isFavorited) {
       toast.info("Đã xóa khỏi danh sách yêu thích!");
     } else {
@@ -70,8 +73,8 @@ const ProductDetailPage = () => {
   if (!book) return <div className="py-20 text-center text-gray-500">Sách không tồn tại.</div>;
 
   const title = book.name || "Đang cập nhật";
-  const sellingPrice = book.selling_price || 0;
-  const originalPrice = book.original_price || sellingPrice;
+  const sellingPrice = Number(book.selling_price || 0); // Ép kiểu số
+  const originalPrice = Number(book.original_price || sellingPrice);
   const discountPercent = originalPrice > sellingPrice ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100) : 0;
   
   const authorDisplay = Array.isArray(book.authors) ? book.authors.map(a => a.name).join(', ') : "Đang cập nhật";
@@ -80,7 +83,6 @@ const ProductDetailPage = () => {
   const pubYear = book.detail?.publication_year || "Đang cập nhật";
   const numPages = book.detail?.page_count || "Đang cập nhật";
   const format = book.detail?.format || "Đang cập nhật";
-  const language = book.detail?.language || "Tiếng Việt";
   const translator = book.detail?.translator || "Đang cập nhật";
   const dimensions = book.detail?.dimensions || "Đang cập nhật";
   const weight = book.detail?.weight_grams || "Đang cập nhật";
@@ -88,11 +90,11 @@ const ProductDetailPage = () => {
   
   const averageRating = book.average_rating || 0;
   const reviewCount = book.review_count || 0;
-
   const galleryImages = book.images?.length > 0 ? book.images : [{ url: book.thumbnail_url }];
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20 pt-4">
+      {/* ... Phần Breadcrumb và Tiêu đề giữ nguyên ... */}
       <div className="container mx-auto px-4 mb-4 text-sm text-gray-500 flex items-center gap-2">
         <Link to="/" className="hover:text-[#007b22]">Trang chủ</Link>
         <FiChevronRight size={14} />
@@ -120,10 +122,7 @@ const ProductDetailPage = () => {
             )}
 
             <div className="flex items-center justify-end mt-8 text-sm text-gray-700 px-4">
-              <button 
-                onClick={handleToggleWishlist}
-                className={`flex items-center gap-2 font-medium transition-colors ${isFavorited ? 'text-red-500' : 'text-gray-600 hover:text-red-500'}`}
-              >
+              <button onClick={handleToggleWishlist} className={`flex items-center gap-2 font-medium transition-colors ${isFavorited ? 'text-red-500' : 'text-gray-600 hover:text-red-500'}`}>
                 {isFavorited ? 'Đã yêu thích' : 'Thêm vào yêu thích'} 
                 <FiHeart size={20} className={isFavorited ? 'fill-current' : ''} />
               </button>
@@ -184,6 +183,7 @@ const ProductDetailPage = () => {
                 Thêm vào giỏ hàng <FiShoppingCart size={18} />
               </button>
               <button 
+                onClick={handleBuyNow}
                 disabled={stock <= 0}
                 className="w-56 h-12 bg-[#007b22] text-white font-semibold rounded hover:bg-green-800 transition-colors shadow-sm disabled:bg-gray-400"
               >
@@ -193,6 +193,7 @@ const ProductDetailPage = () => {
           </div>
         </div>
 
+        {/* ... Phần Mô tả và Thông tin chi tiết giữ nguyên ... */}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           <div className="w-full lg:w-[60%] bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-4 pb-4 border-b border-gray-100">Mô tả sản phẩm</h3>

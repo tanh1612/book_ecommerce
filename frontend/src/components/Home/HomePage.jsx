@@ -5,7 +5,7 @@ import { FiChevronRight, FiZap } from "react-icons/fi";
 import BannerSlider from "../../components/Home/BannerSlider";
 import ProductSlider from "../../components/Product/ProductSlider";
 import ProductCard from "../../components/Product/ProductCard";
-import FlashSaleTimer from "../../components/Home/FlashSaleTimer"; // Import timer mới
+import FlashSaleTimer from "../../components/Home/FlashSaleTimer"; 
 import bookApi from "../../services/bookApi";
 
 const HomePage = () => {
@@ -16,9 +16,21 @@ const HomePage = () => {
     const fetchBooks = async () => {
       try {
         const res = await bookApi.getBooks({ per_page: 20 });
-        setBooks(res.data.data || res.data || []);
+        
+        // BỘ LỌC THÔNG MINH: Tự động tìm mảng dữ liệu (Array) từ cục response của Laravel
+        let booksArray = [];
+        if (Array.isArray(res.data)) {
+          booksArray = res.data; // Trường hợp trả về mảng trực tiếp
+        } else if (res.data?.data && Array.isArray(res.data.data)) {
+          booksArray = res.data.data; // Trường hợp bọc 1 lớp data
+        } else if (res.data?.data?.data && Array.isArray(res.data.data.data)) {
+          booksArray = res.data.data.data; // Trường hợp bọc 2 lớp data (Pagination Resource)
+        }
+        
+        setBooks(booksArray);
       } catch (error) {
         console.error("Lỗi tải sách trang chủ", error);
+        setBooks([]); // Đảm bảo fallback là mảng rỗng nếu có lỗi
       } finally {
         setIsLoading(false);
       }
@@ -26,10 +38,16 @@ const HomePage = () => {
     fetchBooks();
   }, []);
 
-  // Lọc sách Flash Sale: Dựa trên giá giảm hoặc % giảm từ Backend
-  const flashSaleBooks = books.filter(b => b.discount_percent > 0 || b.original_price > b.price);
-  const newBooks = books.slice(0, 8);
-  const suggestBooks = books.slice(0, 10);
+  // Lớp khiên bảo vệ 2: Đảm bảo biến books luôn là Array trước khi dùng các hàm lọc
+  const safeBooks = Array.isArray(books) ? books : [];
+
+  // Lọc sách Flash Sale: Đồng bộ trường selling_price theo API mới
+  const flashSaleBooks = safeBooks.filter(b => 
+    b.discount_percent > 0 || (b.original_price && b.selling_price && b.original_price > b.selling_price)
+  );
+  
+  const newBooks = safeBooks.slice(0, 8);
+  const suggestBooks = safeBooks.slice(0, 10);
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center text-[#157a2c] font-bold">Đang tải dữ liệu...</div>;
