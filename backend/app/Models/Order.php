@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentMethod;
 use App\Enums\Order\PaymentStatus;
 use App\Enums\Payment\PaymentTransactionStatus;
 use App\Enums\Payment\PaymentTransactionType;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -105,6 +107,27 @@ class Order extends Model
         }
 
         return $bankInfo;
+    }
+
+    public function canPay(): bool
+    {
+        if ($this->payment_method !== PaymentMethod::VNPAY) {
+            return false;
+        }
+
+        if ($this->payment_status !== PaymentStatus::PENDING) {
+            return false;
+        }
+
+        if ($this->current_status !== OrderStatus::PENDING) {
+            return false;
+        }
+
+        if ($this->payment_expires_at instanceof CarbonInterface && $this->payment_expires_at->isPast()) {
+            return false;
+        }
+
+        return true;
     }
 
     public function canSubmitRefundBankInfo(): bool

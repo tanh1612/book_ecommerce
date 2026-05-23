@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Enums\Inventory\InventoryStockAlertType;
+use App\Jobs\Inventory\NotifyInventoryStockStatusChangedJob;
 use App\Models\Book;
 use App\Models\Inventory;
 use App\Services\Catalog\CatalogCacheService;
@@ -17,11 +19,13 @@ class InventoryObserver
     public function created(Inventory $inventory): void
     {
         $this->onInventoryChanged($inventory);
+        $this->dispatchImmediateStockAlertIfNeeded($inventory, isNew: true);
     }
 
     public function updated(Inventory $inventory): void
     {
         $this->onInventoryChanged($inventory);
+        $this->dispatchImmediateStockAlertIfNeeded($inventory);
     }
 
     public function deleted(Inventory $inventory): void
@@ -34,6 +38,54 @@ class InventoryObserver
         $bookId = (int) $inventory->book_id;
         $this->catalogCache->forgetBookStock($bookId);
         $this->syncBookInactiveWhenOutOfStock($bookId);
+    }
+
+    private function dispatchImmediateStockAlertIfNeeded(Inventory $inventory, bool $isNew = false): void
+    {
+        if (! config('inventory.low_stock_immediate_notifications', true)) {
+            return;
+        }
+
+        $threshold = (int) config('inventory.low_stock_threshold', 5);
+
+        $oldAvailable = $isNew
+            ? 0
+            : $this->availableStockFromQuantities(
+                (int) $inventory->getOriginal('quantity'),
+                (int) $inventory->getOriginal('reserved_quantity'),
+            );
+
+        $newAvailable = $this->availableStockFromQuantities(
+            (int) $inventory->quantity,
+            (int) $inventory->reserved_quantity,
+        );
+
+        $wasLowStock = $oldAvailable > 0 && $oldAvailable <= $threshold;
+        $isLowStock = $newAvailable > 0 && $newAvailable <= $threshold;
+
+        $wasOutOfStock = $oldAvailable <= 0;
+        $isOutOfStock = $newAvailable <= 0;
+
+        if (! $wasOutOfStock && $isOutOfStock) {
+            NotifyInventoryStockStatusChangedJob::dispatch(
+                (int) $inventory->id,
+                InventoryStockAlertType::OutOfStock,
+            )->afterCommit();
+
+            return;
+        }
+
+        if (! $wasLowStock && $isLowStock) {
+            NotifyInventoryStockStatusChangedJob::dispatch(
+                (int) $inventory->id,
+                InventoryStockAlertType::LowStock,
+            )->afterCommit();
+        }
+    }
+
+    private function availableStockFromQuantities(int $quantity, int $reserved): int
+    {
+        return max(0, $quantity - $reserved);
     }
 
     /**

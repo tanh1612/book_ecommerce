@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\InventoryResource\Pages;
 use App\Filament\Support\InventoryFilamentRules;
 use App\Models\Inventory;
+use App\Services\Inventory\LowStockAlertService;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
 use Filament\Resources\Resource;
@@ -34,6 +35,22 @@ class InventoryResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['book', 'warehouse']);
+    }
+
+    public static function stockStatusListUrl(string $status): string
+    {
+        return static::getUrl('index', [
+            'tableFilters' => [
+                'stock_status' => [
+                    'value' => $status,
+                ],
+            ],
+        ]);
+    }
+
+    public static function lowStockListUrl(): string
+    {
+        return static::stockStatusListUrl('low');
     }
 
     public static function form(Schema $schema): Schema
@@ -181,14 +198,13 @@ class InventoryResource extends Resource
                     ->options([
                         'in_stock' => 'Còn hàng',
                         'out_of_stock' => 'Hết hàng',
-                        'low' => 'Sắp hết (1–5)',
+                        'low' => InventoryFilamentRules::lowStockFilterLabel(),
                     ])
                     ->query(function (Builder $query, array $data): void {
                         match ($data['value'] ?? null) {
                             'out_of_stock' => $query->whereRaw('(quantity - reserved_quantity) <= 0'),
                             'in_stock' => $query->whereRaw('(quantity - reserved_quantity) > 0'),
-                            'low' => $query->whereRaw('(quantity - reserved_quantity) > 0')
-                                ->whereRaw('(quantity - reserved_quantity) <= 5'),
+                            'low' => LowStockAlertService::applyLowStockScope($query),
                             default => null,
                         };
                     }),

@@ -13,12 +13,20 @@ final class InventoryFilamentRules
     public static function availableStockBadgeColor(Inventory $inventory): string
     {
         $stock = $inventory->available_stock;
+        $threshold = (int) config('inventory.low_stock_threshold', 5);
 
         return match (true) {
             $stock <= 0 => 'danger',
-            $stock <= 5 => 'warning',
+            $stock <= $threshold => 'warning',
             default => 'success',
         };
+    }
+
+    public static function lowStockFilterLabel(): string
+    {
+        $threshold = (int) config('inventory.low_stock_threshold', 5);
+
+        return "Sắp hết (1–{$threshold})";
     }
 
     /**

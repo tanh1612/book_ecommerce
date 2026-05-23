@@ -2,9 +2,11 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Resources\InventoryResource;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Order;
+use App\Services\Inventory\LowStockAlertService;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -31,6 +33,11 @@ class StatsOverview extends BaseWidget
                 ->description('Tổng số tài khoản khách hàng')
                 ->descriptionIcon('heroicon-m-users')
                 ->color('warning'),
+            Stat::make('Sách sắp hết hàng', app(LowStockAlertService::class)->countLowStockBooks())
+                ->description('Tồn khả dụng ≤ ngưỡng cảnh báo')
+                ->descriptionIcon('heroicon-m-exclamation-triangle')
+                ->color('warning')
+                ->url(InventoryResource::lowStockListUrl()),
         ];
     }
 }

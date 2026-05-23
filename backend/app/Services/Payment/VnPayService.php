@@ -17,33 +17,48 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
 
 class VnPayService
 {
-    public function createPaymentUrl(Order $order, string $clientIp): array
+    public function createPaymentUrl(Order $order, string $clientIp, bool $forceNew = false): array
     {
         $this->assertConfigured();
 
         if ($order->payment_method !== PaymentMethod::VNPAY) {
+            if ($forceNew) {
+                throw ValidationException::withMessages([
+                    'order' => ['Đơn không thể thanh toán lại.'],
+                ]);
+            }
+
             throw new InvalidArgumentException('Order payment method must be VNPay.');
         }
 
-        if ($order->current_status === OrderStatus::CANCELLED) {
-            throw new InvalidArgumentException('Cannot create VNPay payment for a cancelled order.');
-        }
+        if (! $forceNew) {
+            if ($order->current_status === OrderStatus::CANCELLED) {
+                throw new InvalidArgumentException('Cannot create VNPay payment for a cancelled order.');
+            }
 
-        if ($order->payment_status === PaymentStatus::PAID) {
-            throw new InvalidArgumentException('Order is already paid.');
+            if ($order->payment_status === PaymentStatus::PAID) {
+                throw new InvalidArgumentException('Order is already paid.');
+            }
         }
 
         if ((float) $order->final_amount <= 0) {
+            if ($forceNew) {
+                throw ValidationException::withMessages([
+                    'order' => ['Đơn không thể thanh toán lại.'],
+                ]);
+            }
+
             throw new InvalidArgumentException('Order final amount must be greater than zero.');
         }
 
         try {
-            return DB::transaction(function () use ($order, $clientIp): array {
+            return DB::transaction(function () use ($order, $clientIp, $forceNew): array {
                 /** @var Order $order */
                 $order = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
 
@@ -51,7 +66,10 @@ class VnPayService
                     throw new InvalidArgumentException('Order payment method must be VNPay.');
                 }
 
-                if ($order->current_status === OrderStatus::CANCELLED || $order->payment_status === PaymentStatus::PAID) {
+                if ($forceNew) {
+                    $this->assertCustomerRetryEligible($order);
+                    $this->expirePendingVnPayPayments($order->id, 'customer_retry');
+                } elseif ($order->current_status === OrderStatus::CANCELLED || $order->payment_status === PaymentStatus::PAID) {
                     throw new InvalidArgumentException('Order is not eligible for VNPay payment.');
                 }
 
@@ -61,12 +79,14 @@ class VnPayService
                 $pending = PaymentTransaction::query()
                     ->where('order_id', $order->id)
                     ->where('gateway', PaymentGateway::VNPAY)
+                    ->where('type', PaymentTransactionType::PAYMENT)
                     ->where('status', PaymentTransactionStatus::PENDING)
                     ->orderByDesc('id')
                     ->first();
 
                 if (
-                    $pending !== null
+                    ! $forceNew
+                    && $pending !== null
                     && $order->payment_expires_at instanceof CarbonInterface
                     && $order->payment_expires_at->isFuture()
                 ) {
@@ -81,13 +101,8 @@ class VnPayService
                     }
                 }
 
-                if ($pending !== null) {
-                    $pending->update([
-                        'status' => PaymentTransactionStatus::EXPIRED,
-                        'payload' => array_merge(is_array($pending->payload) ? $pending->payload : [], [
-                            'expired_reason' => 'superseded_or_ttl',
-                        ]),
-                    ]);
+                if (! $forceNew && $pending !== null) {
+                    $this->expirePendingVnPayPayment($pending, 'superseded_or_ttl');
                 }
 
                 $vnpTxnRef = $this->makeTxnRef($order->id);
@@ -123,7 +138,7 @@ class VnPayService
                     'expires_at' => $expiresAt->toIso8601String(),
                 ];
             });
-        } catch (InvalidArgumentException $e) {
+        } catch (ValidationException|InvalidArgumentException $e) {
             throw $e;
         } catch (\Throwable $e) {
             Log::error('VNPay create payment failed', [
@@ -168,10 +183,25 @@ class VnPayService
 
         try {
             return DB::transaction(function () use ($query, $txnRef, $responseCode, $transactionStatus, $amountMinor): array {
-                /** @var PaymentTransaction|null $paymentTransaction */
-                $paymentTransaction = PaymentTransaction::query()
+                /** @var PaymentTransaction|null $txnLookup */
+                $txnLookup = PaymentTransaction::query()
                     ->where('gateway', PaymentGateway::VNPAY)
                     ->where('gateway_txn_id', $txnRef)
+                    ->first();
+
+                if ($txnLookup === null) {
+                    return ['success' => false, 'message' => 'Unknown transaction reference.'];
+                }
+
+                /** @var Order|null $order */
+                $order = Order::query()->whereKey($txnLookup->order_id)->lockForUpdate()->first();
+                if ($order === null) {
+                    return ['success' => false, 'message' => 'Order not found.'];
+                }
+
+                /** @var PaymentTransaction|null $paymentTransaction */
+                $paymentTransaction = PaymentTransaction::query()
+                    ->whereKey($txnLookup->id)
                     ->lockForUpdate()
                     ->first();
 
@@ -179,13 +209,21 @@ class VnPayService
                     return ['success' => false, 'message' => 'Unknown transaction reference.'];
                 }
 
-                $order = Order::query()->whereKey($paymentTransaction->order_id)->lockForUpdate()->first();
-                if ($order === null) {
-                    return ['success' => false, 'message' => 'Order not found.'];
-                }
-
                 if ($order->payment_method !== PaymentMethod::VNPAY) {
                     return ['success' => false, 'message' => 'Order payment method mismatch.'];
+                }
+
+                if ($paymentTransaction->type !== PaymentTransactionType::PAYMENT) {
+                    return ['success' => false, 'message' => 'Invalid transaction type.'];
+                }
+
+                if ($order->payment_status === PaymentStatus::PAID) {
+                    return [
+                        'success' => true,
+                        'idempotent' => true,
+                        'order_id' => $order->id,
+                        'payment_status' => $order->payment_status->value,
+                    ];
                 }
 
                 if ($paymentTransaction->status === PaymentTransactionStatus::PAID) {
@@ -194,6 +232,13 @@ class VnPayService
                         'idempotent' => true,
                         'order_id' => $order->id,
                         'payment_status' => $order->payment_status?->value,
+                    ];
+                }
+
+                if ($paymentTransaction->status !== PaymentTransactionStatus::PENDING) {
+                    return [
+                        'success' => false,
+                        'message' => 'Transaction is no longer active.',
                     ];
                 }
 
@@ -292,6 +337,48 @@ class VnPayService
 
             return ['success' => false, 'message' => 'Unable to process VNPay return.'];
         }
+    }
+
+    private function assertCustomerRetryEligible(Order $order): void
+    {
+        if ($order->canPay()) {
+            return;
+        }
+
+        if ($order->payment_expires_at instanceof CarbonInterface && $order->payment_expires_at->isPast()) {
+            throw ValidationException::withMessages([
+                'order' => ['Đơn hàng đã hết hạn thanh toán.'],
+            ]);
+        }
+
+        throw ValidationException::withMessages([
+            'order' => ['Đơn không thể thanh toán lại.'],
+        ]);
+    }
+
+    private function expirePendingVnPayPayments(int $orderId, string $reason): void
+    {
+        $pendingTransactions = PaymentTransaction::query()
+            ->where('order_id', $orderId)
+            ->where('gateway', PaymentGateway::VNPAY)
+            ->where('type', PaymentTransactionType::PAYMENT)
+            ->where('status', PaymentTransactionStatus::PENDING)
+            ->get();
+
+        foreach ($pendingTransactions as $pending) {
+            $this->expirePendingVnPayPayment($pending, $reason);
+        }
+    }
+
+    private function expirePendingVnPayPayment(PaymentTransaction $pending, string $reason): void
+    {
+        $pending->update([
+            'status' => PaymentTransactionStatus::EXPIRED,
+            'completed_at' => now(),
+            'payload' => array_merge(is_array($pending->payload) ? $pending->payload : [], [
+                'expired_reason' => $reason,
+            ]),
+        ]);
     }
 
     private function assertConfigured(): void

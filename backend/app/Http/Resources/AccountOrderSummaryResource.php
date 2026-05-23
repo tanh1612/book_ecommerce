@@ -29,6 +29,10 @@ class AccountOrderSummaryResource extends JsonResource
 
         return [
             'id' => $order->id,
+            'payment_method' => $order->payment_method?->value,
+            'payment_status' => $order->payment_status?->value,
+            'payment_expires_at' => $order->payment_expires_at?->toIso8601String(),
+            'can_pay' => $order->canPay(),
             'current_status' => $order->current_status?->value,
             'created_at' => $order->created_at?->toIso8601String(),
             'total_quantity' => (int) $items->sum('quantity'),

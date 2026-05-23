@@ -21,7 +21,7 @@ class Account extends Authenticatable implements FilamentUser, HasName
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->role === AccountRole::Admin;
+        return $this->role === AccountRole::Admin && $this->is_active;
     }
 
     public function getFilamentName(): string

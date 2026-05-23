@@ -47,6 +47,8 @@ class AccountOrderResource extends JsonResource
             'shipping_address' => $order->shipping_address,
             'payment_method' => $order->payment_method?->value,
             'payment_status' => $order->payment_status?->value,
+            'payment_expires_at' => $order->payment_expires_at?->toIso8601String(),
+            'can_pay' => $order->canPay(),
             'current_status' => $order->current_status?->value,
             'can_cancel' => $cancelEligibility['can_cancel'],
             'cancel_block_reason' => $cancelEligibility['cancel_block_reason'],

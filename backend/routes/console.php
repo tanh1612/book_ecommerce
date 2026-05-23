@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('payments:expire-vnpay')->everyFiveMinutes();
 Schedule::command('orders:expire-manual-refunds')->daily();
+Schedule::command('inventory:notify-low-stock')->daily();
