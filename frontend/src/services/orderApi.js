@@ -1,3 +1,4 @@
+// src/services/orderApi.js
 import axiosClient from './axiosClient';
 
 const orderApi = {
@@ -15,6 +16,9 @@ const orderApi = {
   
   // Gửi thông tin tài khoản ngân hàng để nhận hoàn tiền
   submitRefundBank: (id, data) => axiosClient.post(`/v1/account/orders/${id}/refund-bank-info`, data),
+  
+  // 🔥 API MỚI BỔ SUNG: Lấy link thanh toán VNPay cho đơn hàng cũ
+  getVnPayPaymentUrl: (orderId) => axiosClient.post(`/v1/account/orders/${orderId}/vnpay/payment-url`),
 };
 
 export default orderApi;

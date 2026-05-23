@@ -1,46 +1,44 @@
 // src/pages/Profile/MyOrders.jsx
 import { useState, useEffect } from 'react';
-import { FiX, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { FiX, FiAlertCircle, FiClock, FiPackage } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { formatCurrency } from '../../utils/formatters';
 import orderApi from '../../services/orderApi';
 
-// Map trạng thái đơn hàng (Dựa theo OrderStatus.php)
-const ORDER_STATUSES = {
-  pending: { label: 'Chờ xử lý', color: 'text-yellow-600 bg-yellow-100' },
-  confirmed: { label: 'Đã xác nhận', color: 'text-blue-600 bg-blue-100' },
-  processing: { label: 'Đang xử lý', color: 'text-indigo-600 bg-indigo-100' },
-  shipping: { label: 'Đang giao hàng', color: 'text-gray-600 bg-gray-200' },
-  completed: { label: 'Hoàn tất', color: 'text-green-600 bg-green-100' },
-  cancelled: { label: 'Đã hủy', color: 'text-red-600 bg-red-100' },
-  refund_closed: { label: 'Đóng - Không hoàn tiền', color: 'text-gray-500 bg-gray-100' },
-};
+// Danh sách các trạng thái dùng cho Tab Bộ lọc & Hiển thị (Khớp 100% với OrderStatus.php)
+const ORDER_STATUSES = [
+  { label: 'Tất cả', value: null, color: 'text-gray-800 bg-gray-100' },
+  { label: 'Chờ xử lý', value: 'pending', color: 'text-yellow-600 bg-yellow-100' },
+  { label: 'Đã xác nhận', value: 'confirmed', color: 'text-blue-600 bg-blue-100' },
+  { label: 'Đang xử lý', value: 'processing', color: 'text-indigo-600 bg-indigo-100' },
+  { label: 'Đang giao hàng', value: 'shipping', color: 'text-gray-600 bg-gray-200' },
+  { label: 'Hoàn tất', value: 'completed', color: 'text-green-600 bg-green-100' },
+  { label: 'Đã hủy', value: 'cancelled', color: 'text-red-600 bg-red-100' },
+  { label: 'Không hoàn tiền', value: 'refund_closed', color: 'text-gray-500 bg-gray-100' },
+];
 
 const MyOrders = () => {
   const [orders, setOrders] = useState([]);
+  const [filterStatus, setFilterStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState(null); // Dùng cho Modal Chi tiết
   
-  // Modal State
+  // State quản lý Modals
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   
-  // Refund Form State
+  // State Form Hoàn tiền (Khớp với OrderRefundBankInfoController)
   const [refundBanks, setRefundBanks] = useState([]);
-  const [refundData, setRefundData] = useState({
-    bank_code: '',
-    account_number: '',
-    account_holder: ''
-  });
+  const [refundData, setRefundData] = useState({ bank_code: '', account_number: '', account_holder: '' });
 
-  const fetchOrders = async () => {
+  // 1. LẤY DANH SÁCH ĐƠN HÀNG (CÓ LỌC)
+  const fetchOrders = async (status = null) => {
     setIsLoading(true);
     try {
-      const res = await orderApi.getOrders();
-      // Laravel trả về data trong res.data.data
+      const res = await orderApi.getOrders(status ? { status } : {});
       setOrders(res.data?.data || []);
     } catch (error) {
-      console.error("Lỗi tải đơn hàng:", error);
       toast.error("Không thể tải danh sách đơn hàng!");
     } finally {
       setIsLoading(false);
@@ -48,24 +46,53 @@ const MyOrders = () => {
   };
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    fetchOrders(filterStatus);
+  }, [filterStatus]);
 
-  // --- XỬ LÝ HỦY ĐƠN ---
+  // 2. XỬ LÝ HỦY ĐƠN
   const handleCancelOrder = async () => {
     if (!selectedOrder) return;
     try {
       await orderApi.cancelOrder(selectedOrder.id);
       toast.success("Hủy đơn hàng thành công!");
       setIsCancelModalOpen(false);
-      setSelectedOrder(null);
-      fetchOrders(); // Tải lại danh sách
+      fetchOrders(filterStatus);
     } catch (error) {
       toast.error(error.response?.data?.message || "Lỗi khi hủy đơn hàng!");
     }
   };
 
-  // --- XỬ LÝ HOÀN TIỀN ---
+  // 3. XỬ LÝ THANH TOÁN LẠI VNPAY
+  const handleRetryPayment = async (orderId) => {
+    try {
+      toast.info("Đang tạo link thanh toán mới...");
+      const res = await orderApi.getVnPayPaymentUrl(orderId);
+      
+      const paymentUrl = res.data?.data?.payment_url;
+      
+      if (paymentUrl && typeof paymentUrl === 'string' && paymentUrl.startsWith('http')) {
+        window.location.href = paymentUrl; // Chuyển hướng sang VNPay
+      } else {
+        toast.error("Không nhận được link thanh toán từ hệ thống!");
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Lỗi khi tạo lại thanh toán VNPay!");
+    }
+  };
+
+  // 4. XỬ LÝ XEM CHI TIẾT
+  const handleViewDetails = async (orderId) => {
+    try {
+      toast.info("Đang tải dữ liệu...", { autoClose: 500 });
+      const res = await orderApi.getOrderDetail(orderId);
+      setSelectedOrder(res.data?.data || res.data);
+      setIsDetailModalOpen(true);
+    } catch (error) {
+      toast.error("Không thể lấy chi tiết đơn hàng");
+    }
+  };
+
+  // 5. XỬ LÝ HOÀN TIỀN
   const openRefundModal = async (order) => {
     setSelectedOrder(order);
     setIsRefundModalOpen(true);
@@ -79,27 +106,21 @@ const MyOrders = () => {
 
   const handleSubmitRefund = async (e) => {
     e.preventDefault();
-    if (!refundData.bank_code || !refundData.account_number || !refundData.account_holder) {
-      return toast.warning("Vui lòng điền đủ thông tin!");
-    }
-    
     try {
       await orderApi.submitRefundBank(selectedOrder.id, refundData);
       toast.success("Đã gửi thông tin nhận hoàn tiền thành công!");
       setIsRefundModalOpen(false);
-      setRefundData({ bank_code: '', account_number: '', account_holder: '' });
-      fetchOrders();
+      fetchOrders(filterStatus);
     } catch (error) {
       toast.error(error.response?.data?.message || "Lỗi gửi thông tin hoàn tiền!");
     }
   };
 
-  // --- UI RENDERERS ---
+  // UI Render Items
   const renderOrderItems = (items) => {
     return items.map((item) => {
       const bookData = item.book || {};
-      const bookName = bookData.name || bookData.title || "Sản phẩm không xác định";
-      // Lấy ảnh đầu tiên trong mảng images, nếu không có thì lấy thumbnail_url
+      const bookName = bookData.name || bookData.title || "Sản phẩm";
       const thumbnail = (bookData.images && bookData.images[0]?.url) || bookData.thumbnail_url || "https://placehold.co/80x120?text=No+Image";
 
       return (
@@ -115,37 +136,65 @@ const MyOrders = () => {
     });
   };
 
-  if (isLoading) {
-    return <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>;
-  }
-
   return (
-    <div className="bg-white p-6 md:p-8 rounded-lg shadow-sm border border-gray-100">
+    <div className="bg-white p-4 md:p-8 rounded-lg shadow-sm border border-gray-100">
       <h1 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">Đơn hàng của tôi</h1>
       
-      {orders.length === 0 ? (
-        <div className="text-center py-10 text-gray-500">
-          Bạn chưa có đơn hàng nào.
+      {/* --- TAB BỘ LỌC TRẠNG THÁI --- */}
+      <div className="flex gap-2 mb-6 border-b pb-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
+        {ORDER_STATUSES.map((status, index) => (
+          <button
+            key={index}
+            onClick={() => setFilterStatus(status.value)}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              filterStatus === status.value 
+                ? 'bg-[#157a2c] text-white shadow-md' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {status.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-16 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <FiPackage size={48} className="text-gray-300 mb-3" />
+          <p className="text-gray-500 font-medium">Không tìm thấy đơn hàng nào ở trạng thái này.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
           {orders.map((order) => {
-            const statusUi = ORDER_STATUSES[order.current_status] || { label: order.current_status, color: 'text-gray-600 bg-gray-100' };
-            const isPaid = order.payment_status === 'paid' || order.payment_status === 'refunding';
+            // An toàn ép kiểu Enum thành String
+            const currentStatus = typeof order.current_status === 'object' ? order.current_status.value : order.current_status;
+            const paymentStatus = typeof order.payment_status === 'object' ? order.payment_status.value : order.payment_status;
+            const paymentMethod = typeof order.payment_method === 'object' ? order.payment_method.value : order.payment_method;
             
-            // Logic hiển thị nút Hoàn tiền: Bị hủy + Đã thanh toán (hoặc đang refunding)
-            const canRefund = (order.current_status === 'cancelled' && isPaid) || order.payment_status === 'refunding';
+            const statusUi = ORDER_STATUSES.find(s => s.value === currentStatus) || ORDER_STATUSES[0];
+            
+            // Logic hiển thị nút
+            const isVnpayPending = paymentMethod === 'vnpay' && paymentStatus === 'pending' && currentStatus !== 'cancelled';
+            const canRefund = paymentStatus === 'refunding' || (currentStatus === 'cancelled' && paymentStatus === 'paid');
 
             return (
               <div key={order.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-sm">
+                <div className="bg-gray-50 p-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 text-sm">
                   <div className="flex gap-4 items-center">
                     <span className="font-bold text-gray-800">Mã đơn: #{order.id}</span>
                     <span className="text-gray-500">{new Date(order.created_at).toLocaleDateString('vi-VN')}</span>
                   </div>
-                  <span className={`font-medium px-3 py-1 rounded-full text-xs ${statusUi.color}`}>
-                    {statusUi.label}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {paymentMethod === 'vnpay' && (
+                       <span className={`text-xs font-bold px-2 py-1 rounded ${paymentStatus === 'paid' ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}`}>
+                         {paymentStatus === 'paid' ? 'Đã TT VNPay' : 'Chưa TT VNPay'}
+                       </span>
+                    )}
+                    <span className={`font-medium px-3 py-1 rounded-full text-xs ${statusUi.color}`}>
+                      {statusUi.label}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="p-4">
@@ -157,14 +206,15 @@ const MyOrders = () => {
                     Thành tiền: <span className="text-xl font-bold text-[#ff424e]">{formatCurrency(order.final_amount)}</span>
                   </div>
                   
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    {/* NÚT HỦY ĐƠN (Chỉ hiện khi PENDING) */}
-                    {order.current_status === 'pending' && (
+                  <div className="flex gap-2 w-full sm:w-auto flex-wrap justify-end">
+                    
+                    {/* NÚT THANH TOÁN LẠI VNPAY */}
+                    {isVnpayPending && (
                       <button 
-                        onClick={() => { setSelectedOrder(order); setIsCancelModalOpen(true); }} 
-                        className="px-4 py-2 border border-red-500 text-red-500 bg-white rounded text-sm font-medium hover:bg-red-50 transition w-full sm:w-auto"
+                        onClick={() => handleRetryPayment(order.id)} 
+                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
                       >
-                        Hủy đơn
+                         <FiClock /> Thanh toán ngay
                       </button>
                     )}
 
@@ -172,25 +222,36 @@ const MyOrders = () => {
                     {canRefund && (
                       <button 
                         onClick={() => openRefundModal(order)} 
-                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition w-full sm:w-auto flex items-center gap-2"
+                        className="px-4 py-2 bg-purple-600 text-white rounded text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2"
                       >
-                        <FiAlertCircle /> Nhập TK Hoàn tiền
+                        <FiAlertCircle /> Nhận hoàn tiền
                       </button>
                     )}
 
-                    {/* NÚT ĐÁNH GIÁ (Chỉ hiện khi COMPLETED) */}
-                    {order.current_status === 'completed' && (
+                    {/* NÚT HỦY ĐƠN */}
+                    {currentStatus === 'pending' && (
+                      <button 
+                        onClick={() => { setSelectedOrder(order); setIsCancelModalOpen(true); }} 
+                        className="px-4 py-2 border border-red-500 text-red-500 bg-white rounded text-sm font-medium hover:bg-red-50 transition"
+                      >
+                        Hủy đơn
+                      </button>
+                    )}
+
+                    {/* NÚT ĐÁNH GIÁ */}
+                    {currentStatus === 'completed' && (
                       <button 
                         onClick={() => toast.info('Tính năng đánh giá đang được phát triển!')} 
-                        className="px-4 py-2 border border-[#157a2c] text-[#157a2c] bg-white rounded text-sm font-medium hover:bg-green-50 transition w-full sm:w-auto"
+                        className="px-4 py-2 border border-[#157a2c] text-[#157a2c] bg-white rounded text-sm font-medium hover:bg-green-50 transition"
                       >
                         Đánh giá
                       </button>
                     )}
 
+                    {/* NÚT XEM CHI TIẾT */}
                     <button 
-                      onClick={() => toast.info('Tính năng xem chi tiết đang phát triển')} 
-                      className="px-4 py-2 bg-[#157a2c] text-white rounded text-sm font-medium hover:bg-green-800 transition w-full sm:w-auto"
+                      onClick={() => handleViewDetails(order.id)} 
+                      className="px-4 py-2 bg-[#157a2c] text-white rounded text-sm font-medium hover:bg-green-800 transition"
                     >
                       Chi tiết
                     </button>
@@ -202,21 +263,57 @@ const MyOrders = () => {
         </div>
       )}
 
-      {/* --- MODAL HỦY ĐƠN --- */}
+      {/* ================= MODAL CHI TIẾT ĐƠN HÀNG ================= */}
+      {isDetailModalOpen && selectedOrder && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <h2 className="text-lg font-bold text-gray-800">Chi tiết đơn hàng #{selectedOrder.id}</h2>
+              <button onClick={() => setIsDetailModalOpen(false)} className="text-gray-400 hover:text-red-500"><FiX size={24}/></button>
+            </div>
+            
+            <div className="p-6">
+              <div className="bg-green-50 border border-green-100 p-4 rounded-lg mb-6">
+                <h3 className="font-bold text-[#157a2c] mb-2 uppercase text-xs">Thông tin giao hàng</h3>
+                <p className="font-medium text-gray-800">{selectedOrder.shipping_name}</p>
+                <p className="text-sm text-gray-600">SĐT: {selectedOrder.shipping_phone}</p>
+                <p className="text-sm text-gray-600">Địa chỉ: {selectedOrder.shipping_address}</p>
+                <p className="text-sm text-gray-600 mt-2">Ghi chú: {selectedOrder.note || 'Không có ghi chú'}</p>
+              </div>
+
+              <h3 className="font-bold text-gray-800 mb-3 border-b pb-2">Danh sách sản phẩm</h3>
+              <div className="mb-6">
+                {renderOrderItems(selectedOrder.items || [])}
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600 flex flex-col gap-2">
+                <div className="flex justify-between"><span>Tổng tiền sách:</span> <span>{formatCurrency(selectedOrder.total_amount)}</span></div>
+                <div className="flex justify-between"><span>Phí vận chuyển:</span> <span>{formatCurrency(selectedOrder.shipping_fee)}</span></div>
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span className="font-bold text-gray-800">Thành tiền:</span> 
+                  <span className="font-bold text-xl text-[#ff424e]">{formatCurrency(selectedOrder.final_amount)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL HỦY ĐƠN ================= */}
       {isCancelModalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Xác nhận hủy đơn</h2>
             <p className="text-gray-600 mb-6">Bạn có chắc chắn muốn hủy đơn hàng <strong>#{selectedOrder.id}</strong> không? Hành động này không thể hoàn tác.</p>
             <div className="flex gap-4 justify-end">
-              <button onClick={() => setIsCancelModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-medium hover:bg-gray-300">Quay lại</button>
+              <button onClick={() => setIsCancelModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-medium hover:bg-gray-300">Đóng</button>
               <button onClick={handleCancelOrder} className="px-4 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700">Đồng ý Hủy</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODAL NHẬP THÔNG TIN HOÀN TIỀN --- */}
+      {/* ================= MODAL NHẬP THÔNG TIN HOÀN TIỀN ================= */}
       {isRefundModalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
@@ -225,8 +322,8 @@ const MyOrders = () => {
               <button onClick={() => setIsRefundModalOpen(false)} className="text-gray-400 hover:text-red-500"><FiX size={24}/></button>
             </div>
             
-            <p className="text-sm text-gray-600 mb-4 bg-blue-50 p-3 rounded border border-blue-100">
-              Đơn hàng <strong>#{selectedOrder.id}</strong> của bạn đã được thanh toán nhưng giao không thành công / bị hủy. Vui lòng cung cấp STK để chúng tôi hoàn lại số tiền <strong>{formatCurrency(selectedOrder.final_amount)}</strong>.
+            <p className="text-sm text-gray-600 mb-4 bg-purple-50 p-3 rounded border border-purple-100">
+              Đơn hàng <strong>#{selectedOrder.id}</strong> của bạn đã thanh toán nhưng bị hủy/giao thất bại. Vui lòng cung cấp STK để nhận lại <strong>{formatCurrency(selectedOrder.final_amount)}</strong>.
             </p>
 
             <form onSubmit={handleSubmitRefund} className="flex flex-col gap-4">
