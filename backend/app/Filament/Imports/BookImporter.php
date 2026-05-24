@@ -5,11 +5,11 @@ namespace App\Filament\Imports;
 use App\Enums\Book\BookFormat;
 use App\Models\Author;
 use App\Models\Book;
-use App\Models\Category;
 use App\Models\Publisher;
 use App\Models\Supplier;
-use App\Traits\GeneratesUniqueSlug;
 use App\Services\Media\BookImageStorageService;
+use App\Support\Catalog\CategoryBreadcrumbIndex;
+use App\Traits\GeneratesUniqueSlug;
 use Filament\Actions\Imports\Exceptions\RowImportFailedException;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
@@ -17,19 +17,18 @@ use Filament\Actions\Imports\Models\Import;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class BookImporter extends Importer
 {
     use GeneratesUniqueSlug;
 
+    private const int MAX_IMAGES_PER_BOOK = 5;
+
     protected static ?string $model = Book::class;
 
-    /**
-     * @var array<string, int>|null
-     */
-    protected static ?array $categoryBreadcrumbToId = null;
+    protected ?CategoryBreadcrumbIndex $categoryIndex = null;
 
     /** @var list<int> */
     protected array $resolvedAuthorIds = [];
@@ -37,10 +36,13 @@ class BookImporter extends Importer
     /** @var list<int> */
     protected array $resolvedCategoryIds = [];
 
-    /** @internal Testing: reset static category map between tests */
+    /** @var list<string> */
+    protected array $pendingImageUrls = [];
+
+    /** @internal Kept for older tests; category index is now per importer instance. */
     public static function clearBreadcrumbCache(): void
     {
-        self::$categoryBreadcrumbToId = null;
+        //
     }
 
     public static function getColumns(): array
@@ -76,7 +78,8 @@ class BookImporter extends Importer
 
             ImportColumn::make('thumbnail_url')
                 ->label('URL Ảnh')
-                ->rules(['nullable', 'string', 'max:5000'])
+                ->requiredMapping()
+                ->rules(['required', 'string', 'max:5000'])
                 ->exampleHeader('thumbnail_url')
                 ->examples(['https://cdn.fahasa.com/media/catalog/product/8/9/8936071673916_1_1.jpg'])
                 ->fillRecordUsing(fn () => null),
@@ -180,8 +183,14 @@ class BookImporter extends Importer
     {
         $this->resolvedAuthorIds = [];
         $this->resolvedCategoryIds = [];
+        $this->pendingImageUrls = $this->imageUrlsFromInput($this->data['thumbnail_url'] ?? null);
+
+        if ($this->pendingImageUrls === []) {
+            throw new RowImportFailedException('Cột thumbnail_url là bắt buộc và phải chứa ít nhất một URL ảnh hợp lệ.');
+        }
 
         $this->record->slug = $this->generateUniqueSlug($this->data['name'], 'books');
+        $this->record->is_active = true;
 
         $supplier = Supplier::where('name', $this->data['supplier'])->first();
         if (! $supplier) {
@@ -201,10 +210,6 @@ class BookImporter extends Importer
             $this->record->selling_price = $this->data['original_price'];
         }
 
-        if (! isset($this->data['is_active'])) {
-            $this->record->is_active = true;
-        }
-
         if (filled($this->data['authors'] ?? null)) {
             $names = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->data['authors'])))));
             foreach ($names as $name) {
@@ -221,12 +226,9 @@ class BookImporter extends Importer
 
         if (filled($this->data['categories'] ?? null)) {
             $breadcrumbs = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->data['categories'])))));
-            $map = $this->breadcrumbToCategoryIdMap();
+            $index = $this->categoryIndex();
             foreach ($breadcrumbs as $breadcrumb) {
-                if (! isset($map[$breadcrumb])) {
-                    throw new RowImportFailedException("Danh mục '{$breadcrumb}' không tồn tại.");
-                }
-                $this->resolvedCategoryIds[] = $map[$breadcrumb];
+                $this->resolvedCategoryIds[] = $index->resolveCategoryId($breadcrumb);
             }
         }
     }
@@ -256,44 +258,6 @@ class BookImporter extends Importer
             'translator' => $this->data['translator'] ?? null,
         ]);
 
-        if (filled($this->data['thumbnail_url'] ?? null)) {
-            try {
-                $urls = preg_split('/\s+/', trim((string) $this->data['thumbnail_url']));
-                $storage = app(BookImageStorageService::class);
-
-                foreach ($urls as $index => $url) {
-                    if (blank($url)) {
-                        continue;
-                    }
-
-                    $publicId = $storage->newBookImagePublicId((string) $this->record->slug);
-                    $options = $storage->cloudinaryUploadOptionsForImageAtPath($publicId);
-
-                    $response = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload($url, $options);
-
-                    $returnedPublicId = $response['public_id'] ?? null;
-                    if (blank($returnedPublicId)) {
-                        throw new RowImportFailedException('Cloudinary không trả về public_id sau khi upload.');
-                    }
-
-                    $this->record->images()->create([
-                        'public_id' => (string) $returnedPublicId,
-                        'sort_order' => $index + 1,
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                Log::error('Book import: Cloudinary upload failed', [
-                    'import_id' => $this->import->getKey(),
-                    'sku' => $this->record->sku,
-                    'book_id' => $this->record->getKey(),
-                    'error' => $e->getMessage(),
-                    'exception' => $e::class,
-                ]);
-
-                throw new RowImportFailedException('Tải ảnh lên Cloudinary thất bại: '.$e->getMessage());
-            }
-        }
-
         if ($this->resolvedAuthorIds !== []) {
             $this->record->authors()->attach($this->resolvedAuthorIds);
         }
@@ -301,23 +265,84 @@ class BookImporter extends Importer
         if ($this->resolvedCategoryIds !== []) {
             $this->record->categories()->attach($this->resolvedCategoryIds);
         }
+
+        $this->uploadImages();
+    }
+
+    private function uploadImages(): void
+    {
+        $storage = app(BookImageStorageService::class);
+        $uploadedCount = 0;
+        $errors = [];
+
+        foreach ($this->pendingImageUrls as $index => $url) {
+            $sortOrder = $index + 1;
+            $publicId = null;
+
+            try {
+                $publicId = $storage->uploadImageFromUrl($url, (int) $this->record->getKey(), $sortOrder);
+
+                $this->record->images()->create([
+                    'public_id' => $publicId,
+                    'sort_order' => $sortOrder,
+                ]);
+
+                $uploadedCount++;
+            } catch (Throwable $e) {
+                if ($publicId !== null && $publicId !== '') {
+                    $storage->deleteByPublicId($publicId);
+                }
+
+                $errors[] = $e->getMessage();
+
+                Log::warning('Book import image upload failed', [
+                    'import_id' => $this->import->getKey(),
+                    'book_id' => $this->record->getKey(),
+                    'sku' => $this->record->sku,
+                    'url' => $url,
+                    'sort_order' => $sortOrder,
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ]);
+            }
+        }
+
+        if ($uploadedCount === 0) {
+            $this->record->delete();
+
+            throw new RowImportFailedException(
+                'Tải ảnh lên Cloudinary thất bại: '.($errors[0] ?? 'không có ảnh nào upload thành công.')
+            );
+        }
     }
 
     /**
-     * @return array<string, int>
+     * @return list<string>
      */
-    protected function breadcrumbToCategoryIdMap(): array
+    private function imageUrlsFromInput(?string $input): array
     {
-        if (self::$categoryBreadcrumbToId !== null) {
-            return self::$categoryBreadcrumbToId;
+        if ($input === null || trim($input) === '') {
+            return [];
         }
 
-        $map = [];
-        foreach (Category::with(['parent.parent'])->get() as $category) {
-            $map[trim($category->getBreadcrumb())] = $category->id;
+        $parts = preg_split('/\s+/', trim($input)) ?: [];
+        $urls = [];
+
+        foreach ($parts as $part) {
+            $url = trim($part);
+            if ($url === '' || in_array($url, $urls, true)) {
+                continue;
+            }
+
+            $urls[] = $url;
         }
 
-        return self::$categoryBreadcrumbToId = $map;
+        return array_slice($urls, 0, self::MAX_IMAGES_PER_BOOK);
+    }
+
+    protected function categoryIndex(): CategoryBreadcrumbIndex
+    {
+        return $this->categoryIndex ??= CategoryBreadcrumbIndex::buildFromDatabase();
     }
 
     public static function getCompletedNotificationBody(Import $import): string

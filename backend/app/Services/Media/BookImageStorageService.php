@@ -177,4 +177,32 @@ class BookImageStorageService
     {
         return $this->bookImagesFolderForSlug($slug).'/'.$this->newBookImageBasename($slug);
     }
+
+    /**
+     * Short public_id for CSV import uploads: book_ecommerce/books/{book_id}/img-{sort_order}-{ulid}
+     */
+    public function newBookImagePublicIdForBook(int $bookId, int $sortOrder): string
+    {
+        $suffix = strtolower(str_replace('-', '', (string) Str::ulid()));
+
+        return self::CLOUDINARY_APP_ROOT.'/books/'.$bookId.'/img-'.$sortOrder.'-'.$suffix;
+    }
+
+    /**
+     * @return string Cloudinary public_id returned after upload
+     */
+    public function uploadImageFromUrl(string $url, int $bookId, int $sortOrder): string
+    {
+        $publicId = $this->newBookImagePublicIdForBook($bookId, $sortOrder);
+        $options = $this->cloudinaryUploadOptionsForImageAtPath($publicId);
+
+        $response = Cloudinary::uploadApi()->upload($url, $options);
+
+        $returnedPublicId = $response['public_id'] ?? null;
+        if (blank($returnedPublicId)) {
+            throw new \RuntimeException('Cloudinary không trả về public_id sau khi upload.');
+        }
+
+        return (string) $returnedPublicId;
+    }
 }

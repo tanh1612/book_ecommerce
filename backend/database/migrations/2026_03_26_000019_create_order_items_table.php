@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
             $table->foreignId('book_id')->constrained('books')->restrictOnDelete();
+            $table->foreignId('promotion_item_id')->nullable()->constrained('promotion_items')->nullOnDelete();
             $table->foreignId('promotion_id')->nullable()->constrained('promotions')->nullOnDelete();
             $table->decimal('price', 15, 2);
             $table->unsignedInteger('quantity');

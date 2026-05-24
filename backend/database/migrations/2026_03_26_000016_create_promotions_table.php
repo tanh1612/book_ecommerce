@@ -14,8 +14,7 @@ return new class extends Migration
             $table->string('type', 50);
             $table->timestamp('start_at');
             $table->timestamp('end_at');
-            $table->unsignedInteger('priority');
-            $table->string('status', 50)->nullable();
+            $table->string('status', 50)->default('scheduled');
             $table->timestamps();
         });
     }

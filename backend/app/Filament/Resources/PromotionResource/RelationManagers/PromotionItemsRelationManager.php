@@ -25,23 +25,21 @@ class PromotionItemsRelationManager extends RelationManager
                     ->searchable()
                     ->preload()
                     ->required(),
-                Forms\Components\Select::make('discount_type')
-                    ->label('Kiểu giảm')
-                    ->options([
-                        'percentage' => 'Phần trăm (%)',
-                        'fixed' => 'Số tiền cố định (₫)',
-                    ])
-                    ->required(),
                 Forms\Components\TextInput::make('discount_value')
-                    ->label('Giá trị giảm')
+                    ->label('Phần trăm giảm')
                     ->numeric()
+                    ->minValue(0.01)
+                    ->maxValue(100)
+                    ->suffix('%')
                     ->required(),
                 Forms\Components\TextInput::make('stock_limit')
-                    ->label('Giới hạn tồn bán')
-                    ->numeric(),
+                    ->label('Giới hạn suất bán')
+                    ->integer()
+                    ->minValue(1),
                 Forms\Components\TextInput::make('max_quantity_per_user')
                     ->label('Tối đa / khách')
-                    ->numeric(),
+                    ->integer()
+                    ->minValue(1),
             ]);
     }
 
@@ -53,25 +51,19 @@ class PromotionItemsRelationManager extends RelationManager
                     ->label('Sách')
                     ->limit(30)
                     ->searchable(),
-                Tables\Columns\TextColumn::make('discount_type')
-                    ->label('Kiểu')
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'percentage' => '%',
-                        'fixed' => '₫',
-                        default => $state,
-                    }),
                 Tables\Columns\TextColumn::make('discount_value')
-                    ->label('Giá trị')
+                    ->label('Giảm')
+                    ->suffix('%')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('stock_limit')
                     ->label('Giới hạn')
-                    ->placeholder('∞'),
+                    ->placeholder('Không giới hạn'),
                 Tables\Columns\TextColumn::make('sold_quantity')
-                    ->label('Đã bán')
+                    ->label('Đã giữ/bán')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('max_quantity_per_user')
                     ->label('Tối đa / khách')
-                    ->placeholder('∞'),
+                    ->placeholder('Không giới hạn'),
             ])
             ->headerActions([
                 Actions\CreateAction::make(),

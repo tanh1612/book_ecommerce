@@ -33,7 +33,7 @@ class ListBooksRequest extends FormRequest
             'price_min' => ['nullable', 'numeric', 'min:0'],
             'price_max' => ['nullable', 'numeric', 'min:0'],
             'publisher' => ['nullable', 'integer', Rule::exists('publishers', 'id')],
-            'supplier' => ['nullable', 'max:255', $this->supplierExistsRule()],
+            'supplier' => ['nullable', 'integer', Rule::exists('suppliers', 'id')],
             'sort' => ['required', 'string', Rule::in(['newest', 'price_asc', 'price_desc', 'rating_desc'])],
         ];
     }
@@ -49,29 +49,5 @@ class ListBooksRequest extends FormRequest
                 }
             }
         });
-    }
-
-    /**
-     * @return \Closure(string, mixed, \Closure(string): void): void
-     */
-    private function supplierExistsRule(): \Closure
-    {
-        return function (string $attribute, mixed $value, \Closure $fail): void {
-            if ($value === null || $value === '') {
-                return;
-            }
-
-            if (is_numeric($value)) {
-                if (! \App\Models\Supplier::query()->whereKey((int) $value)->exists()) {
-                    $fail(__('validation.exists', ['attribute' => $attribute]));
-                }
-
-                return;
-            }
-
-            if (! is_string($value) || ! \App\Models\Supplier::query()->where('slug', $value)->exists()) {
-                $fail(__('validation.exists', ['attribute' => $attribute]));
-            }
-        };
     }
 }

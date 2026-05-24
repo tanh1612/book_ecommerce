@@ -3,7 +3,6 @@
 namespace App\Filament\Imports;
 
 use App\Models\Supplier;
-use App\Traits\GeneratesUniqueSlug;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
@@ -13,8 +12,6 @@ use Illuminate\Validation\Rule;
 
 class SupplierImporter extends Importer
 {
-    use GeneratesUniqueSlug;
-
     protected static ?string $model = Supplier::class;
 
     public static function getColumns(): array
@@ -37,11 +34,6 @@ class SupplierImporter extends Importer
     public function resolveRecord(): Supplier
     {
         return new Supplier;
-    }
-
-    protected function beforeSave(): void
-    {
-        $this->record->slug = $this->generateUniqueSlug($this->data['name'], 'suppliers');
     }
 
     public static function getCompletedNotificationBody(Import $import): string

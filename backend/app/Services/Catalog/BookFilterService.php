@@ -40,7 +40,7 @@ class BookFilterService
             $suppliers = Supplier::query()
                 ->whereHas('books')
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug']);
+                ->get(['id', 'name']);
 
             return [
                 'categories' => $categories,

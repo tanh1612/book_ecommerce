@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
+use App\Traits\GeneratesUniqueSlug;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
 use Filament\Resources\Resource;
@@ -12,10 +13,11 @@ use Filament\Schemas\Components as Layout;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Str;
 
 class CategoryResource extends Resource
 {
+    use GeneratesUniqueSlug;
+
     protected static ?string $model = Category::class;
 
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-tag';
@@ -42,7 +44,13 @@ class CategoryResource extends Resource
                     ->maxLength(255)
                     ->live(onBlur: true)
                     ->columnSpanFull()
-                    ->afterStateUpdated(fn (string $operation, $state, \Filament\Schemas\Components\Utilities\Set $set) => $operation === 'create' ? $set('slug', Str::slug($state)) : null),
+                    ->afterStateUpdated(function (string $operation, ?string $state, \Filament\Schemas\Components\Utilities\Set $set): void {
+                        if ($operation !== 'create' || blank($state)) {
+                            return;
+                        }
+
+                        $set('slug', static::slugFromName($state));
+                    }),
                 Field\TextInput::make('slug')
                     ->label('Slug')
                     ->required()

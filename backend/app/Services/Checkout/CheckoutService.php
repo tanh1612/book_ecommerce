@@ -19,6 +19,9 @@ use App\Notifications\Order\NewOrderNeedsProcessingNotification;
 use App\Services\Admin\AdminNotificationService;
 use App\Services\Order\OrderStatusTransitionService;
 use App\Services\Payment\VnPayService;
+use App\Services\Promotion\PromotionAllocationService;
+use App\Services\Promotion\PromotionPricingService;
+use App\Services\Promotion\PromotionResolver;
 use App\Services\Shipping\ShippingAddressSnapshotFormatter;
 use App\Services\Shipping\ShippingQuoteService;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +37,9 @@ class CheckoutService
         private ShippingQuoteService $shippingQuoteService,
         private ShippingAddressSnapshotFormatter $addressSnapshotFormatter,
         private AdminNotificationService $adminNotificationService,
+        private PromotionResolver $promotionResolver,
+        private PromotionPricingService $promotionPricing,
+        private PromotionAllocationService $promotionAllocation,
     ) {}
 
     /**
@@ -138,6 +144,7 @@ class CheckoutService
                 [$shippingName, $shippingPhone, $shippingAddressText, $provinceCode] = $this->resolveShippingFields($account, $input);
 
                 $shippingFee = $this->shippingQuoteService->resolveBaseFee((int) $shippingMethod->id, $provinceCode);
+                $promotionItems = $this->promotionResolver->activeItemsForBooks($bookIds);
 
                 $totalAmount = '0.00';
                 $lineRows = [];
@@ -151,14 +158,23 @@ class CheckoutService
                     }
                     $qty = (int) $line->quantity;
                     $unit = (string) $book->selling_price;
-                    $lineTotal = bcmul($unit, (string) $qty, 2);
-                    $totalAmount = bcadd($totalAmount, $lineTotal, 2);
+                    $promotionItem = $promotionItems->get($bookId);
+                    $pricing = $this->promotionPricing->calculateLine(
+                        $unit,
+                        $qty,
+                        $promotionItem !== null ? (string) $promotionItem->discount_value : null,
+                    );
+
+                    $totalAmount = bcadd($totalAmount, $pricing['line_total'], 2);
                     $lineRows[] = [
                         'book_id' => $bookId,
-                        'price' => $unit,
+                        'promotion_id' => $promotionItem?->promotion_id,
+                        'promotion_item_id' => $promotionItem?->id,
+                        'promotion_item' => $promotionItem,
+                        'price' => $pricing['unit_price'],
                         'quantity' => $qty,
-                        'total_price' => $lineTotal,
-                        'discount_amount' => '0.00',
+                        'total_price' => $pricing['line_total'],
+                        'discount_amount' => $pricing['discount_amount'],
                     ];
                 }
 
@@ -186,16 +202,21 @@ class CheckoutService
                 ]);
 
                 foreach ($lineRows as $row) {
-                    OrderItem::query()->create([
+                    $orderItem = OrderItem::query()->create([
                         'order_id' => $order->id,
                         'book_id' => $row['book_id'],
-                        'promotion_id' => null,
+                        'promotion_id' => $row['promotion_id'],
+                        'promotion_item_id' => $row['promotion_item_id'],
                         'price' => $row['price'],
                         'quantity' => $row['quantity'],
                         'total_price' => $row['total_price'],
                         'discount_amount' => $row['discount_amount'],
                         'is_reviewed' => false,
                     ]);
+
+                    if ($row['promotion_item'] !== null) {
+                        $this->promotionAllocation->reserve($account, $row['promotion_item'], $orderItem);
+                    }
                 }
 
                 foreach ($cartItems as $line) {

@@ -43,6 +43,8 @@ class CheckoutResource extends JsonResource
                     return [
                         'id' => $item->id,
                         'book_id' => $item->book_id,
+                        'promotion_id' => $item->promotion_id,
+                        'promotion_item_id' => $item->promotion_item_id,
                         'price' => (float) $item->price,
                         'quantity' => (int) $item->quantity,
                         'total_price' => (float) $item->total_price,

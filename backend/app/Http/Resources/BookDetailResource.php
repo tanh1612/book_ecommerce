@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Http\Resources\Concerns\ResolvesBookPromotionPayload;
 use App\Models\Book;
 use App\Services\Catalog\BookStockAvailabilityService;
 use Illuminate\Http\Request;
@@ -12,12 +13,15 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class BookDetailResource extends JsonResource
 {
+    use ResolvesBookPromotionPayload;
+
     /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
         $availability = $this->resolveAvailability();
+        $promotion = $this->promotionPayload();
 
         return [
             'id' => $this->id,
@@ -26,6 +30,9 @@ class BookDetailResource extends JsonResource
             'thumbnail_url' => $this->thumbnailUrl(),
             'original_price' => $this->original_price,
             'selling_price' => $this->selling_price,
+            'effective_price' => $promotion['effective_price'],
+            'discount_amount' => $promotion['discount_amount'],
+            'promotion' => $promotion['promotion'],
             'average_rating' => $this->average_rating,
             'review_count' => $this->review_count,
             'is_active' => (bool) $this->is_active,

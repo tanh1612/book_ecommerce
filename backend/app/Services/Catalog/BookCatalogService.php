@@ -49,15 +49,8 @@ class BookCatalogService
             $query->where('publisher_id', (int) $filters['publisher']);
         }
 
-        if (array_key_exists('supplier', $filters) && $filters['supplier'] !== null && $filters['supplier'] !== '') {
-            $supplier = $filters['supplier'];
-            if (is_numeric($supplier)) {
-                $query->where('supplier_id', (int) $supplier);
-            } else {
-                $query->whereHas('supplier', function (Builder $relation) use ($supplier): void {
-                    $relation->where('slug', (string) $supplier);
-                });
-            }
+        if (! empty($filters['supplier'])) {
+            $query->where('supplier_id', (int) $filters['supplier']);
         }
 
         $sort = (string) ($filters['sort'] ?? 'newest');

@@ -40,7 +40,6 @@ class BookFilterResource extends JsonResource
             'suppliers' => $this->resource['suppliers']->map(fn (\App\Models\Supplier $supplier): array => [
                 'id' => $supplier->id,
                 'name' => $supplier->name,
-                'slug' => $supplier->slug,
             ])->values(),
             'suggested_price_ranges' => $this->resource['suggested_price_ranges'],
         ];

@@ -5,12 +5,17 @@ namespace App\Services\Order;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\Promotion\PromotionAllocationService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class OrderInventoryService
 {
+    public function __construct(
+        private PromotionAllocationService $promotionAllocation,
+    ) {}
+
     /**
      * Release stock reservations held for a pending/cancelled order.
      * Caller should run inside a DB transaction when atomicity with order status matters.
@@ -47,6 +52,8 @@ class OrderInventoryService
                     $inventory->decrement('reserved_quantity', $releaseQty);
                 }
             }
+
+            $this->promotionAllocation->releaseForOrder($order);
         } catch (Throwable $e) {
             Log::error('Release reserved inventory for order failed', [
                 'order_id' => $order->id,

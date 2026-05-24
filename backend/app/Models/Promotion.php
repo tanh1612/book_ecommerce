@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\Promotion\PromotionStatus;
+use App\Enums\Promotion\PromotionType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -12,7 +14,6 @@ class Promotion extends Model
         'type',
         'start_at',
         'end_at',
-        'priority',
         'status',
     ];
 
@@ -21,7 +22,8 @@ class Promotion extends Model
         return [
             'start_at' => 'datetime',
             'end_at' => 'datetime',
-            'status' => \App\Enums\Promotion\PromotionStatus::class,
+            'type' => PromotionType::class,
+            'status' => PromotionStatus::class,
         ];
     }
 

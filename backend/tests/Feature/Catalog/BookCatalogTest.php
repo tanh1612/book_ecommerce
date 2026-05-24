@@ -97,14 +97,14 @@ test('books index filters by publisher id', function (): void {
     expect($slugs)->toContain('pub-a')->not->toContain('pub-b');
 });
 
-test('books index filters by supplier slug', function (): void {
-    $supplierA = Supplier::factory()->create(['slug' => 'supplier-a']);
-    $supplierB = Supplier::factory()->create(['slug' => 'supplier-b']);
+test('books index filters by supplier id', function (): void {
+    $supplierA = Supplier::factory()->create();
+    $supplierB = Supplier::factory()->create();
 
     Book::factory()->create(['slug' => 'sup-a', 'supplier_id' => $supplierA->id]);
     Book::factory()->create(['slug' => 'sup-b', 'supplier_id' => $supplierB->id]);
 
-    $response = $this->getJson('/api/v1/books?supplier=supplier-a');
+    $response = $this->getJson('/api/v1/books?supplier='.$supplierA->id);
 
     $response->assertOk();
     $slugs = collect($response->json('data'))->pluck('slug')->all();

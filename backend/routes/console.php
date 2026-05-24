@@ -9,5 +9,6 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('payments:expire-vnpay')->everyFiveMinutes();
+Schedule::command('promotions:sync-status')->everyFiveMinutes();
 Schedule::command('orders:expire-manual-refunds')->daily();
 Schedule::command('inventory:notify-low-stock')->daily();

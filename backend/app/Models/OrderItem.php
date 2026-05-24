@@ -12,6 +12,7 @@ class OrderItem extends Model
         'order_id',
         'book_id',
         'promotion_id',
+        'promotion_item_id',
         'price',
         'quantity',
         'total_price',
@@ -42,6 +43,11 @@ class OrderItem extends Model
     public function promotion(): BelongsTo
     {
         return $this->belongsTo(Promotion::class);
+    }
+
+    public function promotionItem(): BelongsTo
+    {
+        return $this->belongsTo(PromotionItem::class);
     }
 
     public function review(): HasOne

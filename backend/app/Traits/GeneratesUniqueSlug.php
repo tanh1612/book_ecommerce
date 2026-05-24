@@ -7,9 +7,24 @@ use Illuminate\Support\Str;
 
 trait GeneratesUniqueSlug
 {
+    /**
+     * Build URL slug from a display name; treats /, \, and | as word separators.
+     */
+    public static function slugFromName(?string $name): string
+    {
+        if (blank($name)) {
+            return '';
+        }
+
+        $normalized = preg_replace('#[/\\\\|]+#u', ' ', $name) ?? $name;
+        $normalized = preg_replace('#\s+#u', ' ', trim($normalized)) ?? $normalized;
+
+        return Str::slug($normalized);
+    }
+
     protected function generateUniqueSlug(string $name, string $table): string
     {
-        $slug = Str::slug($name);
+        $slug = static::slugFromName($name);
         $original = $slug;
         $counter = 2;
 

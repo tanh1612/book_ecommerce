@@ -12,6 +12,7 @@ use App\Models\Inventory;
 use App\Models\Publisher;
 use App\Models\Supplier;
 use App\Models\Warehouse;
+use App\Services\Media\BookImageStorageService;
 use Filament\Actions\Imports\Exceptions\RowImportFailedException;
 use Filament\Actions\Imports\Models\Import;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,6 +22,23 @@ use Illuminate\Validation\ValidationException;
 uses(RefreshDatabase::class);
 
 beforeEach(fn () => BookImporter::clearBreadcrumbCache());
+
+function csvImportBindSuccessfulBookImageStorage(): void
+{
+    $storage = Mockery::mock(BookImageStorageService::class);
+    $storage->shouldReceive('uploadImageFromUrl')
+        ->byDefault()
+        ->andReturnUsing(fn (string $url, int $bookId, int $sortOrder): string => "book_ecommerce/books/{$bookId}/img-{$sortOrder}-test");
+    $storage->shouldReceive('deliveryUrlFromPublicId')
+        ->byDefault()
+        ->andReturnUsing(fn (string $publicId): string => 'https://res.cloudinary.test/'.$publicId.'.jpg');
+    $storage->shouldReceive('thumbnailDeliveryUrlFromDeliveryUrl')
+        ->byDefault()
+        ->andReturnUsing(fn (string $deliveryUrl): string => $deliveryUrl);
+    $storage->shouldReceive('deleteByPublicId')->byDefault();
+
+    app()->instance(BookImageStorageService::class, $storage);
+}
 
 function makeImportForBook(): Import
 {
@@ -86,6 +104,8 @@ function inventoryColumnMapIdentity(): array
 }
 
 test('book importer creates book with detail relations when row is valid', function (): void {
+    csvImportBindSuccessfulBookImageStorage();
+
     $supplier = Supplier::factory()->create(['name' => 'NCC Import Test']);
     $publisher = Publisher::factory()->create(['name' => 'NXB Import Test']);
     $author = Author::factory()->create(['name' => 'TG Import Test']);
@@ -98,10 +118,10 @@ test('book importer creates book with detail relations when row is valid', funct
 
     $row = [
         'name' => 'Sách import test',
-        'sku' => null,
+        'sku' => 'IMPORT-SKU-VALID-001',
         'original_price' => '120000',
         'selling_price' => null,
-        'thumbnail_url' => null,
+        'thumbnail_url' => 'https://cdn.example.com/import-cover.jpg',
         'supplier' => $supplier->name,
         'publisher' => $publisher->name,
         'authors' => $author->name,
@@ -120,11 +140,13 @@ test('book importer creates book with detail relations when row is valid', funct
 
     $book = \App\Models\Book::query()->where('name', 'Sách import test')->first();
     expect($book)->not->toBeNull()
+        ->and($book->is_active)->toBeTrue()
         ->and($book->supplier_id)->toBe($supplier->id)
         ->and($book->publisher_id)->toBe($publisher->id)
         ->and($book->detail)->not->toBeNull()
         ->and($book->authors()->pluck('authors.id')->all())->toContain($author->id)
-        ->and($book->categories()->pluck('categories.id')->all())->toContain($child->id);
+        ->and($book->categories()->pluck('categories.id')->all())->toContain($child->id)
+        ->and($book->images)->toHaveCount(1);
 });
 
 test('book importer throws when author name is missing', function (): void {
@@ -138,7 +160,7 @@ test('book importer throws when author name is missing', function (): void {
         'sku' => null,
         'original_price' => '50000',
         'selling_price' => null,
-        'thumbnail_url' => null,
+        'thumbnail_url' => 'https://cdn.example.com/cover.jpg',
         'supplier' => $supplier->name,
         'publisher' => null,
         'authors' => 'Không Có Tác Giả Này',
@@ -167,7 +189,7 @@ test('book importer throws when publisher name does not exist', function (): voi
         'sku' => null,
         'original_price' => '50000',
         'selling_price' => null,
-        'thumbnail_url' => null,
+        'thumbnail_url' => 'https://cdn.example.com/cover.jpg',
         'supplier' => $supplier->name,
         'publisher' => 'NXB Không Tồn Tại XYZ',
         'authors' => null,

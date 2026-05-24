@@ -12,6 +12,7 @@ use App\Models\Account;
 use App\Models\Order;
 use App\Models\OrderTimeline;
 use App\Models\PaymentTransaction;
+use App\Services\Promotion\PromotionAllocationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -63,6 +64,7 @@ class OrderStatusTransitionService
 
     public function __construct(
         private OrderInventoryService $orderInventory,
+        private PromotionAllocationService $promotionAllocation,
     ) {}
 
     public function processOrder(Order $order, Account $actor, ?string $note = null): Order
@@ -265,6 +267,7 @@ class OrderStatusTransitionService
                 $locked->update([
                     'payment_status' => PaymentStatus::PAID,
                 ]);
+                $this->promotionAllocation->confirmForOrder($locked);
 
                 $this->createTimeline(
                     $locked,

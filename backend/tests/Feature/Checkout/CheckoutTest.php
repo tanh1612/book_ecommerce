@@ -6,6 +6,9 @@ use App\Models\Book;
 use App\Models\CartItem;
 use App\Models\Inventory;
 use App\Models\Order;
+use App\Models\Promotion;
+use App\Models\PromotionAllocation;
+use App\Models\PromotionItem;
 use App\Models\ShippingMethod;
 use App\Models\ShippingRate;
 use App\Models\Warehouse;
@@ -253,4 +256,153 @@ test('checkout fails when no shipping rate for province', function (): void {
         ],
     ])->assertStatus(422)
         ->assertJsonValidationErrors(['shipping_method_id']);
+});
+
+test('checkout applies active percentage promotion and reserves promotion allocation', function (): void {
+    $account = Account::factory()->create();
+    $book = checkoutBookWithStock(5);
+    $ship = checkoutShippingMethodForProvince('01');
+
+    $promotion = Promotion::query()->create([
+        'name' => 'Flash test',
+        'type' => 'flash_sale',
+        'start_at' => now()->subMinute(),
+        'end_at' => now()->addHour(),
+        'status' => 'active',
+    ]);
+
+    $promotionItem = PromotionItem::query()->create([
+        'promotion_id' => $promotion->id,
+        'book_id' => $book->id,
+        'discount_value' => 10,
+        'stock_limit' => 5,
+        'max_quantity_per_user' => 2,
+    ]);
+
+    $this->actingAs($account)->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated();
+
+    $response = $this->actingAs($account)->postJson('/api/v1/checkout', [
+        'idempotency_key' => (string) Str::uuid(),
+        'payment_method' => 'cod',
+        'shipping_method_id' => $ship->id,
+        'shipping' => [
+            'recipient_name' => 'Nguyen Van A',
+            'recipient_phone' => '0900000000',
+            'province_code' => '01',
+            'ward_code' => '00070',
+            'detail_address' => '1 Test St',
+        ],
+    ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.order.total_amount', 180000)
+        ->assertJsonPath('data.order.final_amount', 210000)
+        ->assertJsonPath('data.order.items.0.promotion_id', $promotion->id)
+        ->assertJsonPath('data.order.items.0.promotion_item_id', $promotionItem->id)
+        ->assertJsonPath('data.order.items.0.discount_amount', 20000);
+
+    $promotionItem->refresh();
+    expect((int) $promotionItem->sold_quantity)->toBe(2)
+        ->and(PromotionAllocation::query()->where('promotion_item_id', $promotionItem->id)->count())->toBe(1);
+});
+
+test('checkout rejects promotion quantity above customer limit', function (): void {
+    $account = Account::factory()->create();
+    $book = checkoutBookWithStock(5);
+    $ship = checkoutShippingMethodForProvince('01');
+
+    $promotion = Promotion::query()->create([
+        'name' => 'Flash test',
+        'type' => 'flash_sale',
+        'start_at' => now()->subMinute(),
+        'end_at' => now()->addHour(),
+        'status' => 'active',
+    ]);
+
+    PromotionItem::query()->create([
+        'promotion_id' => $promotion->id,
+        'book_id' => $book->id,
+        'discount_value' => 10,
+        'stock_limit' => 5,
+        'max_quantity_per_user' => 1,
+    ]);
+
+    $this->actingAs($account)->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated();
+
+    $this->actingAs($account)->postJson('/api/v1/checkout', [
+        'idempotency_key' => (string) Str::uuid(),
+        'payment_method' => 'cod',
+        'shipping_method_id' => $ship->id,
+        'shipping' => [
+            'recipient_name' => 'Nguyen Van A',
+            'recipient_phone' => '0900000000',
+            'province_code' => '01',
+            'ward_code' => '00070',
+            'detail_address' => '1 Test St',
+        ],
+    ])->assertStatus(422)
+        ->assertJsonValidationErrors(['promotion']);
+});
+
+test('checkout applies highest discount when multiple promotions match a book', function (): void {
+    $account = Account::factory()->create();
+    $book = checkoutBookWithStock(5);
+    $ship = checkoutShippingMethodForProvince('01');
+
+    $lowerPromotion = Promotion::query()->create([
+        'name' => 'Lower sale',
+        'type' => 'discount',
+        'start_at' => now()->subMinute(),
+        'end_at' => now()->addMinutes(30),
+        'status' => 'active',
+    ]);
+
+    $higherPromotion = Promotion::query()->create([
+        'name' => 'Better sale',
+        'type' => 'flash_sale',
+        'start_at' => now()->subMinute(),
+        'end_at' => now()->addHour(),
+        'status' => 'active',
+    ]);
+
+    PromotionItem::query()->create([
+        'promotion_id' => $lowerPromotion->id,
+        'book_id' => $book->id,
+        'discount_value' => 10,
+    ]);
+
+    $higherItem = PromotionItem::query()->create([
+        'promotion_id' => $higherPromotion->id,
+        'book_id' => $book->id,
+        'discount_value' => 25,
+        'stock_limit' => 5,
+    ]);
+
+    $this->actingAs($account)->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 1,
+    ])->assertCreated();
+
+    $this->actingAs($account)->postJson('/api/v1/checkout', [
+        'idempotency_key' => (string) Str::uuid(),
+        'payment_method' => 'cod',
+        'shipping_method_id' => $ship->id,
+        'shipping' => [
+            'recipient_name' => 'Nguyen Van A',
+            'recipient_phone' => '0900000000',
+            'province_code' => '01',
+            'ward_code' => '00070',
+            'detail_address' => '1 Test St',
+        ],
+    ])->assertCreated()
+        ->assertJsonPath('data.order.total_amount', 75000)
+        ->assertJsonPath('data.order.items.0.promotion_id', $higherPromotion->id)
+        ->assertJsonPath('data.order.items.0.promotion_item_id', $higherItem->id)
+        ->assertJsonPath('data.order.items.0.discount_amount', 25000);
 });

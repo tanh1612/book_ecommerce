@@ -14,6 +14,7 @@ use App\Models\PaymentTransaction;
 use App\Notifications\Order\NewOrderNeedsProcessingNotification;
 use App\Services\Admin\AdminNotificationService;
 use App\Services\Order\OrderStatusTransitionService;
+use App\Services\Promotion\PromotionAllocationService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class VnPayService
 {
     public function __construct(
         private AdminNotificationService $adminNotificationService,
+        private PromotionAllocationService $promotionAllocation,
     ) {}
 
     public function createPaymentUrl(Order $order, string $clientIp, bool $forceNew = false): array
@@ -288,6 +290,7 @@ class VnPayService
                     $order->update([
                         'payment_status' => PaymentStatus::PAID,
                     ]);
+                    $this->promotionAllocation->confirmForOrder($order);
 
                     if ($order->current_status === OrderStatus::PENDING) {
                         $order->update(['current_status' => OrderStatus::CONFIRMED]);
