@@ -30,7 +30,6 @@ class AccountOrderResource extends JsonResource
             $manualRefund = [
                 'status_label' => PaymentStatus::REFUNDING->getLabel(),
                 'refund_amount' => (float) $order->final_amount,
-                'support_hotline' => (string) config('refund.support_hotline', ''),
                 'provide_info_deadline_at' => $order->refund_deadline_at?->toIso8601String(),
                 'needs_bank_info' => $order->canSubmitRefundBankInfo(),
                 'bank_info' => $bankInfo !== null ? $this->formatBankInfoForCustomer($bankInfo) : null,

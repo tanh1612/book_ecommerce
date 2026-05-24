@@ -15,6 +15,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderTimeline;
 use App\Models\ShippingMethod;
+use App\Notifications\Order\NewOrderNeedsProcessingNotification;
+use App\Services\Admin\AdminNotificationService;
 use App\Services\Order\OrderStatusTransitionService;
 use App\Services\Payment\VnPayService;
 use App\Services\Shipping\ShippingAddressSnapshotFormatter;
@@ -31,6 +33,7 @@ class CheckoutService
         private VnPayService $vnPayService,
         private ShippingQuoteService $shippingQuoteService,
         private ShippingAddressSnapshotFormatter $addressSnapshotFormatter,
+        private AdminNotificationService $adminNotificationService,
     ) {}
 
     /**
@@ -221,6 +224,12 @@ class CheckoutService
 
                 $order->refresh();
                 $order->load(['items', 'shippingMethod']);
+
+                if ($isCod) {
+                    DB::afterCommit(fn () => $this->adminNotificationService->notifyActiveAdmins(
+                        new NewOrderNeedsProcessingNotification($order->fresh(['account']) ?? $order)
+                    ));
+                }
 
                 return $this->finalizePaymentSideEffects($order, $clientIp);
             });

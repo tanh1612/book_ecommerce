@@ -2,8 +2,6 @@
 
 return [
 
-    'support_hotline' => env('REFUND_SUPPORT_HOTLINE', ''),
-
     'manual_refund_deadline_days' => (int) env('REFUND_MANUAL_DEADLINE_DAYS', 15),
 
     'bank_catalog' => [

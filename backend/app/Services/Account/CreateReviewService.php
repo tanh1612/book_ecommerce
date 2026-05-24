@@ -9,6 +9,8 @@ use App\Models\Book;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Review;
+use App\Notifications\Review\NewReviewPendingApprovalNotification;
+use App\Services\Admin\AdminNotificationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,6 +19,10 @@ use Throwable;
 
 class CreateReviewService
 {
+    public function __construct(
+        private AdminNotificationService $adminNotificationService,
+    ) {}
+
     /**
      * @return array{can_review: bool, review_target_id: int|null}
      */
@@ -156,6 +162,10 @@ class CreateReviewService
                 }
 
                 $locked->update(['is_reviewed' => true]);
+
+                DB::afterCommit(fn () => $this->adminNotificationService->notifyActiveAdmins(
+                    new NewReviewPendingApprovalNotification($review->fresh(['account', 'book']) ?? $review)
+                ));
 
                 return $review;
             });

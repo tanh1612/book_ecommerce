@@ -1,9 +1,15 @@
 <?php
 
 use App\Enums\Account\AccountRole;
+use App\Enums\Order\OrderStatus;
+use App\Enums\Order\PaymentMethod;
+use App\Enums\Order\PaymentStatus;
+use App\Filament\Resources\AccountResource;
 use App\Filament\Resources\AccountResource\Pages\ListAccounts;
 use App\Filament\Resources\AccountResource\Pages\ViewAccount;
 use App\Models\Account;
+use App\Models\Order;
+use App\Models\ShippingMethod;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -59,13 +65,74 @@ test('view inactive account activate action reactivates account', function (): v
     expect($target->refresh()->is_active)->toBeTrue();
 });
 
-test('view account has no delete action', function (): void {
+test('view active account has no delete action', function (): void {
     $admin = Account::factory()->create(['role' => AccountRole::Admin]);
-    $target = Account::factory()->create();
+    $target = Account::factory()->create(['is_active' => true]);
 
     Livewire::actingAs($admin)
         ->test(ViewAccount::class, ['record' => $target->getKey()])
-        ->assertActionDoesNotExist('delete');
+        ->assertActionHidden('delete');
+});
+
+test('view inactive account without unfinished orders can be soft deleted', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $target = Account::factory()->create(['is_active' => false]);
+
+    Livewire::actingAs($admin)
+        ->test(ViewAccount::class, ['record' => $target->getKey()])
+        ->assertActionVisible('delete')
+        ->callAction('delete')
+        ->assertNotified()
+        ->assertRedirect(AccountResource::getUrl('index'));
+
+    expect(Account::withTrashed()->find($target->id)?->trashed())->toBeTrue();
+});
+
+test('view inactive account with unfinished orders cannot be deleted', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $target = Account::factory()->create(['is_active' => false]);
+
+    $shipping = ShippingMethod::query()->create([
+        'name' => 'Test ship',
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    Order::query()->create([
+        'account_id' => $target->id,
+        'shipping_method_id' => $shipping->id,
+        'total_amount' => 100000.00,
+        'shipping_fee' => 0,
+        'final_amount' => 100000.00,
+        'shipping_name' => 'A',
+        'shipping_phone' => '0900000000',
+        'shipping_address' => 'Addr',
+        'payment_method' => PaymentMethod::COD,
+        'payment_status' => PaymentStatus::PENDING,
+        'note' => null,
+        'current_status' => OrderStatus::CONFIRMED,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(ViewAccount::class, ['record' => $target->getKey()])
+        ->assertActionDisabled('delete');
+
+    expect(Account::query()->find($target->id))->not->toBeNull();
+
+    expect(fn () => app(\App\Services\Account\AccountDeletionService::class)
+        ->softDeleteInactive($target->fresh(), $admin))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+test('admin cannot delete own inactive account', function (): void {
+    $admin = Account::factory()->create([
+        'role' => AccountRole::Admin,
+        'is_active' => false,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(ViewAccount::class, ['record' => $admin->getKey()])
+        ->assertActionHidden('delete');
 });
 
 test('inactive admin cannot access filament panel', function (): void {

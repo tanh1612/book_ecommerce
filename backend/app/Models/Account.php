@@ -80,4 +80,9 @@ class Account extends Authenticatable implements FilamentUser, HasName
     {
         return $this->hasOne(Cart::class, 'account_id');
     }
+
+    public function hasUnfinishedOrders(): bool
+    {
+        return $this->orders()->needsAdminProcessing()->exists();
+    }
 }

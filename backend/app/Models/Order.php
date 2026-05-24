@@ -8,6 +8,7 @@ use App\Enums\Order\PaymentStatus;
 use App\Enums\Payment\PaymentTransactionStatus;
 use App\Enums\Payment\PaymentTransactionType;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -69,6 +70,19 @@ class Order extends Model
     public function paymentTransactions(): HasMany
     {
         return $this->hasMany(PaymentTransaction::class);
+    }
+
+    /**
+     * Orders still in the admin fulfillment pipeline (not terminal).
+     */
+    public function scopeNeedsAdminProcessing(Builder $query): Builder
+    {
+        return $query->whereIn('current_status', [
+            OrderStatus::PENDING,
+            OrderStatus::CONFIRMED,
+            OrderStatus::PROCESSING,
+            OrderStatus::SHIPPING,
+        ]);
     }
 
     public function isAdminDeletable(): bool

@@ -428,8 +428,6 @@ class OrderStatusTransitionService
                         'refund_deadline_at' => $deadline,
                     ]);
 
-                    $hotline = (string) config('refund.support_hotline', '');
-
                     PaymentTransaction::query()->create([
                         'order_id' => $locked->id,
                         'gateway' => PaymentGateway::VNPAY,
@@ -438,7 +436,6 @@ class OrderStatusTransitionService
                         'amount' => $locked->final_amount,
                         'status' => PaymentTransactionStatus::PENDING,
                         'payload' => [
-                            'support_hotline' => $hotline,
                             'delivery_failed_at' => now()->toIso8601String(),
                             'refund_deadline_at' => $deadline->toIso8601String(),
                         ],

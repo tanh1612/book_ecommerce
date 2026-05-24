@@ -48,6 +48,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('')
             ->login()
+            ->profile(isSimple: false)
             ->passwordReset()
             ->brandName('Quản trị Bookify')
             ->colors([

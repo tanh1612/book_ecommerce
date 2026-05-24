@@ -11,6 +11,8 @@ use App\Enums\Payment\PaymentTransactionType;
 use App\Models\Order;
 use App\Models\OrderTimeline;
 use App\Models\PaymentTransaction;
+use App\Notifications\Order\NewOrderNeedsProcessingNotification;
+use App\Services\Admin\AdminNotificationService;
 use App\Services\Order\OrderStatusTransitionService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -23,6 +25,10 @@ use RuntimeException;
 
 class VnPayService
 {
+    public function __construct(
+        private AdminNotificationService $adminNotificationService,
+    ) {}
+
     public function createPaymentUrl(Order $order, string $clientIp, bool $forceNew = false): array
     {
         $this->assertConfigured();
@@ -272,6 +278,8 @@ class VnPayService
                 $isSuccess = $responseCode === '00' && $transactionStatus === '00';
 
                 if ($isSuccess) {
+                    $shouldNotifyOrderNeedsProcessing = false;
+
                     $paymentTransaction->update([
                         'status' => PaymentTransactionStatus::PAID,
                         'completed_at' => now(),
@@ -283,6 +291,8 @@ class VnPayService
 
                     if ($order->current_status === OrderStatus::PENDING) {
                         $order->update(['current_status' => OrderStatus::CONFIRMED]);
+                        $shouldNotifyOrderNeedsProcessing = true;
+
                         OrderTimeline::query()->create([
                             'order_id' => $order->id,
                             'status' => OrderStatus::CONFIRMED->value,
@@ -294,6 +304,12 @@ class VnPayService
                             'status' => $order->current_status->value,
                             'note' => OrderStatusTransitionService::TIMELINE_NOTE_VNPAY_PAID,
                         ]);
+                    }
+
+                    if ($shouldNotifyOrderNeedsProcessing) {
+                        DB::afterCommit(fn () => $this->adminNotificationService->notifyActiveAdmins(
+                            new NewOrderNeedsProcessingNotification($order->fresh(['account']) ?? $order)
+                        ));
                     }
 
                     return [

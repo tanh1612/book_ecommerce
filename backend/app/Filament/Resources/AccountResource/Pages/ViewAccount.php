@@ -4,10 +4,12 @@ namespace App\Filament\Resources\AccountResource\Pages;
 
 use App\Filament\Resources\AccountResource;
 use App\Models\Account;
+use App\Services\Account\AccountDeletionService;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class ViewAccount extends ViewRecord
 {
@@ -48,6 +50,42 @@ class ViewAccount extends ViewRecord
                         ->title('Đã kích hoạt tài khoản')
                         ->success()
                         ->send();
+                }),
+            Actions\DeleteAction::make()
+                ->label('Xóa')
+                ->visible(fn (Account $record): bool => ! $record->is_active
+                    && (int) $record->getKey() !== (int) Auth::id())
+                ->disabled(fn (Account $record): bool => $record->hasUnfinishedOrders())
+                ->tooltip(fn (Account $record): ?string => $record->hasUnfinishedOrders()
+                    ? 'Không thể xóa khi còn đơn chưa hoàn thành.'
+                    : null)
+                ->modalHeading('Xóa tài khoản')
+                ->modalDescription('Tài khoản sẽ bị xóa và không thể khôi phục lại. Bạn có chắc muốn thực hiện thao tác?')
+                ->action(function (Account $record): void {
+                    $actor = Auth::user();
+
+                    if (! $actor instanceof Account) {
+                        return;
+                    }
+
+                    try {
+                        app(AccountDeletionService::class)->softDeleteInactive($record, $actor);
+                    } catch (ValidationException $e) {
+                        Notification::make()
+                            ->title('Không thể xóa tài khoản')
+                            ->body(collect($e->errors())->flatten()->first() ?? 'Dữ liệu không hợp lệ.')
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Đã xóa tài khoản')
+                        ->success()
+                        ->send();
+
+                    $this->redirect(AccountResource::getUrl('index'));
                 }),
         ];
     }

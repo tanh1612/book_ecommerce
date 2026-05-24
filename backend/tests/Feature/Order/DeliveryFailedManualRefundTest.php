@@ -90,7 +90,7 @@ test('cod shipping pending delivery failed cancels order failed payment releases
 });
 
 test('vnpay shipping paid delivery failed sets refunding pending transaction and deadline', function (): void {
-    config(['refund.manual_refund_deadline_days' => 15, 'refund.support_hotline' => '1900xxxx']);
+    config(['refund.manual_refund_deadline_days' => 15]);
 
     $admin = Account::factory()->create();
     $order = deliveryFailedBaseOrder(OrderStatus::SHIPPING, PaymentMethod::VNPAY, PaymentStatus::PAID);
@@ -108,8 +108,9 @@ test('vnpay shipping paid delivery failed sets refunding pending transaction and
 
     expect($txn->gateway)->toBe(PaymentGateway::VNPAY)
         ->and($txn->status)->toBe(PaymentTransactionStatus::PENDING)
-        ->and((string) $txn->amount)->toBe((string) $order->final_amount);
-    expect($txn->payload['support_hotline'] ?? null)->toBe('1900xxxx');
+        ->and((string) $txn->amount)->toBe((string) $order->final_amount)
+        ->and($txn->payload['delivery_failed_at'] ?? null)->not->toBeNull()
+        ->and($txn->payload)->not->toHaveKey('support_hotline');
 });
 
 test('admin can confirm manual refund marks transaction refunded', function (): void {
@@ -233,8 +234,6 @@ test('does not duplicate pending refund transaction', function (): void {
 })->throws(ValidationException::class);
 
 test('account can view own order with manual refund payload via api', function (): void {
-    config(['refund.support_hotline' => '1900 1234']);
-
     $shipping = ShippingMethod::query()->create([
         'name' => 'Test ship',
         'description' => null,
@@ -261,8 +260,8 @@ test('account can view own order with manual refund payload via api', function (
         ->getJson("/api/v1/account/orders/{$order->id}")
         ->assertOk();
 
-    $response->assertJsonPath('data.manual_refund.support_hotline', '1900 1234');
-    expect((float) $response->json('data.manual_refund.refund_amount'))->toBe(100000.0);
+    expect((float) $response->json('data.manual_refund.refund_amount'))->toBe(100000.0)
+        ->and($response->json('data.manual_refund'))->not->toHaveKey('support_hotline');
 });
 
 test('admin can view any order via policy', function (): void {
