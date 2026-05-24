@@ -18,6 +18,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(\Illuminate\Contracts\Auth\Authenticatable::class, \App\Models\Account::class);
+
+        $this->app->bind(
+            \Filament\Auth\Notifications\ResetPassword::class,
+            \App\Notifications\Auth\AdminPasswordResetNotification::class,
+        );
     }
 
     /**
