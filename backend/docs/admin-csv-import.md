@@ -12,6 +12,7 @@
 | Importer | Ghi chú |
 |----------|---------|
 | **BookImporter** | `supplier` (tên) bắt buộc phải khớp NCC; `publisher` nếu có cột thì tên phải khớp NXB; `authors` từng tên phải tồn tại (không gán nếu thiếu); `categories` breadcrumb `A > B` khớp chuỗi breadcrumb trong DB; `sku` unique; URL ảnh nếu có mà upload Cloudinary lỗi → dòng import **thất bại**. |
+| **InventoryImporter** | CSV gồm `book_sku`, `warehouse_id`, `quantity`, `location_code`; `book_sku` phải khớp sách hiện có; `warehouse_id` phải là kho đang hoạt động; `quantity` là số lượng nhập thêm; khi tạo mới thì `sold_quantity` / `reserved_quantity` mặc định `0`; khi đã có tồn kho thì không đổi `sold_quantity` / `reserved_quantity`; `last_restocked_at` tự lấy thời điểm xử lý dòng import. |
 | **AuthorImporter** | `name` bắt buộc; `email` nullable nhưng nếu có phải unique. |
 | **PublisherImporter** / **SupplierImporter** | `name` unique; `email` nullable nhưng nếu có phải unique. |
 

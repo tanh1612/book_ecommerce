@@ -35,6 +35,13 @@ class ListInventories extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            \Filament\Actions\ImportAction::make()
+                ->importer(\App\Filament\Imports\InventoryImporter::class)
+                ->label('Nhập CSV')
+                ->color('info')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->chunkSize(50)
+                ->maxRows(20_000),
             Actions\CreateAction::make()
                 ->label('Thêm tồn kho'),
         ];

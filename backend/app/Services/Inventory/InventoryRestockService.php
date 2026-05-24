@@ -63,6 +63,7 @@ class InventoryRestockService
                 $this->assertLastRestockedAtForRestock($existing->last_restocked_at, $newRestockedAt);
 
                 $existing->update([
+                    'warehouse_id' => $warehouseId,
                     'quantity' => (int) $existing->quantity + $quantityDelta,
                     'location_code' => $locationCode,
                     'last_restocked_at' => $newRestockedAt,
