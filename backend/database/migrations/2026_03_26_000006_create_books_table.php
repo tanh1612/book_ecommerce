@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('books', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('supplier_id')->constrained('suppliers')->restrictOnDelete();
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->restrictOnDelete();
             $table->foreignId('publisher_id')->nullable()->constrained('publishers')->nullOnDelete();
             $table->string('name');
             $table->string('slug')->unique();

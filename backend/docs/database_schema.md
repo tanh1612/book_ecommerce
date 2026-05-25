@@ -67,7 +67,7 @@ UNIQUE KEY `authors_email_unique` (`email`)
 -- Dumping structure for table book_ecommerce.books
 CREATE TABLE IF NOT EXISTS `books` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-`supplier_id` bigint unsigned NOT NULL,
+`supplier_id` bigint unsigned DEFAULT NULL,
 `publisher_id` bigint unsigned DEFAULT NULL,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
