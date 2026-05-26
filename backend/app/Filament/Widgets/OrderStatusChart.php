@@ -94,7 +94,7 @@ class OrderStatusChart extends ChartWidget
             OrderStatus::SHIPPING->value => '#64748b',
             OrderStatus::COMPLETED->value => '#10b981',
             OrderStatus::CANCELLED->value => '#f43f5e',
-            OrderStatus::REFUND_CLOSED->value => '#71717a',
+            OrderStatus::REFUND_EXPIRED->value => '#71717a',
         ];
 
         return $statuses

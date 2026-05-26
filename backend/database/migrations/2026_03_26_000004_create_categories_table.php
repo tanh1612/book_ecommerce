@@ -13,7 +13,6 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug')->unique();
             $table->foreignId('parent_id')->nullable()->constrained('categories')->restrictOnDelete();
-            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }

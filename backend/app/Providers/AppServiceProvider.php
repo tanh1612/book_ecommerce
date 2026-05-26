@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\Media\BookImageStorageService;
+use App\Services\Search\BookMeilisearchSyncDispatcher;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
@@ -23,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
             \Filament\Auth\Notifications\ResetPassword::class,
             \App\Notifications\Auth\AdminPasswordResetNotification::class,
         );
+
+        $this->app->scoped(BookMeilisearchSyncDispatcher::class);
     }
 
     /**

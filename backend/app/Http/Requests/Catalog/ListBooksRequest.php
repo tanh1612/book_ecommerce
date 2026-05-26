@@ -15,8 +15,25 @@ class ListBooksRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $keyword = $this->input('keyword');
+        if (is_string($keyword)) {
+            $keyword = trim($keyword);
+            if ($keyword === '') {
+                $keyword = null;
+            }
+        } else {
+            $keyword = null;
+        }
+
+        $hasKeyword = $keyword !== null;
+        $sort = $this->input('sort');
+        if ($sort === null || $sort === '') {
+            $sort = $hasKeyword ? 'relevance' : 'newest';
+        }
+
         $this->merge([
-            'sort' => $this->input('sort', 'newest'),
+            'keyword' => $keyword,
+            'sort' => $sort,
             'per_page' => $this->input('per_page', 40),
         ]);
     }
@@ -29,12 +46,13 @@ class ListBooksRequest extends FormRequest
         return [
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:40'],
-            'category' => ['nullable', 'string', 'max:255', Rule::exists('categories', 'slug')->where('is_active', true)],
+            'keyword' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:255', Rule::exists('categories', 'slug')],
             'price_min' => ['nullable', 'numeric', 'min:0'],
             'price_max' => ['nullable', 'numeric', 'min:0'],
             'publisher' => ['nullable', 'integer', Rule::exists('publishers', 'id')],
             'supplier' => ['nullable', 'integer', Rule::exists('suppliers', 'id')],
-            'sort' => ['required', 'string', Rule::in(['newest', 'price_asc', 'price_desc', 'rating_desc'])],
+            'sort' => ['required', 'string', Rule::in(['relevance', 'newest', 'price_asc', 'price_desc', 'rating_desc'])],
         ];
     }
 
@@ -47,6 +65,10 @@ class ListBooksRequest extends FormRequest
                 if ($min > $max) {
                     $validator->errors()->add('price_min', 'The price min must be less than or equal to price max.');
                 }
+            }
+
+            if (! $this->filled('keyword') && $this->input('sort') === 'relevance') {
+                $validator->errors()->add('sort', 'The selected sort is invalid.');
             }
         });
     }

@@ -13,7 +13,7 @@ enum OrderStatus: string implements HasColor, HasLabel
     case SHIPPING = 'shipping';
     case COMPLETED = 'completed';
     case CANCELLED = 'cancelled';
-    case REFUND_CLOSED = 'refund_closed';
+    case REFUND_EXPIRED = 'refund_expired';
 
     public function getLabel(): ?string
     {
@@ -24,7 +24,7 @@ enum OrderStatus: string implements HasColor, HasLabel
             self::SHIPPING => 'Đang giao hàng',
             self::COMPLETED => 'Hoàn tất',
             self::CANCELLED => 'Đã hủy',
-            self::REFUND_CLOSED => 'Đóng - Không hoàn tiền',
+            self::REFUND_EXPIRED => 'Quá hạn hoàn tiền',
         };
     }
 
@@ -37,7 +37,7 @@ enum OrderStatus: string implements HasColor, HasLabel
             self::SHIPPING => 'gray',
             self::COMPLETED => 'success',
             self::CANCELLED => 'danger',
-            self::REFUND_CLOSED => 'gray',
+            self::REFUND_EXPIRED => 'gray',
         };
     }
 }

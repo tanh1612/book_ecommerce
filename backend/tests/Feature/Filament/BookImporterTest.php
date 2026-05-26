@@ -15,7 +15,18 @@ use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
-beforeEach(fn () => BookImporter::clearBreadcrumbCache());
+beforeEach(function (): void {
+    BookImporter::clearBreadcrumbCache();
+    app()->instance(
+        'test.defaultImportCategory',
+        Category::factory()->create(['name' => 'Import Default Category']),
+    );
+});
+
+function defaultImportCategory(): Category
+{
+    return app('test.defaultImportCategory');
+}
 
 function makeBookImport(): Import
 {
@@ -57,7 +68,7 @@ function bookImporterColumnMap(): array
 
 function validBookImportRow(array $overrides = []): array
 {
-    return array_merge([
+    $defaults = [
         'name' => 'Sach import test',
         'sku' => 'IMPORT-SKU-'.uniqid(),
         'original_price' => '120000',
@@ -66,7 +77,7 @@ function validBookImportRow(array $overrides = []): array
         'supplier' => 'NCC Import',
         'publisher' => null,
         'authors' => null,
-        'categories' => null,
+        'categories' => defaultImportCategory()->getBreadcrumb(),
         'description' => null,
         'language' => null,
         'format' => null,
@@ -75,7 +86,9 @@ function validBookImportRow(array $overrides = []): array
         'dimensions' => null,
         'publication_year' => null,
         'translator' => null,
-    ], $overrides);
+    ];
+
+    return array_merge($defaults, $overrides);
 }
 
 function bindSuccessfulBookImageStorage(): void
@@ -118,6 +131,18 @@ test('book importer matches category after normalize', function (): void {
 
     expect($book)->not->toBeNull()
         ->and($book->categories()->pluck('categories.id')->all())->toContain($child->id);
+});
+
+test('book importer rejects row without categories', function (): void {
+    $supplier = Supplier::factory()->create(['name' => 'NCC Import']);
+
+    $import = makeBookImport();
+    $importer = new BookImporter($import, bookImporterColumnMap(), []);
+
+    expect(fn () => $importer(validBookImportRow([
+        'supplier' => $supplier->name,
+        'categories' => '   ',
+    ])))->toThrow(ValidationException::class);
 });
 
 test('book importer fails for unknown category', function (): void {

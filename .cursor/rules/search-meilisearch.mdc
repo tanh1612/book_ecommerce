@@ -9,23 +9,25 @@ alwaysApply: false
 
 ### Searchable Attributes (priority order — first = highest weight)
 
-1. `title` — book title (HIGHEST priority).
-2. `authors.name` — author name (HIGH priority).
+1. `name` — book title (HIGHEST priority).
+2. `author_names` — author names (HIGH priority).
 3. `description` — book description (MEDIUM priority).
 
 ```json
 {
-  "searchableAttributes": ["title", "authors.name", "description"]
+  "searchableAttributes": ["name", "author_names", "description"]
 }
 ```
 
 ### Filterable Attributes
 
-`category_id`, `author_id`, `publisher_id`, `selling_price`, `average_rating`, `is_active`, `promotion_id`.
+`category_ids`, `author_ids`, `publisher_id`, `supplier_id`, `selling_price`, `average_rating`, `is_active`, `in_stock`.
+
+Promotion is **not** indexed; catalog promotion display uses MySQL via `PromotionResolver` / `BookSummaryResource`.
 
 ### Sortable Attributes
 
-`selling_price`, `created_at`, `average_rating`, `review_count`.
+`id`, `selling_price`, `created_at`, `average_rating`, `review_count`.
 
 ## Features
 
@@ -35,7 +37,19 @@ alwaysApply: false
 
 ## Sync Strategy
 
-- Index changes through a queueable job (`SyncBookToMeilisearch`).
-- Trigger on `Book` model events via an Eloquent observer: `created`, `updated`, `deleted`.
-- Provide a bulk reindex command, e.g. `php artisan meilisearch:reindex books`.
-- On `is_active = false` or stock-out, do not delete from index — keep the record but rely on filterable attributes to hide it at query time.
+- Direct `Book` create/update/delete: Laravel Scout `ModelObserver` (respects `SCOUT_QUEUE`).
+- Related data (description, authors, categories, inventory, aggregated ratings): `SyncBookToMeilisearch` job via `BookMeilisearchSyncDispatcher` after DB commit.
+- Job calls `$book->searchableSync()` in the worker (no nested `MakeSearchable` queue job).
+- `BookMeilisearchSyncDispatcher` dispatches after DB commit; `SyncBookToMeilisearch` is unique per `book_id` until processing starts, so repeated committed triggers collapse while rolled-back changes enqueue nothing.
+- The dispatcher is container-scoped so `BookImporter` can suppress partial relation triggers while assembling a row, then emit one sync after the row succeeds.
+- Bulk field updates / document shape changes: Meilisearch `addDocuments` replaces documents by `id` (stale fields drop when omitted from payload). **Do not** `scout:flush` for routine rollouts.
+- Standard rollout (with Redis queue worker running **before** import):
+
+  ```bash
+  php artisan scout:sync-index-settings
+  php artisan scout:import "App\Models\Book"
+  ```
+
+  Monitor the queue and Meilisearch tasks until finished.
+- Use `scout:flush` only for orphan cleanup or full rebuild (maintenance window or new index + swap).
+- Inactive or out-of-stock books remain in the index; catalog search does not filter them out by default.

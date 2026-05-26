@@ -5,7 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BookResource\Pages;
 use App\Filament\Resources\BookResource\RelationManagers;
 use App\Models\Book;
+use App\Services\Catalog\BookCategoryAssignmentService;
 use App\Services\Media\BookImageStorageService;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
 use Filament\Resources\Resource;
@@ -113,6 +116,12 @@ class BookResource extends Resource
                     Field\Select::make('categories')
                         ->relationship('categories', 'name', modifyQueryUsing: fn ($query) => $query->with('parent.parent'))
                         ->getOptionLabelFromRecordUsing(fn ($record) => $record->getBreadcrumb())
+                        ->saveRelationshipsUsing(function (Field\Select $component, Model $record, mixed $state): void {
+                            app(BookCategoryAssignmentService::class)->syncCategories(
+                                $record instanceof Book ? $record : Book::query()->findOrFail($record->getKey()),
+                                Arr::wrap($state ?? []),
+                            );
+                        })
                         ->label('Danh mục')
                         ->multiple()
                         ->required()
@@ -294,6 +303,9 @@ class BookResource extends Resource
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')->label('Trạng thái'),
+                Tables\Filters\Filter::make('without_categories')
+                    ->label('Chưa có danh mục')
+                    ->query(fn ($query) => $query->whereDoesntHave('categories')),
             ])
             ->actions([
                 Actions\ViewAction::make()->label('Xem'),

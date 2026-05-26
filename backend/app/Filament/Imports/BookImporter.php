@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\Publisher;
 use App\Models\Supplier;
 use App\Services\Media\BookImageStorageService;
+use App\Services\Search\BookMeilisearchSyncDispatcher;
 use App\Support\Catalog\CategoryBreadcrumbIndex;
 use App\Traits\GeneratesUniqueSlug;
 use Filament\Actions\Imports\Exceptions\RowImportFailedException;
@@ -15,6 +16,7 @@ use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
 use Illuminate\Validation\Rule;
@@ -108,7 +110,8 @@ class BookImporter extends Importer
 
             ImportColumn::make('categories')
                 ->label('Danh mục (Nhiều breadcrumb cách nhau dấu phẩy)')
-                ->rules(['nullable'])
+                ->requiredMapping()
+                ->rules(['required'])
                 ->exampleHeader('categories')
                 ->examples(['Sách tiếng Việt > Tiểu sử - Hồi ký, Sách tiếng Việt > Khoa Học'])
                 ->fillRecordUsing(fn () => null),
@@ -179,6 +182,34 @@ class BookImporter extends Importer
         return new Book;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function __invoke(array $data): void
+    {
+        $meilisearchSync = app(BookMeilisearchSyncDispatcher::class);
+
+        Book::withoutSyncingToSearch(function () use ($data, $meilisearchSync): void {
+            DB::transaction(function () use ($data, $meilisearchSync): void {
+                $meilisearchSync->withoutDispatching(function () use ($data): void {
+                    parent::__invoke($data);
+                });
+
+                try {
+                    $meilisearchSync->dispatch((int) $this->record->getKey());
+                } catch (Throwable $e) {
+                    Log::error('Meilisearch sync dispatch failed after book import row', [
+                        'book_id' => $this->record->getKey(),
+                        'error' => $e->getMessage(),
+                        'exception' => $e::class,
+                    ]);
+
+                    throw $e;
+                }
+            });
+        });
+    }
+
     protected function beforeSave(): void
     {
         $this->resolvedAuthorIds = [];
@@ -224,12 +255,23 @@ class BookImporter extends Importer
             }
         }
 
-        if (filled($this->data['categories'] ?? null)) {
-            $breadcrumbs = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->data['categories'])))));
-            $index = $this->categoryIndex();
-            foreach ($breadcrumbs as $breadcrumb) {
-                $this->resolvedCategoryIds[] = $index->resolveCategoryId($breadcrumb);
-            }
+        if (blank($this->data['categories'] ?? null)) {
+            throw new RowImportFailedException('Cột categories là bắt buộc: mỗi sách phải có ít nhất một danh mục hợp lệ.');
+        }
+
+        $breadcrumbs = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->data['categories'])))));
+
+        if ($breadcrumbs === []) {
+            throw new RowImportFailedException('Cột categories là bắt buộc: mỗi sách phải có ít nhất một danh mục hợp lệ.');
+        }
+
+        $index = $this->categoryIndex();
+        foreach ($breadcrumbs as $breadcrumb) {
+            $this->resolvedCategoryIds[] = $index->resolveCategoryId($breadcrumb);
+        }
+
+        if ($this->resolvedCategoryIds === []) {
+            throw new RowImportFailedException('Cột categories là bắt buộc: mỗi sách phải có ít nhất một danh mục hợp lệ.');
         }
     }
 
@@ -263,7 +305,8 @@ class BookImporter extends Importer
         }
 
         if ($this->resolvedCategoryIds !== []) {
-            $this->record->categories()->attach($this->resolvedCategoryIds);
+            app(\App\Services\Catalog\BookCategoryAssignmentService::class)
+                ->attachCategories($this->record, $this->resolvedCategoryIds);
         }
 
         $this->uploadImages();

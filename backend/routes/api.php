@@ -72,6 +72,9 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
     // List books
     Route::get('', [BookController::class, 'index']);
 
+    // Autocomplete suggestions (must be before {slug})
+    Route::get('suggestions', [BookController::class, 'suggestions']);
+
     // Review eligibility for authenticated user on book detail page
     Route::get('{slug}/review-eligibility', [BookReviewEligibilityController::class, 'show'])
         ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:60,1']);

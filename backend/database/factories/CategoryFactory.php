@@ -22,7 +22,6 @@ class CategoryFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name.'-'.fake()->unique()->numerify('####')),
             'parent_id' => null,
-            'is_active' => true,
         ];
     }
 

@@ -3,11 +3,40 @@
 namespace App\Services\Promotion;
 
 use App\Enums\Promotion\PromotionStatus;
+use App\Models\Book;
 use App\Models\PromotionItem;
 use Illuminate\Support\Collection;
 
 class PromotionResolver
 {
+    public function activeItemForLoadedBook(Book $book): ?PromotionItem
+    {
+        $now = now();
+
+        return $book->promotionItems
+            ->filter(function (PromotionItem $item) use ($now): bool {
+                $promotion = $item->promotion;
+
+                return $promotion !== null
+                    && $promotion->status === PromotionStatus::ACTIVE
+                    && $promotion->start_at <= $now
+                    && $promotion->end_at > $now;
+            })
+            ->sort(function (PromotionItem $left, PromotionItem $right): int {
+                $discountComparison = (float) $right->discount_value <=> (float) $left->discount_value;
+                if ($discountComparison !== 0) {
+                    return $discountComparison;
+                }
+
+                $endComparison = $left->promotion->end_at->getTimestamp() <=> $right->promotion->end_at->getTimestamp();
+
+                return $endComparison !== 0
+                    ? $endComparison
+                    : (int) $left->id <=> (int) $right->id;
+            })
+            ->first();
+    }
+
     /**
      * @param  array<int, int>  $bookIds
      * @return Collection<int, PromotionItem>

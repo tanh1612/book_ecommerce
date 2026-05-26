@@ -151,6 +151,9 @@ test('book importer creates book with detail relations when row is valid', funct
 
 test('book importer throws when author name is missing', function (): void {
     $supplier = Supplier::factory()->create(['name' => 'NCC Import Test 2']);
+    $parent = Category::factory()->create(['name' => 'RootAuthorFail']);
+    $child = Category::factory()->child($parent)->create(['name' => 'LeafAuthorFail']);
+    $breadcrumb = $child->fresh(['parent'])->getBreadcrumb();
 
     $import = makeImportForBook();
     $importer = new BookImporter($import, bookColumnMapIdentity(), []);
@@ -164,7 +167,7 @@ test('book importer throws when author name is missing', function (): void {
         'supplier' => $supplier->name,
         'publisher' => null,
         'authors' => 'Không Có Tác Giả Này',
-        'categories' => null,
+        'categories' => $breadcrumb,
         'description' => null,
         'language' => null,
         'format' => null,
@@ -180,6 +183,9 @@ test('book importer throws when author name is missing', function (): void {
 
 test('book importer throws when publisher name does not exist', function (): void {
     $supplier = Supplier::factory()->create(['name' => 'NCC Import Test 3']);
+    $parent = Category::factory()->create(['name' => 'RootPublisherFail']);
+    $child = Category::factory()->child($parent)->create(['name' => 'LeafPublisherFail']);
+    $breadcrumb = $child->fresh(['parent'])->getBreadcrumb();
 
     $import = makeImportForBook();
     $importer = new BookImporter($import, bookColumnMapIdentity(), []);
@@ -193,7 +199,7 @@ test('book importer throws when publisher name does not exist', function (): voi
         'supplier' => $supplier->name,
         'publisher' => 'NXB Không Tồn Tại XYZ',
         'authors' => null,
-        'categories' => null,
+        'categories' => $breadcrumb,
         'description' => null,
         'language' => null,
         'format' => null,

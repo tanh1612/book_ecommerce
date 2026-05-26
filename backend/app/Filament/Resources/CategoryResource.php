@@ -5,14 +5,18 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
+use App\Services\Catalog\CategoryDeletionService;
 use App\Traits\GeneratesUniqueSlug;
 use Filament\Actions;
 use Filament\Forms\Components as Field;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components as Layout;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Validation\ValidationException;
 
 class CategoryResource extends Resource
 {
@@ -62,7 +66,6 @@ class CategoryResource extends Resource
                     ->relationship('parent', 'name', modifyQueryUsing: function ($query, ?Category $record) {
                         $q = $query->with('parent.parent');
 
-                        // Loại trừ chính mình khỏi danh sách
                         return $record ? $q->whereNotIn('id', [...$record->getDescendantIds(), $record->id]) : $q;
                     })
                     ->getOptionLabelFromRecordUsing(fn ($record) => $record->getBreadcrumb())
@@ -77,7 +80,6 @@ class CategoryResource extends Resource
                                 return;
                             }
 
-                            // 1. CHỐNG VÒNG LẶP: Không được chọn con cháu làm cha (chỉ check khi edit)
                             if ($record) {
                                 $descendantIds = $record->getDescendantIds();
                                 if (in_array($value, $descendantIds)) {
@@ -87,16 +89,13 @@ class CategoryResource extends Resource
                                 }
                             }
 
-                            // 2. KIỂM TRA ĐỘ SÂU TỐI ĐA
                             $parentDepth = $parent->getDepth();
-                            $maxDepthBranch = 1; // Mặc định là chính nó
+                            $maxDepthBranch = 1;
 
                             if ($record) {
-                                // Nếu là edit, tính thêm độ sâu của các nhánh con hiện có
                                 $maxDepthBranch = $record->getMaxDescendantDepth() + 1;
                             }
 
-                            // Tổng độ sâu tối đa cho phép là 3 cấp (Root = 0, Cấp 2 = 1, Cấp 3 = 2)
                             if (($parentDepth + $maxDepthBranch) > 2) {
                                 $fail('Thao tác này làm vượt quá giới hạn 3 cấp danh mục. Vui lòng kiểm tra lại cấu trúc nhánh.');
                             }
@@ -106,54 +105,84 @@ class CategoryResource extends Resource
                     ->preload()
                     ->columnSpanFull()
                     ->placeholder('— Không có (Danh mục gốc) —'),
-                Field\Toggle::make('is_active')
-                    ->label('Đang hoạt động')
-                    ->inline(false)
-                    ->default(true)
-                    ->live()
-                    ->afterStateUpdated(function ($state, \Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set): void {
-                        if (! $state || ! self::hasInactiveAncestor((int) $get('parent_id'))) {
-                            return;
-                        }
-
-                        $set('is_active', false);
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Không thể bật danh mục')
-                            ->body('Không cho phép bật danh mục này vì danh mục cha đang tắt.')
-                            ->danger()
-                            ->send();
-                    })
-                    ->rules([
-                        fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get): void {
-                            if (! $value) {
-                                return;
-                            }
-
-                            if (self::hasInactiveAncestor((int) $get('parent_id'))) {
-                                $fail('Không cho phép bật danh mục này vì danh mục cha đang tắt.');
-                            }
-                        },
-                    ]),
             ])->columnSpanFull(),
         ]);
     }
 
-    private static function hasInactiveAncestor(int $parentId): bool
+    public static function deleteBlockReason(Category $category): ?string
     {
-        while ($parentId > 0) {
-            $parent = Category::query()
-                ->whereKey($parentId)
-                ->first(['id', 'parent_id', 'is_active']);
-
-            if ($parent === null || ! $parent->is_active) {
-                return true;
-            }
-
-            $parentId = (int) $parent->parent_id;
+        if ($category->children()->exists()) {
+            return "Danh mục \"{$category->name}\" đang có ".$category->children()->count().' danh mục con. Hãy xóa hoặc chuyển các danh mục con trước.';
         }
 
-        return false;
+        if ($category->books()->exists()) {
+            return "Danh mục \"{$category->name}\" đang liên kết với ".$category->books()->count().' sách. Hãy gán sách sang danh mục khác trước khi xóa.';
+        }
+
+        return null;
+    }
+
+    public static function haltDeleteIfBlocked(Category $record, Actions\DeleteAction|Actions\DeleteBulkAction $action): void
+    {
+        $reason = static::deleteBlockReason($record);
+
+        if ($reason === null) {
+            return;
+        }
+
+        \Filament\Notifications\Notification::make()
+            ->title('Không thể xóa')
+            ->body($reason)
+            ->danger()
+            ->send();
+
+        $action->halt();
+    }
+
+    public static function haltBulkDeleteIfBlocked(EloquentCollection $records, Actions\DeleteBulkAction $action): void
+    {
+        foreach ($records as $record) {
+            static::haltDeleteIfBlocked($record, $action);
+        }
+    }
+
+    public static function configureDeleteAction(Actions\DeleteAction $action): Actions\DeleteAction
+    {
+        return $action
+            ->before(fn (Category $record, Actions\DeleteAction $action): mixed => static::haltDeleteIfBlocked($record, $action))
+            ->using(function (Category $record): bool {
+                try {
+                    return app(CategoryDeletionService::class)->delete($record);
+                } catch (ValidationException $exception) {
+                    static::notifyDeleteFailed($exception);
+
+                    return false;
+                }
+            });
+    }
+
+    public static function configureBulkDeleteAction(Actions\DeleteBulkAction $action): Actions\DeleteBulkAction
+    {
+        return $action
+            ->before(fn (EloquentCollection $records, Actions\DeleteBulkAction $action): mixed => static::haltBulkDeleteIfBlocked($records, $action))
+            ->using(function (Actions\DeleteBulkAction $action, EloquentCollection $records): void {
+                try {
+                    app(CategoryDeletionService::class)->deleteMany($records);
+                    $action->reportBulkProcessingSuccessfulRecordsCount($records->count());
+                } catch (ValidationException $exception) {
+                    static::notifyDeleteFailed($exception);
+                    $action->reportCompleteBulkProcessingFailure();
+                }
+            });
+    }
+
+    private static function notifyDeleteFailed(ValidationException $exception): void
+    {
+        Notification::make()
+            ->title('Không thể xóa')
+            ->body(collect($exception->errors())->flatten()->first() ?? 'Danh mục không thể xóa do dữ liệu liên quan vừa thay đổi.')
+            ->danger()
+            ->send();
     }
 
     public static function table(Table $table): Table
@@ -168,9 +197,6 @@ class CategoryResource extends Resource
                     ->label('Danh mục cha')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('is_active')
-                    ->label('Hoạt động')
-                    ->boolean(),
                 Tables\Columns\TextColumn::make('updated_at')
                     ->label('Cập nhật')
                     ->dateTime()
@@ -178,37 +204,15 @@ class CategoryResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')->label('Trạng thái'),
+                //
             ])
             ->actions([
                 Actions\EditAction::make(),
-                Actions\DeleteAction::make()
-                    ->before(function (Category $record, Actions\DeleteAction $action) {
-                        if ($record->children()->exists()) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Không thể xóa')
-                                ->body("Danh mục \"{$record->name}\" đang có ".$record->children()->count().' danh mục con. Hãy xóa hoặc chuyển các danh mục con trước.')
-                                ->danger()
-                                ->send();
-                            $action->halt();
-                        }
-                    }),
+                static::configureDeleteAction(Actions\DeleteAction::make()),
             ])
             ->bulkActions([
                 Actions\BulkActionGroup::make([
-                    Actions\DeleteBulkAction::make()
-                        ->before(function (\Illuminate\Database\Eloquent\Collection $records, Actions\DeleteBulkAction $action) {
-                            foreach ($records as $record) {
-                                if ($record->children()->exists()) {
-                                    \Filament\Notifications\Notification::make()
-                                        ->title('Không thể xóa')
-                                        ->body('Có danh mục được chọn đang chứa danh mục con. Hãy xử lý các danh mục con trước.')
-                                        ->danger()
-                                        ->send();
-                                    $action->halt();
-                                }
-                            }
-                        }),
+                    static::configureBulkDeleteAction(Actions\DeleteBulkAction::make()),
                 ]),
             ]);
     }

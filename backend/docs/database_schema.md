@@ -1,10 +1,3 @@
----
--- Host: 127.0.0.1
--- Server version: 8.4.3 - MySQL Community Server - GPL
--- Server OS: Win64
--- HeidiSQL Version: 12.8.0.6908
----
-
 /_!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT _/;
 /_!40101 SET NAMES utf8 _/;
 /_!50503 SET NAMES utf8mb4 _/;
@@ -14,7 +7,6 @@
 /_!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' _/;
 /_!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 _/;
 
--- Dumping structure for table book_ecommerce.accounts
 CREATE TABLE IF NOT EXISTS `accounts` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -30,9 +22,6 @@ PRIMARY KEY (`id`),
 UNIQUE KEY `accounts_email_unique` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.addresses
 CREATE TABLE IF NOT EXISTS `addresses` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `account_id` bigint unsigned NOT NULL,
@@ -50,9 +39,6 @@ KEY `addresses_account_id_is_default_index` (`account_id`,`is_default`),
 CONSTRAINT `addresses_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.authors
 CREATE TABLE IF NOT EXISTS `authors` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -60,11 +46,8 @@ CREATE TABLE IF NOT EXISTS `authors` (
 `created_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 UNIQUE KEY `authors_email_unique` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=895 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.books
 CREATE TABLE IF NOT EXISTS `books` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `supplier_id` bigint unsigned DEFAULT NULL,
@@ -92,11 +75,8 @@ KEY `books_created_at_index` (`created_at`),
 CONSTRAINT `books_publisher_id_foreign` FOREIGN KEY (`publisher_id`) REFERENCES `publishers` (`id`) ON DELETE SET NULL,
 CONSTRAINT `books_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT,
 CONSTRAINT `books_prices` CHECK (((`original_price` > 0) and (`selling_price` > 0)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1758 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.book_authors
 CREATE TABLE IF NOT EXISTS `book_authors` (
 `book_id` bigint unsigned NOT NULL,
 `author_id` bigint unsigned NOT NULL,
@@ -106,9 +86,6 @@ CONSTRAINT `book_authors_author_id_foreign` FOREIGN KEY (`author_id`) REFERENCES
 CONSTRAINT `book_authors_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.book_categories
 CREATE TABLE IF NOT EXISTS `book_categories` (
 `book_id` bigint unsigned NOT NULL,
 `category_id` bigint unsigned NOT NULL,
@@ -118,9 +95,6 @@ CONSTRAINT `book_categories_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES 
 CONSTRAINT `book_categories_category_id_foreign` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.book_details
 CREATE TABLE IF NOT EXISTS `book_details` (
 `book_id` bigint unsigned NOT NULL,
 `description` text COLLATE utf8mb4_unicode_ci,
@@ -135,9 +109,6 @@ PRIMARY KEY (`book_id`),
 CONSTRAINT `book_details_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.book_images
 CREATE TABLE IF NOT EXISTS `book_images` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `book_id` bigint unsigned NOT NULL,
@@ -148,11 +119,8 @@ CREATE TABLE IF NOT EXISTS `book_images` (
 PRIMARY KEY (`id`),
 KEY `book_images_book_id_foreign` (`book_id`),
 CONSTRAINT `book_images_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2568 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.cache
 CREATE TABLE IF NOT EXISTS `cache` (
 `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `value` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -161,9 +129,6 @@ PRIMARY KEY (`key`),
 KEY `cache_expiration_index` (`expiration`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.cache_locks
 CREATE TABLE IF NOT EXISTS `cache_locks` (
 `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `owner` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -172,9 +137,6 @@ PRIMARY KEY (`key`),
 KEY `cache_locks_expiration_index` (`expiration`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.carts
 CREATE TABLE IF NOT EXISTS `carts` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `account_id` bigint unsigned DEFAULT NULL,
@@ -186,11 +148,8 @@ PRIMARY KEY (`id`),
 UNIQUE KEY `carts_account_id_unique` (`account_id`),
 UNIQUE KEY `carts_guest_token_hash_unique` (`guest_token_hash`),
 CONSTRAINT `carts_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.cart_items
 CREATE TABLE IF NOT EXISTS `cart_items` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `cart_id` bigint unsigned NOT NULL,
@@ -206,27 +165,19 @@ CONSTRAINT `cart_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `book
 CONSTRAINT `cart_items_cart_id_foreign` FOREIGN KEY (`cart_id`) REFERENCES `carts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.categories
 CREATE TABLE IF NOT EXISTS `categories` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `parent_id` bigint unsigned DEFAULT NULL,
-`is_active` tinyint(1) NOT NULL DEFAULT '1',
 `created_at` timestamp NULL DEFAULT NULL,
 `updated_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 UNIQUE KEY `categories_slug_unique` (`slug`),
 KEY `categories_parent_id_foreign` (`parent_id`),
-KEY `categories_is_active_index` (`is_active`),
 CONSTRAINT `categories_parent_id_foreign` FOREIGN KEY (`parent_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.failed_import_rows
 CREATE TABLE IF NOT EXISTS `failed_import_rows` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `data` json NOT NULL,
@@ -237,11 +188,8 @@ CREATE TABLE IF NOT EXISTS `failed_import_rows` (
 PRIMARY KEY (`id`),
 KEY `failed_import_rows_import_id_foreign` (`import_id`),
 CONSTRAINT `failed_import_rows_import_id_foreign` FOREIGN KEY (`import_id`) REFERENCES `imports` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6295 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.failed_jobs
 CREATE TABLE IF NOT EXISTS `failed_jobs` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `uuid` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -254,9 +202,6 @@ PRIMARY KEY (`id`),
 UNIQUE KEY `failed_jobs_uuid_unique` (`uuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.imports
 CREATE TABLE IF NOT EXISTS `imports` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `completed_at` timestamp NULL DEFAULT NULL,
@@ -272,11 +217,8 @@ CREATE TABLE IF NOT EXISTS `imports` (
 PRIMARY KEY (`id`),
 KEY `imports_user_id_foreign` (`user_id`),
 CONSTRAINT `imports_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.inventories
 CREATE TABLE IF NOT EXISTS `inventories` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `book_id` bigint unsigned NOT NULL,
@@ -292,11 +234,8 @@ KEY `inventories_warehouse_id_foreign` (`warehouse_id`),
 CONSTRAINT `inventories_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
 CONSTRAINT `inventories_warehouse_id_foreign` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`) ON DELETE RESTRICT,
 CONSTRAINT `inventories_reserved_within_quantity_check` CHECK ((`reserved_quantity` <= `quantity`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1757 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.jobs
 CREATE TABLE IF NOT EXISTS `jobs` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `queue` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -309,9 +248,6 @@ PRIMARY KEY (`id`),
 KEY `jobs_queue_index` (`queue`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.job_batches
 CREATE TABLE IF NOT EXISTS `job_batches` (
 `id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -326,19 +262,13 @@ CREATE TABLE IF NOT EXISTS `job_batches` (
 PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.migrations
 CREATE TABLE IF NOT EXISTS `migrations` (
 `id` int unsigned NOT NULL AUTO_INCREMENT,
 `migration` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `batch` int NOT NULL,
 PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.notifications
 CREATE TABLE IF NOT EXISTS `notifications` (
 `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
 `type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -352,9 +282,6 @@ PRIMARY KEY (`id`),
 KEY `notifications_notifiable_type_notifiable_id_index` (`notifiable_type`,`notifiable_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.orders
 CREATE TABLE IF NOT EXISTS `orders` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `account_id` bigint unsigned NOT NULL,
@@ -385,9 +312,6 @@ CONSTRAINT `orders_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `ac
 CONSTRAINT `orders_shipping_method_id_foreign` FOREIGN KEY (`shipping_method_id`) REFERENCES `shipping_methods` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.order_items
 CREATE TABLE IF NOT EXISTS `order_items` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `order_id` bigint unsigned NOT NULL,
@@ -413,9 +337,6 @@ CONSTRAINT `order_items_promotion_id_foreign` FOREIGN KEY (`promotion_id`) REFER
 CONSTRAINT `order_items_promotion_item_id_foreign` FOREIGN KEY (`promotion_item_id`) REFERENCES `promotion_items` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.order_timelines
 CREATE TABLE IF NOT EXISTS `order_timelines` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `order_id` bigint unsigned NOT NULL,
@@ -428,9 +349,6 @@ KEY `order_timelines_order_id_foreign` (`order_id`),
 CONSTRAINT `order_timelines_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.password_reset_tokens
 CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
 `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `token` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -438,9 +356,6 @@ CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
 PRIMARY KEY (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.payment_transactions
 CREATE TABLE IF NOT EXISTS `payment_transactions` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `order_id` bigint unsigned NOT NULL,
@@ -459,9 +374,6 @@ KEY `payment_transactions_order_id_status_index` (`order_id`,`status`),
 CONSTRAINT `payment_transactions_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.personal_access_tokens
 CREATE TABLE IF NOT EXISTS `personal_access_tokens` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `tokenable_type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -479,9 +391,6 @@ KEY `personal_access_tokens_tokenable_type_tokenable_id_index` (`tokenable_type`
 KEY `personal_access_tokens_expires_at_index` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.promotions
 CREATE TABLE IF NOT EXISTS `promotions` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -497,9 +406,6 @@ KEY `promotions_start_at_end_at_index` (`start_at`,`end_at`),
 CONSTRAINT `promotions_end_after_start_check` CHECK ((`end_at` > `start_at`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.promotion_allocations
 CREATE TABLE IF NOT EXISTS `promotion_allocations` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `promotion_item_id` bigint unsigned NOT NULL,
@@ -522,9 +428,6 @@ CONSTRAINT `promotion_allocations_promotion_item_id_foreign` FOREIGN KEY (`promo
 CONSTRAINT `promotion_allocations_quantity_positive_check` CHECK ((`quantity` > 0))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.promotion_items
 CREATE TABLE IF NOT EXISTS `promotion_items` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `promotion_id` bigint unsigned NOT NULL,
@@ -544,9 +447,6 @@ CONSTRAINT `promotion_items_discount_percent_check` CHECK (((`discount_value` > 
 CONSTRAINT `promotion_items_sold_within_stock_check` CHECK (((`stock_limit` is null) or (`sold_quantity` <= `stock_limit`)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.publishers
 CREATE TABLE IF NOT EXISTS `publishers` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -555,11 +455,8 @@ CREATE TABLE IF NOT EXISTS `publishers` (
 PRIMARY KEY (`id`),
 UNIQUE KEY `publishers_name_unique` (`name`),
 UNIQUE KEY `publishers_email_unique` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.reviews
 CREATE TABLE IF NOT EXISTS `reviews` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `account_id` bigint unsigned NOT NULL,
@@ -581,9 +478,6 @@ CONSTRAINT `reviews_order_item_id_foreign` FOREIGN KEY (`order_item_id`) REFEREN
 CONSTRAINT `reviews_rating_range_check` CHECK ((`rating` between 1 and 5))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.sessions
 CREATE TABLE IF NOT EXISTS `sessions` (
 `id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `user_id` bigint unsigned DEFAULT NULL,
@@ -596,9 +490,6 @@ KEY `sessions_user_id_index` (`user_id`),
 KEY `sessions_last_activity_index` (`last_activity`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.shipping_methods
 CREATE TABLE IF NOT EXISTS `shipping_methods` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -609,9 +500,6 @@ CREATE TABLE IF NOT EXISTS `shipping_methods` (
 PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.shipping_rates
 CREATE TABLE IF NOT EXISTS `shipping_rates` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `shipping_method_id` bigint unsigned NOT NULL,
@@ -625,9 +513,6 @@ KEY `shipping_rates_province_code_index` (`province_code`),
 CONSTRAINT `shipping_rates_shipping_method_id_foreign` FOREIGN KEY (`shipping_method_id`) REFERENCES `shipping_methods` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.suppliers
 CREATE TABLE IF NOT EXISTS `suppliers` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -637,11 +522,8 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
 PRIMARY KEY (`id`),
 UNIQUE KEY `suppliers_name_unique` (`name`),
 UNIQUE KEY `suppliers_email_unique` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=91 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.user_profiles
 CREATE TABLE IF NOT EXISTS `user_profiles` (
 `account_id` bigint unsigned NOT NULL,
 `first_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -654,9 +536,6 @@ PRIMARY KEY (`account_id`),
 CONSTRAINT `user_profiles_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Data exporting was unselected.
-
--- Dumping structure for table book_ecommerce.warehouses
 CREATE TABLE IF NOT EXISTS `warehouses` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -666,9 +545,7 @@ CREATE TABLE IF NOT EXISTS `warehouses` (
 `created_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 UNIQUE KEY `warehouses_singleton_key_unique` (`singleton_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Data exporting was unselected.
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /_!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') _/;
 /_!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') _/;

@@ -53,7 +53,7 @@ test('immediate stock alerts are skipped when config is disabled', function (): 
     $inventory = seedInventoryWithStock(20);
     updateInventoryInCommittedTransaction($inventory, ['quantity' => 3, 'reserved_quantity' => 0]);
 
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(NotifyInventoryStockStatusChangedJob::class);
     Notification::assertNothingSent();
 });
 
@@ -81,7 +81,7 @@ test('low stock alert is not sent again while stock remains in low range', funct
 
     updateInventoryInCommittedTransaction($inventory, ['quantity' => 4, 'reserved_quantity' => 1]);
 
-    Bus::assertNothingDispatched();
+    Bus::assertNotDispatched(NotifyInventoryStockStatusChangedJob::class);
 });
 
 test('out of stock alert is sent when available stock drops to zero', function (): void {

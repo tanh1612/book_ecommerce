@@ -79,6 +79,38 @@ test('review list exposes only view table action', function (): void {
         ->assertTableActionDoesNotExist('delete');
 });
 
+test('review list tabs count and scope approved and rejected reviews', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $book = Book::factory()->create();
+    $pending = filamentPendingReview($book);
+    $approved = filamentPendingReview($book);
+    $rejected = filamentPendingReview($book);
+
+    $approved->update(['status' => ReviewStatus::APPROVED]);
+    $rejected->update(['status' => ReviewStatus::REJECTED]);
+
+    $tabs = app(ListReviews::class)->getTabs();
+
+    expect($tabs['all']->getLabel())->toBe('Tổng đánh giá')
+        ->and($tabs['all']->getBadge())->toBe(3)
+        ->and($tabs['all']->getBadgeColor())->toBe('primary')
+        ->and($tabs['approved']->getLabel())->toBe('Đã phê duyệt')
+        ->and($tabs['approved']->getBadge())->toBe(1)
+        ->and($tabs['approved']->getBadgeColor())->toBe('success')
+        ->and($tabs['rejected']->getLabel())->toBe('Đã từ chối')
+        ->and($tabs['rejected']->getBadge())->toBe(1)
+        ->and($tabs['rejected']->getBadgeColor())->toBe('danger');
+
+    Livewire::actingAs($admin)
+        ->test(ListReviews::class)
+        ->set('activeTab', 'approved')
+        ->assertCanSeeTableRecords([$approved])
+        ->assertCanNotSeeTableRecords([$pending, $rejected])
+        ->set('activeTab', 'rejected')
+        ->assertCanSeeTableRecords([$rejected])
+        ->assertCanNotSeeTableRecords([$pending, $approved]);
+});
+
 test('view review approve updates status and book aggregates', function (): void {
     $admin = Account::factory()->create(['role' => AccountRole::Admin]);
     $book = Book::factory()->create(['review_count' => 0, 'average_rating' => 0]);

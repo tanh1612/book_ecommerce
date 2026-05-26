@@ -3,12 +3,27 @@
 namespace App\Filament\Resources\PublisherResource\Pages;
 
 use App\Filament\Resources\PublisherResource;
+use App\Models\Publisher;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Tabs\Tab;
 
 class ListPublishers extends ListRecords
 {
     protected static string $resource = PublisherResource::class;
+
+    /**
+     * @return array<string, Tab>
+     */
+    public function getTabs(): array
+    {
+        return [
+            'all' => Tab::make('Tất cả')
+                ->badge(static fn (): int => Publisher::query()->count())
+                ->badgeColor('success')
+                ->deferBadge(),
+        ];
+    }
 
     protected function getHeaderActions(): array
     {

@@ -22,15 +22,13 @@ class BookFilterService
         return $this->catalogCache->rememberFiltersMetadata(function (): array {
             $categories = Category::query()
                 ->whereNull('parent_id')
-                ->where('is_active', true)
                 ->with([
                     'children' => function ($query): void {
-                        $query->where('is_active', true)
-                            ->orderBy('name');
+                        $query->orderBy('name');
                     },
                 ])
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'parent_id', 'is_active']);
+                ->get(['id', 'name', 'slug', 'parent_id']);
 
             $publishers = Publisher::query()
                 ->whereHas('books')

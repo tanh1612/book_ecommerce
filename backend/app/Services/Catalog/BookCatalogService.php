@@ -3,7 +3,6 @@
 namespace App\Services\Catalog;
 
 use App\Models\Book;
-use App\Models\Category;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -11,6 +10,8 @@ class BookCatalogService
 {
     public function __construct(
         private CatalogCacheService $catalogCache,
+        private BookCatalogSearchService $bookCatalogSearch,
+        private CatalogCategoryResolver $categoryResolver,
     ) {}
 
     /**
@@ -18,19 +19,25 @@ class BookCatalogService
      */
     public function paginateBooks(array $filters): LengthAwarePaginator
     {
+        $keyword = isset($filters['keyword']) ? trim((string) $filters['keyword']) : '';
+
+        if ($keyword !== '') {
+            return $this->bookCatalogSearch->paginate($keyword, $filters);
+        }
+
+        return $this->paginateBooksFromDatabase($filters);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function paginateBooksFromDatabase(array $filters): LengthAwarePaginator
+    {
         $perPage = (int) ($filters['per_page'] ?? 40);
         $query = $this->baseListQuery();
 
         if (! empty($filters['category'])) {
-            $category = Category::query()
-                ->where('slug', (string) $filters['category'])
-                ->where('is_active', true)
-                ->firstOrFail();
-
-            $categoryIds = array_values(array_unique(array_merge(
-                [$category->id],
-                $category->getDescendantIds()
-            )));
+            $categoryIds = $this->categoryResolver->descendantIdsForSlug((string) $filters['category']);
 
             $query->whereHas('categories', function (Builder $relation) use ($categoryIds): void {
                 $relation->whereIn('categories.id', $categoryIds);
@@ -83,34 +90,7 @@ class BookCatalogService
      */
     private function baseListQuery(): Builder
     {
-        return Book::query()
-            ->with([
-                'authors',
-                'categories' => function ($query): void {
-                    $query->where('categories.is_active', true);
-                },
-                'publisher:id,name',
-                'images' => function ($query): void {
-                    $query->select(['id', 'book_id', 'image_url', 'sort_order'])
-                        ->orderBy('sort_order')
-                        ->orderBy('id')
-                        ->limit(1);
-                },
-                'inventories:id,book_id,quantity,reserved_quantity',
-            ])
-            ->select([
-                'id',
-                'publisher_id',
-                'name',
-                'slug',
-                'thumbnail',
-                'original_price',
-                'selling_price',
-                'review_count',
-                'average_rating',
-                'is_active',
-                'created_at',
-            ]);
+        return $this->bookCatalogSearch->applyListQueryConstraints(Book::query());
     }
 
     /**
@@ -127,9 +107,7 @@ class BookCatalogService
                         ->orderBy('id');
                 },
                 'authors:id,name',
-                'categories' => function ($query): void {
-                    $query->where('categories.is_active', true);
-                },
+                'categories:id,name,slug',
                 'publisher:id,name',
             ])
             ->select([

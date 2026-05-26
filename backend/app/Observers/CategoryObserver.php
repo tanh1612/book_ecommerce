@@ -4,6 +4,8 @@ namespace App\Observers;
 
 use App\Models\Category;
 use App\Services\Catalog\CatalogCacheService;
+use App\Services\Search\BookMeilisearchSyncDispatcher;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -12,75 +14,46 @@ class CategoryObserver
 {
     public function __construct(
         private CatalogCacheService $catalogCache,
+        private BookMeilisearchSyncDispatcher $meilisearchSync,
     ) {}
-
-    /**
-     * Prevent enabling a category while any ancestor is inactive (admin cannot bypass via direct save).
-     */
-    public function saving(Category $category): void
-    {
-        if (! $category->is_active) {
-            return;
-        }
-
-        $parentId = $category->parent_id;
-
-        while ($parentId !== null) {
-            /** @var Category|null $parentRow */
-            $parentRow = Category::query()
-                ->whereKey($parentId)
-                ->first(['id', 'parent_id', 'is_active']);
-
-            if ($parentRow === null || ! $parentRow->is_active) {
-                throw ValidationException::withMessages([
-                    'is_active' => 'Không cho phép bật danh mục này vì danh mục cha đang tắt.',
-                ]);
-            }
-
-            $parentId = $parentRow->parent_id;
-        }
-    }
 
     public function saved(Category $category): void
     {
-        if ($category->wasChanged('is_active')) {
-            $this->syncDescendantActiveStates($category);
-        }
-
         $this->invalidateBranchBooks($category);
         $this->catalogCache->forgetFiltersMetadata();
     }
 
     public function deleting(Category $category): void
     {
-        $this->invalidateBranchBooks($category);
-        $this->catalogCache->forgetFiltersMetadata();
-    }
+        if ($category->children()->exists()) {
+            throw ValidationException::withMessages([
+                'name' => 'Không thể xóa danh mục đang có danh mục con. Hãy xóa hoặc chuyển các danh mục con trước.',
+            ]);
+        }
 
-    private function syncDescendantActiveStates(Category $category): void
-    {
-        $descendantIds = $category->getDescendantIds();
-
-        if ($descendantIds === []) {
-            return;
+        if ($category->books()->exists()) {
+            throw ValidationException::withMessages([
+                'name' => 'Không thể xóa danh mục đang liên kết với sách. Hãy gán sách sang danh mục khác trước.',
+            ]);
         }
 
         try {
-            Category::withoutEvents(function () use ($descendantIds, $category): void {
-                Category::query()->whereIn('id', $descendantIds)->update([
-                    'is_active' => (bool) $category->is_active,
-                ]);
-            });
+            $bookIds = DB::table('book_categories')
+                ->where('category_id', $category->id)
+                ->distinct()
+                ->pluck('book_id');
+
+            $this->meilisearchSync->dispatchMany($bookIds);
         } catch (Throwable $e) {
-            Log::error('Category descendant is_active sync failed', [
+            Log::warning('Meilisearch reindex dispatch failed (category delete)', [
                 'category_id' => $category->id,
-                'is_active' => $category->is_active,
                 'error' => $e->getMessage(),
                 'exception' => $e::class,
             ]);
-
-            throw $e;
         }
+
+        $this->invalidateBranchBooks($category);
+        $this->catalogCache->forgetFiltersMetadata();
     }
 
     private function invalidateBranchBooks(Category $category): void

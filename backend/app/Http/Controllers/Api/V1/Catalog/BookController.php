@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api\V1\Catalog;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Catalog\BookSuggestionsRequest;
 use App\Http\Requests\Catalog\ListBooksRequest;
 use App\Http\Resources\BookDetailResource;
 use App\Http\Resources\BookFilterResource;
+use App\Http\Resources\BookSuggestionResource;
 use App\Http\Resources\BookSummaryResource;
+use App\Services\Catalog\BookCatalogSearchService;
 use App\Services\Catalog\BookCatalogService;
 use App\Services\Catalog\BookFilterService;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -18,6 +21,20 @@ class BookController extends Controller
         $paginator = $bookCatalogService->paginateBooks($request->validated());
 
         return BookSummaryResource::collection($paginator);
+    }
+
+    public function suggestions(
+        BookSuggestionsRequest $request,
+        BookCatalogSearchService $searchService,
+    ): AnonymousResourceCollection {
+        $validated = $request->validated();
+
+        $suggestions = $searchService->suggestions(
+            (string) $validated['keyword'],
+            (int) $validated['limit'],
+        );
+
+        return BookSuggestionResource::collection($suggestions);
     }
 
     public function show(string $slug, BookCatalogService $bookCatalogService): BookDetailResource

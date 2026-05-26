@@ -16,11 +16,6 @@ return new class extends Migration
             $table->index('created_at');
         });
 
-        // Categories - filter active categories
-        Schema::table('categories', function (Blueprint $table) {
-            $table->index('is_active');
-        });
-
         // Orders - filter/search theo status, thời gian
         Schema::table('orders', function (Blueprint $table) {
             $table->index('current_status');

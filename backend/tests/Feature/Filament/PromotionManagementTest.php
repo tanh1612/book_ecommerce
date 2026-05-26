@@ -139,6 +139,41 @@ test('non scheduled promotions hide edit action on list', function (): void {
         ->assertTableActionHidden('edit', $active);
 });
 
+test('promotion list tabs count and scope promotions by status', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+
+    $promotions = collect(PromotionStatus::cases())->mapWithKeys(
+        fn (PromotionStatus $status): array => [
+            $status->value => Promotion::query()->create([
+                'name' => $status->value,
+                'type' => PromotionType::REGULAR_SALE,
+                'start_at' => now()->addDay(),
+                'end_at' => now()->addDays(2),
+                'status' => $status,
+            ]),
+        ],
+    );
+
+    $tabs = app(ListPromotions::class)->getTabs();
+
+    expect($tabs['all']->getLabel())->toBe('Tất cả')
+        ->and($tabs['all']->getBadge())->toBe(count(PromotionStatus::cases()))
+        ->and($tabs['all']->getBadgeColor())->toBe('primary');
+
+    foreach (PromotionStatus::cases() as $status) {
+        expect($tabs[$status->value]->getLabel())->toBe($status->getLabel())
+            ->and($tabs[$status->value]->getBadge())->toBe(1)
+            ->and($tabs[$status->value]->getBadgeColor())->toBe($status->getColor())
+            ->and($tabs[$status->value]->isBadgeDeferred())->toBeTrue();
+    }
+
+    Livewire::actingAs($admin)
+        ->test(ListPromotions::class)
+        ->set('activeTab', PromotionStatus::ACTIVE->value)
+        ->assertCanSeeTableRecords([$promotions[PromotionStatus::ACTIVE->value]])
+        ->assertCanNotSeeTableRecords($promotions->except(PromotionStatus::ACTIVE->value));
+});
+
 test('non scheduled promotion cannot open edit page', function (PromotionStatus $status): void {
     $admin = Account::factory()->create(['role' => AccountRole::Admin]);
 

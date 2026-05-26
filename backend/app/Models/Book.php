@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Search\BookSearchDocumentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,11 +12,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Scout\Searchable;
 
 class Book extends Model
 {
     /** @use HasFactory<\Database\Factories\BookFactory> */
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $fillable = [
         'supplier_id',
@@ -90,6 +92,35 @@ class Book extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function searchableAs(): string
+    {
+        return 'books';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return app(BookSearchDocumentFactory::class)->make($this);
+    }
+
+    /**
+     * Eager load document inputs during bulk imports to avoid per-book relation queries.
+     *
+     * @param  Builder<Book>  $query
+     * @return Builder<Book>
+     */
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query->with([
+            'authors:id,name',
+            'categories:id',
+            'detail:book_id,description',
+            'inventories:id,book_id,quantity,reserved_quantity',
+        ]);
     }
 
     protected function thumbnail(): Attribute

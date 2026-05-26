@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Catalog\CatalogCacheService;
+use App\Services\Search\BookMeilisearchSyncDispatcher;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -18,15 +19,15 @@ class BookAuthor extends Pivot
     protected static function booted(): void
     {
         static::saved(function (BookAuthor $pivot): void {
-            self::forgetBookCache((int) $pivot->book_id);
+            self::onPivotChanged((int) $pivot->book_id);
         });
 
         static::deleted(function (BookAuthor $pivot): void {
-            self::forgetBookCache((int) $pivot->book_id);
+            self::onPivotChanged((int) $pivot->book_id);
         });
     }
 
-    private static function forgetBookCache(int $bookId): void
+    private static function onPivotChanged(int $bookId): void
     {
         if ($bookId <= 0) {
             return;
@@ -34,8 +35,9 @@ class BookAuthor extends Pivot
 
         try {
             app(CatalogCacheService::class)->forgetBookById($bookId);
+            app(BookMeilisearchSyncDispatcher::class)->dispatch($bookId);
         } catch (Throwable $e) {
-            Log::warning('Catalog cache invalidation failed (book_authors)', [
+            Log::warning('Book author pivot side effects failed', [
                 'book_id' => $bookId,
                 'error' => $e->getMessage(),
                 'exception' => $e::class,

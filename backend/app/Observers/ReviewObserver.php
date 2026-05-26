@@ -6,6 +6,7 @@ use App\Enums\Review\ReviewStatus;
 use App\Models\Book;
 use App\Models\Review;
 use App\Services\Catalog\CatalogCacheService;
+use App\Services\Search\BookMeilisearchSyncDispatcher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -14,23 +15,32 @@ class ReviewObserver
 {
     public function __construct(
         private CatalogCacheService $catalogCache,
+        private BookMeilisearchSyncDispatcher $meilisearchSync,
     ) {}
 
     public function saved(Review $review): void
     {
+        $previousBookId = $review->wasChanged('book_id')
+            ? $review->getOriginal('book_id')
+            : null;
+
         $this->recalculateForBookId((int) $review->book_id);
 
-        if ($review->wasChanged('book_id')) {
-            $previousBookId = $review->getOriginal('book_id');
-            if ($previousBookId !== null && (int) $previousBookId !== (int) $review->book_id) {
-                $this->recalculateForBookId((int) $previousBookId);
-            }
+        if ($previousBookId !== null && (int) $previousBookId !== (int) $review->book_id) {
+            $this->recalculateForBookId((int) $previousBookId);
+        }
+
+        $this->meilisearchSync->dispatch((int) $review->book_id);
+
+        if ($previousBookId !== null && (int) $previousBookId !== (int) $review->book_id) {
+            $this->meilisearchSync->dispatch((int) $previousBookId);
         }
     }
 
     public function deleted(Review $review): void
     {
         $this->recalculateForBookId((int) $review->book_id);
+        $this->meilisearchSync->dispatch((int) $review->book_id);
     }
 
     private function recalculateForBookId(int $bookId): void

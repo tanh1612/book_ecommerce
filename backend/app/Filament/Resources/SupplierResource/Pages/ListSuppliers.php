@@ -3,12 +3,27 @@
 namespace App\Filament\Resources\SupplierResource\Pages;
 
 use App\Filament\Resources\SupplierResource;
+use App\Models\Supplier;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Tabs\Tab;
 
 class ListSuppliers extends ListRecords
 {
     protected static string $resource = SupplierResource::class;
+
+    /**
+     * @return array<string, Tab>
+     */
+    public function getTabs(): array
+    {
+        return [
+            'all' => Tab::make('Tất cả')
+                ->badge(static fn (): int => Supplier::query()->count())
+                ->badgeColor('success')
+                ->deferBadge(),
+        ];
+    }
 
     protected function getHeaderActions(): array
     {

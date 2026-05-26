@@ -7,6 +7,7 @@ use App\Jobs\Inventory\NotifyInventoryStockStatusChangedJob;
 use App\Models\Book;
 use App\Models\Inventory;
 use App\Services\Catalog\CatalogCacheService;
+use App\Services\Search\BookMeilisearchSyncDispatcher;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -14,6 +15,7 @@ class InventoryObserver
 {
     public function __construct(
         private CatalogCacheService $catalogCache,
+        private BookMeilisearchSyncDispatcher $meilisearchSync,
     ) {}
 
     public function created(Inventory $inventory): void
@@ -37,6 +39,7 @@ class InventoryObserver
     {
         $bookId = (int) $inventory->book_id;
         $this->catalogCache->forgetBookStock($bookId);
+        $this->meilisearchSync->dispatch($bookId);
         $this->syncBookInactiveWhenOutOfStock($bookId);
     }
 

@@ -20,7 +20,7 @@
 
 | Importer | Ghi chú |
 |----------|---------|
-| **BookImporter** | `supplier` (tên) bắt buộc phải khớp NCC; `publisher` nếu có thì tên phải khớp NXB; `authors` từng tên phải tồn tại; `categories` breadcrumb `A > B` khớp danh mục trong DB sau chuẩn hóa nhẹ (lowercase, trim, gom whitespace, chuẩn dash `–/—/−` thành `-`, spacing quanh `>` và `-`); không fuzzy, không tự tạo category; nếu hai danh mục DB trùng khóa sau chuẩn hóa thì dòng import fail. `thumbnail_url` bắt buộc; dòng import thành công khi upload được ít nhất một ảnh; `sku` unique. |
+| **BookImporter** | `supplier` (tên) bắt buộc phải khớp NCC; `publisher` nếu có thì tên phải khớp NXB; `authors` từng tên phải tồn tại; `categories` **bắt buộc** — ít nhất một breadcrumb `A > B` khớp danh mục trong DB sau chuẩn hóa nhẹ (lowercase, trim, gom whitespace, chuẩn dash `–/—/−` thành `-`, spacing quanh `>` và `-`); không fuzzy, không tự tạo category; dòng không có category hợp lệ sẽ fail; nếu hai danh mục DB trùng khóa sau chuẩn hóa thì dòng import fail. `thumbnail_url` bắt buộc; dòng import thành công khi upload được ít nhất một ảnh; `sku` unique. |
 | **InventoryImporter** | CSV gồm `book_sku`, `warehouse_id`, `quantity`, `location_code`; `book_sku` phải khớp sách hiện có; `warehouse_id` phải là kho đang hoạt động; `quantity` là số lượng nhập thêm; khi tạo mới thì `sold_quantity` / `reserved_quantity` mặc định `0`; khi đã có tồn kho thì không đổi `sold_quantity` / `reserved_quantity`; `last_restocked_at` lấy thời điểm xử lý dòng import. |
 | **AuthorImporter** | `name` bắt buộc; `email` nullable nhưng nếu có phải unique. |
 | **PublisherImporter** / **SupplierImporter** | `name` unique; `email` nullable nhưng nếu có phải unique. |

@@ -17,15 +17,7 @@ class Category extends Model
         'name',
         'slug',
         'parent_id',
-        'is_active',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'is_active' => 'boolean',
-        ];
-    }
 
     public function parent(): BelongsTo
     {

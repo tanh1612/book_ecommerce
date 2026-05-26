@@ -41,6 +41,27 @@ test('account list still exposes create header action', function (): void {
         ->assertActionExists('create');
 });
 
+test('account list shows all accounts by default and customer tab scopes customer accounts', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $customer = Account::factory()->create(['role' => AccountRole::Customer]);
+    $tabs = app(ListAccounts::class)->getTabs();
+
+    expect($tabs['all']->getLabel())->toBe('Tất cả')
+        ->and($tabs['all']->getBadge())->toBe(2)
+        ->and($tabs['all']->getBadgeColor())->toBe('primary')
+        ->and($tabs['customers']->getLabel())->toBe('Khách hàng')
+        ->and($tabs['customers']->getBadge())->toBe(1)
+        ->and($tabs['customers']->getBadgeColor())->toBe('success')
+        ->and($tabs['customers']->isBadgeDeferred())->toBeTrue();
+
+    Livewire::actingAs($admin)
+        ->test(ListAccounts::class)
+        ->assertCanSeeTableRecords([$admin, $customer])
+        ->set('activeTab', 'customers')
+        ->assertCanSeeTableRecords([$customer])
+        ->assertCanNotSeeTableRecords([$admin]);
+});
+
 test('view active account lock action deactivates account', function (): void {
     $admin = Account::factory()->create(['role' => AccountRole::Admin]);
     $target = Account::factory()->create(['is_active' => true]);
