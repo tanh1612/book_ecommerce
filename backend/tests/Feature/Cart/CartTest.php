@@ -89,22 +89,27 @@ test('member get cart bootstraps empty cart keyed by account', function (): void
     expect($cart->guest_token_hash)->toBeNull();
 });
 
-test('cart item book payload is slim without catalog metadata', function (): void {
+test('get cart returns full quote with slim book payload', function (): void {
     $book = createBookWithAvailableStock(8);
 
-    $response = $this->postJson('/api/v1/cart/items', [
+    $addResponse = $this->postJson('/api/v1/cart/items', [
         'book_id' => $book->id,
         'quantity' => 2,
     ])->assertCreated();
 
-    $response->assertJsonPath('data.items.0.book.id', $book->id)
+    withGuestCartCookieFrom($addResponse);
+
+    $this->getJson('/api/v1/cart')
+        ->assertOk()
+        ->assertJsonPath('data.items.0.book.id', $book->id)
         ->assertJsonPath('data.items.0.book.name', $book->name)
         ->assertJsonPath('data.items.0.book.slug', $book->slug)
         ->assertJsonPath('data.items.0.book.selling_price', $book->selling_price)
         ->assertJsonPath('data.items.0.book.original_price', $book->original_price)
         ->assertJsonPath('data.items.0.book.is_active', true)
         ->assertJsonPath('data.items.0.available_stock', 8)
-        ->assertJsonPath('data.items.0.line_subtotal', 200_000)
+        ->assertJsonPath('data.items.0.line_subtotal_before_discount', 200_000)
+        ->assertJsonPath('data.pricing_expectations', [])
         ->assertJsonMissingPath('data.items.0.book.authors')
         ->assertJsonMissingPath('data.items.0.book.categories')
         ->assertJsonMissingPath('data.items.0.book.publisher')
@@ -112,6 +117,22 @@ test('cart item book payload is slim without catalog metadata', function (): voi
         ->assertJsonMissingPath('data.items.0.book.review_count')
         ->assertJsonMissingPath('data.items.0.book.in_stock')
         ->assertJsonMissingPath('data.items.0.book.available_stock');
+});
+
+test('add item returns slim mutation payload', function (): void {
+    $book = createBookWithAvailableStock(5);
+
+    $this->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated()
+        ->assertJsonPath('message', 'Đã thêm vào giỏ hàng.')
+        ->assertJsonPath('data.book_id', $book->id)
+        ->assertJsonPath('data.quantity', 2)
+        ->assertJsonPath('data.total_quantity', 2)
+        ->assertJsonPath('data.selected_quantity', 2)
+        ->assertJsonMissingPath('data.items')
+        ->assertJsonMissingPath('data.pricing_expectations');
 });
 
 test('guest can add merge and update cart items', function (): void {
@@ -129,6 +150,7 @@ test('guest can add merge and update cart items', function (): void {
         'book_id' => $book->id,
         'quantity' => 1,
     ])->assertCreated()
+        ->assertJsonPath('data.quantity', 3)
         ->assertJsonPath('data.total_quantity', 3);
 
     withGuestCartCookieFrom($secondAdd);
@@ -139,12 +161,16 @@ test('guest can add merge and update cart items', function (): void {
         'quantity' => 4,
         'selected' => false,
     ])->assertOk()
+        ->assertJsonPath('message', 'Đã cập nhật giỏ hàng.')
+        ->assertJsonPath('data.quantity', 4)
+        ->assertJsonPath('data.selected', false)
         ->assertJsonPath('data.total_quantity', 4)
         ->assertJsonPath('data.selected_quantity', 0);
 
     $this->patchJson("/api/v1/cart/items/{$itemId}", [
         'selected' => true,
     ])->assertOk()
+        ->assertJsonPath('data.selected', true)
         ->assertJsonPath('data.selected_quantity', 4);
 });
 
@@ -181,7 +207,10 @@ test('guest can remove one cart item', function (): void {
 
     $this->deleteJson("/api/v1/cart/items/{$itemId}")
         ->assertOk()
-        ->assertJsonPath('data.items', []);
+        ->assertJsonPath('message', 'Đã xóa sản phẩm khỏi giỏ hàng.')
+        ->assertJsonPath('data.removed_cart_item_id', $itemId)
+        ->assertJsonPath('data.total_quantity', 0)
+        ->assertJsonMissingPath('data.items');
 
     expect(CartItem::query()->count())->toBe(0);
 });
@@ -244,8 +273,14 @@ test('guest can select all cart items in one request', function (): void {
 
     $this->patchJson('/api/v1/cart/items/selection', ['selected' => true])
         ->assertOk()
+        ->assertJsonPath('message', 'Đã cập nhật lựa chọn giỏ hàng.')
         ->assertJsonPath('data.selected_quantity', 3)
-        ->assertJsonPath('data.selected_subtotal', 300_000);
+        ->assertJsonPath('data.total_quantity', 3)
+        ->assertJsonMissingPath('data.items');
+
+    $this->getJson('/api/v1/cart')
+        ->assertOk()
+        ->assertJsonPath('data.selected_subtotal_before_discount', 300_000);
 
     expect(CartItem::query()->where('selected', false)->count())->toBe(0);
 });
@@ -271,7 +306,13 @@ test('guest can deselect all cart items in one request', function (): void {
     $this->patchJson('/api/v1/cart/items/selection', ['selected' => false])
         ->assertOk()
         ->assertJsonPath('data.selected_quantity', 0)
-        ->assertJsonPath('data.selected_subtotal', 0);
+        ->assertJsonPath('data.total_quantity', 2)
+        ->assertJsonMissingPath('data.pricing_expectations');
+
+    $this->getJson('/api/v1/cart')
+        ->assertOk()
+        ->assertJsonPath('data.selected_subtotal_before_discount', 0)
+        ->assertJsonPath('data.pricing_expectations', []);
 
     expect(CartItem::query()->where('selected', true)->count())->toBe(0);
 });
@@ -293,6 +334,26 @@ test('guest can bulk update selection on empty cart', function (): void {
 
     $this->patchJson('/api/v1/cart/items/selection', ['selected' => false])
         ->assertOk()
-        ->assertJsonPath('data.items', [])
-        ->assertJsonPath('data.selected_quantity', 0);
+        ->assertJsonPath('data.total_quantity', 0)
+        ->assertJsonPath('data.selected_quantity', 0)
+        ->assertJsonMissingPath('data.items');
+});
+
+test('member cannot update another members cart item', function (): void {
+    $owner = Account::factory()->create();
+    $other = Account::factory()->create();
+    $book = createBookWithAvailableStock(5);
+
+    $this->actingAs($owner)->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 1,
+    ])->assertCreated();
+
+    $itemId = CartItem::query()->firstOrFail()->id;
+
+    $this->actingAs($other)->patchJson("/api/v1/cart/items/{$itemId}", [
+        'quantity' => 2,
+    ])->assertNotFound();
+
+    expect((int) CartItem::query()->findOrFail($itemId)->quantity)->toBe(1);
 });

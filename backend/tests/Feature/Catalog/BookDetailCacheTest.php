@@ -1,8 +1,11 @@
 <?php
 
+use App\Enums\Promotion\PromotionStatus;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Inventory;
+use App\Models\Promotion;
+use App\Models\PromotionItem;
 use App\Models\ShippingMethod;
 use App\Models\ShippingRate;
 use App\Models\Warehouse;
@@ -73,6 +76,7 @@ test('checkout reserved_quantity change does not flush book detail cache', funct
             'ward_code' => '00070',
             'detail_address' => '1 Test St',
         ],
+        'pricing_expectations' => checkoutPricingExpectationsForBook($book),
     ])->assertCreated();
 
     expect(Cache::has($detailKey))->toBeTrue()
@@ -95,6 +99,46 @@ test('inventory save forgets book stock micro-cache', function (): void {
     $inventory->increment('reserved_quantity');
 
     expect(Cache::has($stockKey))->toBeFalse();
+});
+
+test('promotion item update invalidates cached book detail flash sale payload', function (): void {
+    $book = Book::factory()->create(['slug' => 'flash-cache-invalidate']);
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'warehouse_id' => Warehouse::factory(),
+        'quantity' => 10,
+        'reserved_quantity' => 0,
+    ]);
+
+    $promotion = Promotion::query()->create([
+        'name' => 'Cache bust',
+        'type' => 'flash_sale',
+        'start_at' => now()->subMinute(),
+        'end_at' => now()->addHour(),
+        'status' => PromotionStatus::ACTIVE,
+    ]);
+
+    $item = PromotionItem::query()->create([
+        'promotion_id' => $promotion->id,
+        'book_id' => $book->id,
+        'discount_value' => 10,
+    ]);
+
+    $detailKey = app(CatalogCacheService::class)->bookDetailCacheKey($book->slug);
+
+    $this->getJson('/api/v1/books/'.$book->slug)
+        ->assertOk()
+        ->assertJsonPath('data.flash_sale.discount_percent', 10);
+
+    expect(Cache::has($detailKey))->toBeTrue();
+
+    $item->update(['discount_value' => 30]);
+
+    expect(Cache::has($detailKey))->toBeFalse();
+
+    $this->getJson('/api/v1/books/'.$book->slug)
+        ->assertOk()
+        ->assertJsonPath('data.flash_sale.discount_percent', 30);
 });
 
 test('book detail api reflects updated stock after inventory reservation', function (): void {

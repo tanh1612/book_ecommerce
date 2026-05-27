@@ -7,6 +7,7 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Inventory;
 use App\Models\Warehouse;
+use App\Services\Cart\MergeGuestCartService;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -15,8 +16,37 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->withoutMiddleware(VerifyCsrfToken::class);
+    $this->disableCookieEncryption();
+    $this->withCredentials();
     Cache::flush();
 });
+
+function loginTestGuestCartCookieFrom(\Illuminate\Testing\TestResponse $response): void
+{
+    $cookieName = (string) config('cart.guest_token_cookie');
+
+    foreach ($response->baseResponse->headers->getCookies() as $cookie) {
+        if ($cookie->getName() !== $cookieName) {
+            continue;
+        }
+
+        test()->withCookie(
+            $cookie->getName(),
+            $cookie->getValue(),
+            $cookie->getExpiresTime(),
+            $cookie->getPath(),
+            $cookie->getDomain(),
+            $cookie->isSecure(),
+            $cookie->isHttpOnly(),
+            false,
+            $cookie->getSameSite(),
+        );
+
+        return;
+    }
+
+    test()->fail('Guest cart cookie missing from response');
+}
 
 test('customer can login with valid credentials', function (): void {
     $account = Account::factory()->create([
@@ -227,10 +257,12 @@ test('guest cart merges into member cart after login', function (): void {
         'reserved_quantity' => 0,
     ]);
 
-    $this->postJson('/api/v1/cart/items', [
+    $guestAdd = $this->postJson('/api/v1/cart/items', [
         'book_id' => $book->id,
         'quantity' => 2,
     ])->assertCreated();
+
+    loginTestGuestCartCookieFrom($guestAdd);
 
     $this->postJson('/api/v1/auth/login', [
         'email' => 'member@example.com',
@@ -271,10 +303,12 @@ test('login merges duplicate book quantities from guest cart', function (): void
         'selected' => true,
     ]);
 
-    $this->postJson('/api/v1/cart/items', [
+    $guestAdd = $this->postJson('/api/v1/cart/items', [
         'book_id' => $book->id,
         'quantity' => 2,
     ])->assertCreated();
+
+    loginTestGuestCartCookieFrom($guestAdd);
 
     $this->postJson('/api/v1/auth/login', [
         'email' => 'member@example.com',
@@ -286,6 +320,50 @@ test('login merges duplicate book quantities from guest cart', function (): void
         ->assertJsonPath('data.total_quantity', 3);
 
     expect(CartItem::query()->where('cart_id', $memberCart->id)->count())->toBe(1);
+});
+
+test('login merge caps combined quantity to available stock', function (): void {
+    $account = Account::factory()->create([
+        'email' => 'member@example.com',
+    ]);
+
+    $book = Book::factory()->create();
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'warehouse_id' => Warehouse::factory(),
+        'quantity' => 3,
+        'reserved_quantity' => 0,
+    ]);
+
+    $memberCart = Cart::query()->create([
+        'account_id' => $account->id,
+        'guest_token_hash' => null,
+        'guest_token_expires_at' => null,
+    ]);
+    CartItem::query()->create([
+        'cart_id' => $memberCart->id,
+        'book_id' => $book->id,
+        'quantity' => 2,
+        'selected' => true,
+    ]);
+
+    $guestAdd = $this->postJson('/api/v1/cart/items', [
+        'book_id' => $book->id,
+        'quantity' => 2,
+    ])->assertCreated();
+
+    loginTestGuestCartCookieFrom($guestAdd);
+
+    $this->postJson('/api/v1/auth/login', [
+        'email' => 'member@example.com',
+        'password' => 'password',
+    ])->assertOk();
+
+    $this->getJson('/api/v1/cart')
+        ->assertOk()
+        ->assertJsonPath('data.total_quantity', 3);
+
+    expect((int) CartItem::query()->where('cart_id', $memberCart->id)->value('quantity'))->toBe(3);
 });
 
 test('failed login does not merge guest cart', function (): void {
@@ -314,4 +392,26 @@ test('failed login does not merge guest cart', function (): void {
     ])->assertUnprocessable();
 
     expect(Cart::query()->where('guest_token_hash', $guestTokenHash)->exists())->toBeTrue();
+});
+
+test('login returns warning when guest cart merge fails', function (): void {
+    Account::factory()->create([
+        'email' => 'merge-fail@example.com',
+    ]);
+
+    $this->mock(MergeGuestCartService::class, function ($mock): void {
+        $mock->shouldReceive('mergeGuestCartAfterLogin')
+            ->once()
+            ->andThrow(new \RuntimeException('Simulated merge failure'));
+    });
+
+    $this->postJson('/api/v1/auth/login', [
+        'email' => 'merge-fail@example.com',
+        'password' => 'password',
+    ])
+        ->assertOk()
+        ->assertJsonPath(
+            'warnings.0',
+            'Không thể gộp giỏ hàng khách. Vui lòng kiểm tra lại giỏ hàng.',
+        );
 });

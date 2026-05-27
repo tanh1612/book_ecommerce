@@ -2,8 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\Promotion\PromotionStatus;
-use App\Models\Promotion;
+use App\Services\Promotion\PromotionLifecycleService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -13,26 +12,12 @@ class SyncPromotionStatusesCommand extends Command
 
     protected $description = 'Activate scheduled promotions and expire active promotions according to their time window.';
 
-    public function handle(): int
+    public function handle(PromotionLifecycleService $lifecycle): int
     {
         try {
-            $now = now();
+            $result = $lifecycle->syncStatuses();
 
-            $activated = Promotion::query()
-                ->where('status', PromotionStatus::SCHEDULED->value)
-                ->where('start_at', '<=', $now)
-                ->where('end_at', '>', $now)
-                ->update(['status' => PromotionStatus::ACTIVE->value]);
-
-            $expired = Promotion::query()
-                ->whereIn('status', [
-                    PromotionStatus::SCHEDULED->value,
-                    PromotionStatus::ACTIVE->value,
-                ])
-                ->where('end_at', '<=', $now)
-                ->update(['status' => PromotionStatus::EXPIRED->value]);
-
-            $this->info("Activated {$activated} promotion(s), expired {$expired} promotion(s).");
+            $this->info("Activated {$result['activated']} promotion(s), expired {$result['expired']} promotion(s).");
 
             return self::SUCCESS;
         } catch (\Throwable $e) {

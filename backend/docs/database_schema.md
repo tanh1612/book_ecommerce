@@ -432,7 +432,7 @@ CREATE TABLE IF NOT EXISTS `promotion_items` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `promotion_id` bigint unsigned NOT NULL,
 `book_id` bigint unsigned NOT NULL,
-`discount_value` decimal(15,2) NOT NULL,
+`discount_value` decimal(5,2) NOT NULL,
 `stock_limit` int unsigned DEFAULT NULL,
 `sold_quantity` int unsigned NOT NULL DEFAULT '0',
 `max_quantity_per_user` smallint unsigned DEFAULT NULL,
@@ -443,7 +443,7 @@ UNIQUE KEY `promotion_items_promotion_id_book_id_unique` (`promotion_id`,`book_i
 KEY `promotion_items_book_id_foreign` (`book_id`),
 CONSTRAINT `promotion_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
 CONSTRAINT `promotion_items_promotion_id_foreign` FOREIGN KEY (`promotion_id`) REFERENCES `promotions` (`id`) ON DELETE CASCADE,
-CONSTRAINT `promotion_items_discount_percent_check` CHECK (((`discount_value` > 0) and (`discount_value` <= 100))),
+CONSTRAINT `promotion_items_discount_percent_check` CHECK (((`discount_value` > 0) and (`discount_value` <= 100) and (`discount_value` = floor(`discount_value`)))),
 CONSTRAINT `promotion_items_sold_within_stock_check` CHECK (((`stock_limit` is null) or (`sold_quantity` <= `stock_limit`)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

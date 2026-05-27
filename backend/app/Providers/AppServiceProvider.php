@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\Media\BookImageStorageService;
+use App\Services\Promotion\FlashSaleScheduleMutex;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->scoped(BookMeilisearchSyncDispatcher::class);
+
+        $this->app->singleton(FlashSaleScheduleMutex::class);
     }
 
     /**
@@ -42,6 +45,8 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\Author::observe(\App\Observers\AuthorObserver::class);
         \App\Models\Inventory::observe(\App\Observers\InventoryObserver::class);
         \App\Models\BookDetail::observe(\App\Observers\BookDetailObserver::class);
+        \App\Models\Promotion::observe(\App\Observers\PromotionObserver::class);
+        \App\Models\PromotionItem::observe(\App\Observers\PromotionItemObserver::class);
 
         \Illuminate\Support\Facades\Storage::extend('cloudinary_fast', function ($app, $config) {
             $cloudinary = new \Cloudinary\Cloudinary($config['url'] ?? env('CLOUDINARY_URL'));

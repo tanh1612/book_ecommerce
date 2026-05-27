@@ -19,9 +19,11 @@ use App\Notifications\Order\NewOrderNeedsProcessingNotification;
 use App\Services\Admin\AdminNotificationService;
 use App\Services\Order\OrderStatusTransitionService;
 use App\Services\Payment\VnPayService;
+use App\Exceptions\Promotion\PromotionUnavailableException;
 use App\Services\Promotion\PromotionAllocationService;
+use App\Services\Promotion\PromotionCheckoutPricingValidator;
 use App\Services\Promotion\PromotionPricingService;
-use App\Services\Promotion\PromotionResolver;
+use App\Services\Promotion\FlashSaleResolver;
 use App\Services\Shipping\ShippingAddressSnapshotFormatter;
 use App\Services\Shipping\ShippingQuoteService;
 use Illuminate\Support\Facades\DB;
@@ -37,9 +39,10 @@ class CheckoutService
         private ShippingQuoteService $shippingQuoteService,
         private ShippingAddressSnapshotFormatter $addressSnapshotFormatter,
         private AdminNotificationService $adminNotificationService,
-        private PromotionResolver $promotionResolver,
+        private FlashSaleResolver $flashSaleResolver,
         private PromotionPricingService $promotionPricing,
         private PromotionAllocationService $promotionAllocation,
+        private PromotionCheckoutPricingValidator $promotionCheckoutPricing,
     ) {}
 
     /**
@@ -144,7 +147,26 @@ class CheckoutService
                 [$shippingName, $shippingPhone, $shippingAddressText, $provinceCode] = $this->resolveShippingFields($account, $input);
 
                 $shippingFee = $this->shippingQuoteService->resolveBaseFee((int) $shippingMethod->id, $provinceCode);
-                $promotionItems = $this->promotionResolver->activeItemsForBooks($bookIds);
+
+                $quantityByBookId = $cartItems
+                    ->mapWithKeys(static fn (CartItem $line): array => [(int) $line->book_id => (int) $line->quantity])
+                    ->all();
+
+                $promotionItems = $this->flashSaleResolver->activeItemsForBooks(
+                    $bookIds,
+                    (int) $account->id,
+                    $quantityByBookId,
+                );
+
+                $expectations = $input['pricing_expectations'] ?? [];
+
+                $this->promotionCheckoutPricing->validate(
+                    $account,
+                    $cartItems,
+                    $books,
+                    $promotionItems,
+                    $expectations,
+                );
 
                 $totalAmount = '0.00';
                 $lineRows = [];
@@ -201,6 +223,13 @@ class CheckoutService
                     'current_status' => $initialOrderStatus,
                 ]);
 
+                usort($lineRows, static function (array $left, array $right): int {
+                    $leftId = $left['promotion_item_id'] ?? 0;
+                    $rightId = $right['promotion_item_id'] ?? 0;
+
+                    return (int) $leftId <=> (int) $rightId;
+                });
+
                 foreach ($lineRows as $row) {
                     $orderItem = OrderItem::query()->create([
                         'order_id' => $order->id,
@@ -215,7 +244,15 @@ class CheckoutService
                     ]);
 
                     if ($row['promotion_item'] !== null) {
-                        $this->promotionAllocation->reserve($account, $row['promotion_item'], $orderItem);
+                        try {
+                            $this->promotionAllocation->reserve($account, $row['promotion_item'], $orderItem);
+                        } catch (ValidationException $allocationException) {
+                            if ($allocationException->errors()['promotion'] ?? null) {
+                                throw new PromotionUnavailableException;
+                            }
+
+                            throw $allocationException;
+                        }
                     }
                 }
 
@@ -254,7 +291,7 @@ class CheckoutService
 
                 return $this->finalizePaymentSideEffects($order, $clientIp);
             });
-        } catch (ValidationException $e) {
+        } catch (ValidationException|PromotionUnavailableException $e) {
             throw $e;
         } catch (Throwable $e) {
             Log::error('Checkout failed', [

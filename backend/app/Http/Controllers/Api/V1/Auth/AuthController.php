@@ -16,7 +16,9 @@ use App\Services\Cart\MergeGuestCartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -49,9 +51,14 @@ class AuthController extends Controller
     ): JsonResponse {
         $guestToken = $guestCartTokenService->getRawTokenFromRequest();
         $account = $registerAccountService->register($request->validated());
-        $mergeGuestCartService->assignGuestCartToNewAccount($guestToken, $account);
+        $warnings = $this->mergeGuestCartWithWarnings(
+            fn () => $mergeGuestCartService->assignGuestCartToNewAccount($guestToken, $account),
+            $account->id,
+            'register',
+        );
 
         return (new AccountResource($account))
+            ->additional($this->authResponseMeta($warnings))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
@@ -64,9 +71,15 @@ class AuthController extends Controller
     ): JsonResponse {
         $preLoginGuestToken = $guestCartTokenService->getRawTokenFromRequest();
         $account = $loginAccountService->login($request->validated(), $request->ip());
-        $mergeGuestCartService->mergeGuestCartAfterLogin($preLoginGuestToken, $account);
+        $warnings = $this->mergeGuestCartWithWarnings(
+            fn () => $mergeGuestCartService->mergeGuestCartAfterLogin($preLoginGuestToken, $account),
+            $account->id,
+            'login',
+        );
 
-        return (new AccountResource($account))->response();
+        return (new AccountResource($account))
+            ->additional($this->authResponseMeta($warnings))
+            ->response();
     }
 
     public function logout(Request $request): Response
@@ -77,5 +90,41 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return response()->noContent();
+    }
+
+    /**
+     * @param  callable(): void  $merge
+     * @return list<string>
+     */
+    private function mergeGuestCartWithWarnings(callable $merge, int $accountId, string $flow): array
+    {
+        try {
+            $merge();
+
+            return [];
+        } catch (Throwable $e) {
+            Log::error('Guest cart merge failed after auth', [
+                'account_id' => $accountId,
+                'flow' => $flow,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'Không thể gộp giỏ hàng khách. Vui lòng kiểm tra lại giỏ hàng.',
+            ];
+        }
+    }
+
+    /**
+     * @param  list<string>  $warnings
+     * @return array<string, mixed>
+     */
+    private function authResponseMeta(array $warnings): array
+    {
+        if ($warnings === []) {
+            return [];
+        }
+
+        return ['warnings' => $warnings];
     }
 }

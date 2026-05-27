@@ -23,7 +23,7 @@ alwaysApply: false
 
 `category_ids`, `author_ids`, `publisher_id`, `supplier_id`, `selling_price`, `average_rating`, `is_active`, `in_stock`.
 
-Promotion is **not** indexed; catalog promotion display uses MySQL via `PromotionResolver` / `BookSummaryResource`.
+Promotion is **not** indexed; catalog list uses `books.selling_price` only. Flash Sale is exposed via `FlashSaleResolver` on book detail, cart, and `/flash-sales/active` — not on book index.
 
 ### Sortable Attributes
 

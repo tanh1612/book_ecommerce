@@ -113,6 +113,7 @@ test('deactivated session user is blocked from checkout and shipping quote', fun
             'ward_code' => '00070',
             'detail_address' => '1 Test St',
         ],
+        'pricing_expectations' => checkoutPricingExpectationsForBook($book),
     ])
         ->assertForbidden()
         ->assertJsonPath('message', 'Tài khoản đã bị khóa hoặc chưa được kích hoạt.');

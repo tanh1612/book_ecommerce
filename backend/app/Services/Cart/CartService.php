@@ -80,10 +80,26 @@ class CartService
         return $cart;
     }
 
-    public function addItem(int $bookId, int $quantity): Cart
+    /**
+     * @return array{total_quantity: int, selected_quantity: int}
+     */
+    public function cartQuantitySummary(?Cart $cart = null): array
+    {
+        $cartId = (int) ($cart ?? $this->getCurrentCart())->id;
+
+        return [
+            'total_quantity' => (int) CartItem::query()->where('cart_id', $cartId)->sum('quantity'),
+            'selected_quantity' => (int) CartItem::query()
+                ->where('cart_id', $cartId)
+                ->where('selected', true)
+                ->sum('quantity'),
+        ];
+    }
+
+    public function addItem(int $bookId, int $quantity): CartItem
     {
         try {
-            return DB::transaction(function () use ($bookId, $quantity): Cart {
+            return DB::transaction(function () use ($bookId, $quantity): CartItem {
                 $cart = Cart::query()->whereKey($this->getCurrentCart()->id)->lockForUpdate()->firstOrFail();
 
                 $book = Book::query()
@@ -117,16 +133,16 @@ class CartService
 
                 if ($existing !== null) {
                     $existing->update(['quantity' => $newTotal]);
-                } else {
-                    CartItem::query()->create([
-                        'cart_id' => $cart->id,
-                        'book_id' => $bookId,
-                        'quantity' => $quantity,
-                        'selected' => true,
-                    ]);
+
+                    return $existing->fresh() ?? $existing;
                 }
 
-                return $cart;
+                return CartItem::query()->create([
+                    'cart_id' => $cart->id,
+                    'book_id' => $bookId,
+                    'quantity' => $quantity,
+                    'selected' => true,
+                ]);
             });
         } catch (ValidationException $e) {
             throw $e;
@@ -144,10 +160,10 @@ class CartService
     /**
      * @param  array{quantity?: int, selected?: bool}  $data
      */
-    public function updateItem(CartItem $cartItem, array $data): Cart
+    public function updateItem(CartItem $cartItem, array $data): CartItem
     {
         try {
-            return DB::transaction(function () use ($cartItem, $data): Cart {
+            return DB::transaction(function () use ($cartItem, $data): CartItem {
                 $cart = Cart::query()->whereKey($this->getCurrentCart()->id)->lockForUpdate()->firstOrFail();
 
                 $lockedItem = CartItem::query()
@@ -178,7 +194,7 @@ class CartService
                     $lockedItem->update(['selected' => (bool) $data['selected']]);
                 }
 
-                return $cart;
+                return $lockedItem->fresh() ?? $lockedItem;
             });
         } catch (ValidationException $e) {
             throw $e;
@@ -214,10 +230,10 @@ class CartService
         }
     }
 
-    public function removeItem(CartItem $cartItem): Cart
+    public function removeItem(CartItem $cartItem): int
     {
         try {
-            return DB::transaction(function () use ($cartItem): Cart {
+            return DB::transaction(function () use ($cartItem): int {
                 $cart = Cart::query()->whereKey($this->getCurrentCart()->id)->lockForUpdate()->firstOrFail();
 
                 $lockedItem = CartItem::query()
@@ -230,9 +246,10 @@ class CartService
                     abort(404);
                 }
 
+                $removedId = (int) $lockedItem->id;
                 $lockedItem->delete();
 
-                return $cart;
+                return $removedId;
             });
         } catch (Throwable $e) {
             Log::error('Remove cart item failed', [
@@ -244,7 +261,7 @@ class CartService
         }
     }
 
-    private function availableStockForBook(int $bookId): int
+    public function availableStockForBook(int $bookId): int
     {
         return (int) DB::table('inventories')
             ->where('book_id', $bookId)

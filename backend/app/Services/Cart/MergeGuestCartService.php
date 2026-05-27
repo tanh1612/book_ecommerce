@@ -13,6 +13,7 @@ class MergeGuestCartService
 {
     public function __construct(
         private GuestCartTokenService $guestCartTokenService,
+        private CartService $cartService,
     ) {}
 
     /**
@@ -36,6 +37,8 @@ class MergeGuestCartService
                             'guest_token_expires_at' => null,
                         ])->save();
 
+                        $this->capCartItemsToAvailableStock($guestCart);
+
                         return;
                     }
                 }
@@ -57,6 +60,8 @@ class MergeGuestCartService
                 'account_id' => $account->id,
                 'error' => $e->getMessage(),
             ]);
+
+            throw $e;
         }
     }
 
@@ -93,6 +98,8 @@ class MergeGuestCartService
                         'guest_token_expires_at' => null,
                     ])->save();
 
+                    $this->capCartItemsToAvailableStock($guestCart);
+
                     return;
                 }
 
@@ -118,6 +125,8 @@ class MergeGuestCartService
                     }
                 }
 
+                $this->capCartItemsToAvailableStock($memberCart);
+
                 $guestCart->delete();
             });
 
@@ -127,6 +136,43 @@ class MergeGuestCartService
                 'account_id' => $account->id,
                 'error' => $e->getMessage(),
             ]);
+
+            throw $e;
+        }
+    }
+
+    private function capCartItemsToAvailableStock(Cart $cart): void
+    {
+        foreach ($cart->items()->lockForUpdate()->cursor() as $item) {
+            $bookId = (int) $item->book_id;
+            $available = $this->cartService->availableStockForBook($bookId);
+            $quantity = (int) $item->quantity;
+
+            if ($quantity <= $available) {
+                continue;
+            }
+
+            if ($available <= 0) {
+                Log::warning('Removed cart line after merge: no available stock', [
+                    'cart_id' => $cart->id,
+                    'cart_item_id' => $item->id,
+                    'book_id' => $bookId,
+                    'requested_quantity' => $quantity,
+                ]);
+                $item->delete();
+
+                continue;
+            }
+
+            Log::warning('Capped cart line quantity after guest cart merge', [
+                'cart_id' => $cart->id,
+                'cart_item_id' => $item->id,
+                'book_id' => $bookId,
+                'requested_quantity' => $quantity,
+                'capped_quantity' => $available,
+            ]);
+
+            $item->update(['quantity' => $available]);
         }
     }
 }

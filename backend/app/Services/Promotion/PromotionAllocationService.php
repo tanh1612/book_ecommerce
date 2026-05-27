@@ -3,9 +3,12 @@
 namespace App\Services\Promotion;
 
 use App\Enums\Promotion\PromotionAllocationStatus;
+use App\Enums\Promotion\PromotionStatus;
+use App\Enums\Promotion\PromotionType;
 use App\Models\Account;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Promotion;
 use App\Models\PromotionAllocation;
 use App\Models\PromotionItem;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +18,10 @@ use Throwable;
 
 class PromotionAllocationService
 {
+    public function __construct(
+        private FlashSaleResolver $flashSaleResolver,
+    ) {}
+
     public function reserve(Account $account, PromotionItem $promotionItem, OrderItem $orderItem): PromotionAllocation
     {
         $quantity = (int) $orderItem->quantity;
@@ -26,8 +33,29 @@ class PromotionAllocationService
         }
 
         try {
-            $affected = PromotionItem::query()
+            /** @var PromotionItem $lockedItem */
+            $lockedItem = PromotionItem::query()
+                ->with('promotion')
                 ->whereKey($promotionItem->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            /** @var Promotion $lockedPromotion */
+            $lockedPromotion = Promotion::query()
+                ->whereKey($lockedItem->promotion_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertFlashSaleEligible($lockedPromotion);
+
+            if (! $this->flashSaleResolver->isItemApplicableForQuantity($lockedItem, $quantity, (int) $account->id)) {
+                throw ValidationException::withMessages([
+                    'promotion' => ['Khuyến mãi đã hết suất hoặc vượt giới hạn mua.'],
+                ]);
+            }
+
+            $affected = PromotionItem::query()
+                ->whereKey($lockedItem->id)
                 ->where(function ($query) use ($quantity): void {
                     $query
                         ->whereNull('stock_limit')
@@ -43,32 +71,8 @@ class PromotionAllocationService
                 ]);
             }
 
-            /** @var PromotionItem $locked */
-            $locked = PromotionItem::query()
-                ->whereKey($promotionItem->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($locked->max_quantity_per_user !== null) {
-                $usedByCustomer = (int) PromotionAllocation::query()
-                    ->where('promotion_item_id', $locked->id)
-                    ->where('account_id', $account->id)
-                    ->whereIn('status', [
-                        PromotionAllocationStatus::RESERVED->value,
-                        PromotionAllocationStatus::CONFIRMED->value,
-                    ])
-                    ->lockForUpdate()
-                    ->sum('quantity');
-
-                if ($usedByCustomer + $quantity > (int) $locked->max_quantity_per_user) {
-                    throw ValidationException::withMessages([
-                        'promotion' => ['Bạn đã vượt quá số lượng mua tối đa của khuyến mãi này.'],
-                    ]);
-                }
-            }
-
             return PromotionAllocation::query()->create([
-                'promotion_item_id' => $locked->id,
+                'promotion_item_id' => $lockedItem->id,
                 'account_id' => $account->id,
                 'order_id' => $orderItem->order_id,
                 'order_item_id' => $orderItem->id,
@@ -139,6 +143,23 @@ class PromotionAllocationService
             ]);
 
             throw $e;
+        }
+    }
+
+    private function assertFlashSaleEligible(Promotion $promotion): void
+    {
+        $now = now();
+
+        if ($promotion->type !== PromotionType::FLASH_SALE
+            || ! in_array($promotion->status, [
+                PromotionStatus::SCHEDULED,
+                PromotionStatus::ACTIVE,
+            ], true)
+            || $promotion->start_at > $now
+            || $promotion->end_at <= $now) {
+            throw ValidationException::withMessages([
+                'promotion' => ['Flash Sale không còn hiệu lực.'],
+            ]);
         }
     }
 }

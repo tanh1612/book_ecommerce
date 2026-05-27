@@ -1,0 +1,47 @@
+---
+description: Use when implementing promotions, flash sale, cart promotion quotes, or checkout pricing_expectations.
+globs: backend/app/**/Promotion/**/*.php,backend/app/Services/Promotion/**/*.php,backend/app/Filament/Resources/PromotionResource/**/*.php,backend/app/Http/Controllers/Api/V1/Promotion/**/*.php,backend/app/Http/Resources/*FlashSale*.php,backend/app/Http/Resources/Cart*.php,backend/app/Services/Checkout/CheckoutService.php
+alwaysApply: false
+---
+
+# Promotion Business Rules (Bookify)
+
+## Scope
+
+- The `promotions` module is **Flash Sale only**. Do not add `Sale thường` / `discount` campaign types without an explicit product decision.
+- **Regular catalog price** is `books.selling_price` (vs `original_price` for list/strike-through). That is not a promotion campaign.
+
+## Flash Sale visibility
+
+- **Do not** expose flash-sale pricing on generic book list/index endpoints.
+- **Do** expose flash sale on:
+  - `GET /api/v1/flash-sales/active`
+  - book detail (`flash_sale` payload)
+  - cart quote fields when applicable
+- Checkout requires `pricing_expectations` with `book_id`, `promotion_item_id`, `effective_unit_price`, and **`line_total`** only for selected lines currently quoted with Flash Sale; backend **recomputes** and rejects missing or stale Flash Sale data (`PROMOTION_UNAVAILABLE`). Compare both unit and line total — unit alone can collide after `line_total / qty` rounding. Regular-price lines do not require client price expectations.
+
+## Admin (Filament)
+
+- All new promotions are stored as `type = flash_sale`, `status = scheduled` on create.
+- Only future `scheduled` campaigns are editable/deletable (lifecycle service).
+- Flash sale schedule overlap is validated under `FlashSaleScheduleMutex` + `FlashSaleOverlapValidator`.
+
+## Concurrency & inventory
+
+- Reserve flash-sale quota in `PromotionAllocationService` inside checkout transaction (`sold_quantity`, per-user limits).
+- `sold_quantity` increases at checkout reserve time (including VNPay pending). `remaining_stock` on API = `stock_limit - sold_quantity` (capped by inventory). Quota is released when order is cancelled/expired via `OrderInventoryService::releaseReservedForOrder`.
+- One active flash-sale campaign at a time (overlap prevention at admin write time).
+- Runtime Flash Sale eligibility is determined by `start_at <= now < end_at` for non-cancelled scheduled/active campaigns, so adjacent campaigns switch at their configured boundary without waiting for status-sync scheduling.
+
+## Cart quote vs checkout
+
+- **Guest cart** (`GET /api/v1/cart` without login): `max_quantity_per_user` is **not** enforced in quote — only stock/inventory and campaign window. Checkout always requires login and enforces per-user limits.
+- **Member cart**: quote uses `account_id` and includes prior `promotion_allocations` (status `reserved` or `confirmed`) when checking `max_quantity_per_user`.
+
+## Catalog cache
+
+- Book detail cache (`catalog:book:slug:{slug}`) is invalidated when `Promotion` / `PromotionItem` rows change (`PromotionObserver`, `PromotionItemObserver`). Flash Sale payload on book detail is not part of the cached book blob but resolved at response time; invalidation keeps related reads consistent after admin edits.
+
+## Legacy data
+
+- Runtime resolver is `FlashSaleResolver` only; legacy `discount` rows are ignored by API.

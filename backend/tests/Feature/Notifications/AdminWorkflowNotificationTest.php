@@ -171,6 +171,7 @@ test('cod checkout notifies active admins about new order needing processing', f
             'ward_code' => '00070',
             'detail_address' => '1 Test St',
         ],
+        'pricing_expectations' => checkoutPricingExpectationsForBook($book),
     ]);
 
     $response->assertCreated();

@@ -35,6 +35,11 @@ class CheckoutRequest extends FormRequest
             'shipping.ward_code' => ['required_without:address_id', 'string', 'max:20'],
             'shipping.detail_address' => ['required_without:address_id', 'string', 'max:255'],
             'shipping.district_code' => ['prohibited'],
+            'pricing_expectations' => ['sometimes', 'array'],
+            'pricing_expectations.*.book_id' => ['required', 'integer', 'distinct'],
+            'pricing_expectations.*.promotion_item_id' => ['nullable', 'integer', Rule::exists('promotion_items', 'id')],
+            'pricing_expectations.*.effective_unit_price' => ['required', 'numeric', 'min:0'],
+            'pricing_expectations.*.line_total' => ['required', 'numeric', 'min:0'],
         ];
     }
 

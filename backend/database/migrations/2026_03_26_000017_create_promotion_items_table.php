@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('promotion_id')->constrained('promotions')->cascadeOnDelete();
             $table->foreignId('book_id')->constrained('books')->cascadeOnDelete();
-            $table->decimal('discount_value', 15, 2);
+            $table->decimal('discount_value', 5, 2);
             $table->unsignedInteger('stock_limit')->nullable();
             $table->unsignedInteger('sold_quantity')->default(0);
             $table->unsignedSmallInteger('max_quantity_per_user')->nullable();

@@ -9,7 +9,7 @@ uses(RefreshDatabase::class);
 test('promotion status sync activates and expires promotions by time window', function (): void {
     $scheduled = Promotion::query()->create([
         'name' => 'Starts now',
-        'type' => 'discount',
+        'type' => 'flash_sale',
         'start_at' => now()->subMinute(),
         'end_at' => now()->addHour(),
         'status' => PromotionStatus::SCHEDULED,

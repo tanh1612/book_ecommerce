@@ -10,7 +10,6 @@ use Filament\Actions;
 use Filament\Forms\Components as Field;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components as Layout;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -172,11 +171,11 @@ class InventoryResource extends Resource
                 Tables\Columns\TextColumn::make('sold_quantity')
                     ->label('Đã bán')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('location_code')
                     ->label('Mã vị trí')
                     ->searchable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('last_restocked_at')
                     ->label('Nhập kho gần nhất')
                     ->dateTime('d/m/Y H:i')

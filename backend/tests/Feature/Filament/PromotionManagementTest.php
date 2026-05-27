@@ -9,6 +9,7 @@ use App\Filament\Resources\PromotionResource\Pages\ListPromotions;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Promotion;
+use App\Models\PromotionItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -21,7 +22,6 @@ function validPromotionFormPayload(Book $book): array
 {
     return [
         'name' => 'Chiến dịch test',
-        'type' => PromotionType::FLASH_SALE->value,
         'start_at' => now()->addDay()->format('Y-m-d H:i:s'),
         'end_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
         'items' => [
@@ -45,7 +45,112 @@ test('creating promotion always stores scheduled status', function (): void {
 
     $promotion = Promotion::query()->firstOrFail();
 
-    expect($promotion->status)->toBe(PromotionStatus::SCHEDULED);
+    expect($promotion->status)->toBe(PromotionStatus::SCHEDULED)
+        ->and($promotion->items)->toHaveCount(1)
+        ->and($promotion->items->first()->book_id)->toBe($book->id)
+        ->and($promotion->items->first()->discount_value)->toBe(10);
+});
+
+test('creating promotion persists multiple items in one request', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $firstBook = Book::factory()->create();
+    $secondBook = Book::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(CreatePromotion::class)
+        ->fillForm([
+            'name' => 'Multi item flash',
+            'start_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'end_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
+            'items' => [
+                [
+                    'book_id' => $firstBook->id,
+                    'discount_value' => 10,
+                ],
+                [
+                    'book_id' => $secondBook->id,
+                    'discount_value' => 20,
+                    'stock_limit' => 5,
+                ],
+            ],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $promotion = Promotion::query()->with('items')->firstOrFail();
+
+    expect($promotion->items)->toHaveCount(2)
+        ->and($promotion->items->pluck('book_id')->sort()->values()->all())
+        ->toBe(collect([$firstBook->id, $secondBook->id])->sort()->values()->all());
+});
+
+test('creating promotion rejects empty items list', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+
+    Livewire::actingAs($admin)
+        ->test(CreatePromotion::class)
+        ->fillForm([
+            'name' => 'No items',
+            'start_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'end_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
+            'items' => [],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['items']);
+
+    expect(Promotion::query()->count())->toBe(0)
+        ->and(PromotionItem::query()->count())->toBe(0);
+});
+
+test('creating promotion rejects duplicate books in items payload', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $book = Book::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(CreatePromotion::class)
+        ->fillForm([
+            'name' => 'Duplicate books',
+            'start_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'end_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
+            'items' => [
+                [
+                    'book_id' => $book->id,
+                    'discount_value' => 10,
+                ],
+                [
+                    'book_id' => $book->id,
+                    'discount_value' => 15,
+                ],
+            ],
+        ])
+        ->call('create');
+
+    expect(Promotion::query()->count())->toBe(0)
+        ->and(PromotionItem::query()->count())->toBe(0);
+});
+
+test('creating promotion rejects book already in another flash sale window', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $book = Book::factory()->create();
+
+    Promotion::query()->create([
+        'name' => 'Existing flash',
+        'type' => PromotionType::FLASH_SALE,
+        'start_at' => now()->addDay(),
+        'end_at' => now()->addDays(3),
+        'status' => PromotionStatus::SCHEDULED,
+    ])->items()->create([
+        'book_id' => $book->id,
+        'discount_value' => 10,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(CreatePromotion::class)
+        ->fillForm(validPromotionFormPayload($book))
+        ->call('create');
+
+    expect(Promotion::query()->count())->toBe(1)
+        ->and(PromotionItem::query()->count())->toBe(1);
 });
 
 test('creating promotion ignores client supplied status payload', function (): void {
@@ -60,6 +165,20 @@ test('creating promotion ignores client supplied status payload', function (): v
         ->assertHasNoFormErrors();
 
     expect(Promotion::query()->firstOrFail()->status)->toBe(PromotionStatus::SCHEDULED);
+});
+
+test('creating promotion always stores flash sale type', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $book = Book::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(CreatePromotion::class)
+        ->fillForm(validPromotionFormPayload($book))
+        ->set('data.type', 'discount')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Promotion::query()->firstOrFail()->type)->toBe(PromotionType::FLASH_SALE);
 });
 
 test('creating promotion rejects start_at in the past', function (): void {
@@ -119,7 +238,7 @@ test('non scheduled promotions hide edit action on list', function (): void {
 
     $scheduled = Promotion::query()->create([
         'name' => 'Scheduled',
-        'type' => PromotionType::REGULAR_SALE,
+        'type' => PromotionType::FLASH_SALE,
         'start_at' => now()->addDay(),
         'end_at' => now()->addDays(2),
         'status' => PromotionStatus::SCHEDULED,
@@ -146,7 +265,7 @@ test('promotion list tabs count and scope promotions by status', function (): vo
         fn (PromotionStatus $status): array => [
             $status->value => Promotion::query()->create([
                 'name' => $status->value,
-                'type' => PromotionType::REGULAR_SALE,
+                'type' => PromotionType::FLASH_SALE,
                 'start_at' => now()->addDay(),
                 'end_at' => now()->addDays(2),
                 'status' => $status,
@@ -215,7 +334,6 @@ test('scheduled promotion can be edited with future start_at', function (): void
         ->test(EditPromotion::class, ['record' => $promotion->getKey()])
         ->fillForm([
             'name' => 'Editable updated',
-            'type' => PromotionType::FLASH_SALE->value,
             'start_at' => now()->addDays(4)->format('Y-m-d H:i:s'),
             'end_at' => now()->addDays(6)->format('Y-m-d H:i:s'),
         ])
@@ -243,7 +361,6 @@ test('editing scheduled promotion rejects start_at in the past', function (): vo
         ->test(EditPromotion::class, ['record' => $promotion->getKey()])
         ->fillForm([
             'name' => 'Editable',
-            'type' => PromotionType::FLASH_SALE->value,
             'start_at' => now()->subHour()->format('Y-m-d H:i:s'),
             'end_at' => now()->addDays(5)->format('Y-m-d H:i:s'),
         ])
@@ -276,7 +393,6 @@ test('edit save aborts when promotion status changed while form is open', functi
     $component
         ->fillForm([
             'name' => 'Should not save',
-            'type' => PromotionType::FLASH_SALE->value,
             'start_at' => now()->addDays(4)->format('Y-m-d H:i:s'),
             'end_at' => now()->addDays(6)->format('Y-m-d H:i:s'),
         ])
@@ -287,4 +403,103 @@ test('edit save aborts when promotion status changed while form is open', functi
 
     expect($promotion->name)->toBe('Editable')
         ->and($promotion->status)->toBe(PromotionStatus::ACTIVE);
+});
+
+test('scheduled promotion can be cancelled from edit page', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+
+    $promotion = Promotion::query()->create([
+        'name' => 'To cancel',
+        'type' => PromotionType::FLASH_SALE,
+        'start_at' => now()->addDay(),
+        'end_at' => now()->addDays(2),
+        'status' => PromotionStatus::SCHEDULED,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(EditPromotion::class, ['record' => $promotion->getKey()])
+        ->callAction('cancel')
+        ->assertHasNoActionErrors();
+
+    expect($promotion->fresh()->status)->toBe(PromotionStatus::CANCELLED);
+});
+
+test('unused scheduled promotion can be deleted', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+
+    $promotion = Promotion::query()->create([
+        'name' => 'To delete',
+        'type' => PromotionType::FLASH_SALE,
+        'start_at' => now()->addDay(),
+        'end_at' => now()->addDays(2),
+        'status' => PromotionStatus::SCHEDULED,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(EditPromotion::class, ['record' => $promotion->getKey()])
+        ->callAction('delete')
+        ->assertHasNoActionErrors();
+
+    expect(Promotion::query()->whereKey($promotion->id)->exists())->toBeFalse();
+});
+
+test('editing scheduled flash sale rejects date range overlapping another campaign', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+    $book = Book::factory()->create();
+
+    Promotion::query()->create([
+        'name' => 'Other flash',
+        'type' => PromotionType::FLASH_SALE,
+        'start_at' => now()->addDays(5),
+        'end_at' => now()->addDays(8),
+        'status' => PromotionStatus::SCHEDULED,
+    ])->items()->create([
+        'book_id' => $book->id,
+        'discount_value' => 10,
+    ]);
+
+    $promotion = Promotion::query()->create([
+        'name' => 'Editable flash',
+        'type' => PromotionType::FLASH_SALE,
+        'start_at' => now()->addDays(10),
+        'end_at' => now()->addDays(12),
+        'status' => PromotionStatus::SCHEDULED,
+    ]);
+
+    $promotion->items()->create([
+        'book_id' => $book->id,
+        'discount_value' => 15,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(EditPromotion::class, ['record' => $promotion->getKey()])
+        ->fillForm([
+            'name' => 'Editable flash',
+            'start_at' => now()->addDays(6)->format('Y-m-d H:i:s'),
+            'end_at' => now()->addDays(9)->format('Y-m-d H:i:s'),
+        ])
+        ->call('save');
+
+    $promotion->refresh();
+
+    expect($promotion->start_at->format('Y-m-d'))->toBe(now()->addDays(10)->format('Y-m-d'))
+        ->and($promotion->end_at->format('Y-m-d'))->toBe(now()->addDays(12)->format('Y-m-d'));
+});
+
+test('active promotion hides delete action on list table', function (): void {
+    $admin = Account::factory()->create(['role' => AccountRole::Admin]);
+
+    $promotion = Promotion::query()->create([
+        'name' => 'Active promo',
+        'type' => PromotionType::FLASH_SALE,
+        'start_at' => now()->subMinute(),
+        'end_at' => now()->addHour(),
+        'status' => PromotionStatus::ACTIVE,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(ListPromotions::class)
+        ->assertTableActionHidden('delete', $promotion);
+
+    expect(Promotion::query()->whereKey($promotion->id)->exists())->toBeTrue();
 });

@@ -53,6 +53,22 @@ test('promotion item rejects discount outside percent range', function (): void 
     ]))->toThrow(\Illuminate\Database\QueryException::class);
 });
 
+test('promotion item rejects fractional discount percent', function (): void {
+    $promotion = Promotion::query()->create([
+        'name' => 'Flash integer only',
+        'type' => 'flash_sale',
+        'start_at' => now()->addDay(),
+        'end_at' => now()->addDays(2),
+        'status' => 'scheduled',
+    ]);
+
+    expect(fn () => PromotionItem::query()->create([
+        'promotion_id' => $promotion->id,
+        'book_id' => Book::factory()->create()->id,
+        'discount_value' => 24.01,
+    ]))->toThrow(\Illuminate\Database\QueryException::class);
+});
+
 test('promotion allocation rejects non positive quantity', function (): void {
     $promotion = Promotion::query()->create([
         'name' => 'Flash test',

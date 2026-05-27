@@ -20,7 +20,7 @@ class PromotionItem extends Model
     protected function casts(): array
     {
         return [
-            'discount_value' => 'decimal:2',
+            'discount_value' => 'integer',
         ];
     }
 
