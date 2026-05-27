@@ -13,11 +13,11 @@ class SupplierObserver
 
     public function saved(Supplier $supplier): void
     {
-        $this->catalogCache->forgetFiltersMetadata();
+        $this->catalogCache->forgetFiltersMetadataAfterCommit();
     }
 
     public function deleted(Supplier $supplier): void
     {
-        $this->catalogCache->forgetFiltersMetadata();
+        $this->catalogCache->forgetFiltersMetadataAfterCommit();
     }
 }

@@ -38,7 +38,7 @@ class InventoryObserver
     private function onInventoryChanged(Inventory $inventory): void
     {
         $bookId = (int) $inventory->book_id;
-        $this->catalogCache->forgetBookStock($bookId);
+        $this->catalogCache->forgetBookStockAfterCommit($bookId);
         $this->meilisearchSync->dispatch($bookId);
         $this->syncBookInactiveWhenOutOfStock($bookId);
     }

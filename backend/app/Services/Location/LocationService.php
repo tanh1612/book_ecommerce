@@ -13,6 +13,8 @@ class LocationService
 {
     private const CACHE_BUST_KEY = 'locations:cache_bust';
 
+    private const STALE_KEY_SUFFIX = ':stale';
+
     /**
      * Bump cache bust counter so all location cache keys become stale without scanning stores.
      */
@@ -43,19 +45,7 @@ class LocationService
 
         $cacheKey = $this->cacheKey('new_provinces', $query);
 
-        try {
-            return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($query): array {
-                return $this->getJson('new-provinces', $query);
-            });
-        } catch (Throwable $e) {
-            Log::warning('Location provinces cache read failed', [
-                'key' => $cacheKey,
-                'error' => $e->getMessage(),
-                'exception' => $e::class,
-            ]);
-
-            return $this->getJson('new-provinces', $query);
-        }
+        return $this->rememberLocationPayload($cacheKey, fn (): array => $this->getJson('new-provinces', $query));
     }
 
     /**
@@ -71,19 +61,10 @@ class LocationService
 
         $cacheKey = $this->cacheKey('new_wards', array_merge(['province' => $provinceCode], $query));
 
-        try {
-            return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($provinceCode, $query): array {
-                return $this->getJson("new-provinces/{$provinceCode}/wards", $query);
-            });
-        } catch (Throwable $e) {
-            Log::warning('Location wards cache read failed', [
-                'key' => $cacheKey,
-                'error' => $e->getMessage(),
-                'exception' => $e::class,
-            ]);
-
-            return $this->getJson("new-provinces/{$provinceCode}/wards", $query);
-        }
+        return $this->rememberLocationPayload(
+            $cacheKey,
+            fn (): array => $this->getJson("new-provinces/{$provinceCode}/wards", $query),
+        );
     }
 
     /**
@@ -98,19 +79,86 @@ class LocationService
 
         $cacheKey = $this->cacheKey('new_full_address', $query);
 
+        return $this->rememberLocationPayload(
+            $cacheKey,
+            fn (): array => $this->getJson('new-full-address', $query),
+        );
+    }
+
+    /**
+     * @param  callable(): array<string, mixed>  $fetchUpstream
+     * @return array<string, mixed>
+     */
+    private function rememberLocationPayload(string $cacheKey, callable $fetchUpstream): array
+    {
+        $primary = $this->readLocationCache($cacheKey);
+        if ($primary !== null) {
+            return $primary;
+        }
+
         try {
-            return Cache::remember($cacheKey, $this->cacheTtl(), function () use ($query): array {
-                return $this->getJson('new-full-address', $query);
-            });
+            $fresh = $fetchUpstream();
+            $this->storeLocationCaches($cacheKey, $fresh);
+
+            return $fresh;
         } catch (Throwable $e) {
-            Log::warning('Location full address cache read failed', [
+            Log::warning('Location upstream fetch failed', [
                 'key' => $cacheKey,
                 'error' => $e->getMessage(),
                 'exception' => $e::class,
             ]);
 
-            return $this->getJson('new-full-address', $query);
+            $stale = $this->readLocationCache($this->staleCacheKey($cacheKey));
+            if ($stale !== null) {
+                Log::info('Location stale cache fallback used', ['key' => $cacheKey]);
+
+                return $stale;
+            }
+
+            throw $e;
         }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function readLocationCache(string $key): ?array
+    {
+        try {
+            $value = Cache::get($key);
+
+            return is_array($value) ? $value : null;
+        } catch (Throwable $e) {
+            Log::warning('Location cache read failed', [
+                'key' => $key,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function storeLocationCaches(string $cacheKey, array $payload): void
+    {
+        try {
+            Cache::put($cacheKey, $payload, $this->cacheTtl());
+            Cache::put($this->staleCacheKey($cacheKey), $payload, $this->staleCacheTtl());
+        } catch (Throwable $e) {
+            Log::warning('Location cache write failed', [
+                'key' => $cacheKey,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    private function staleCacheKey(string $primaryKey): string
+    {
+        return $primaryKey.self::STALE_KEY_SUFFIX;
     }
 
     /**
@@ -193,6 +241,11 @@ class LocationService
     private function cacheTtl(): \DateTimeInterface|\DateInterval|int
     {
         return max(60, (int) config('tinh_thanh_pho.cache_ttl_seconds', 604800));
+    }
+
+    private function staleCacheTtl(): \DateTimeInterface|\DateInterval|int
+    {
+        return max(60, (int) config('tinh_thanh_pho.stale_cache_ttl_seconds', 60 * 60 * 24 * 30));
     }
 
     private function http(): \Illuminate\Http\Client\PendingRequest

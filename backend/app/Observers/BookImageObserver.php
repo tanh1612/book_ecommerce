@@ -40,7 +40,7 @@ class BookImageObserver
     public function saved(BookImage $bookImage): void
     {
         $this->updateBookThumbnail($bookImage->book);
-        $this->catalogCache->forgetBookById((int) $bookImage->book_id);
+        $this->catalogCache->forgetBookByIdAfterCommit((int) $bookImage->book_id);
     }
 
     /**
@@ -62,7 +62,7 @@ class BookImageObserver
 
         $this->bookImageStorage->normalizeSortOrdersForBook($book);
         $this->updateBookThumbnail($book);
-        $this->catalogCache->forgetBookById((int) $bookId);
+        $this->catalogCache->forgetBookByIdAfterCommit((int) $bookId);
     }
 
     /**

@@ -10,6 +10,8 @@ return [
 
     'cache_ttl_seconds' => (int) env('TINH_THANH_PHO_CACHE_TTL', 60 * 60 * 24 * 7),
 
+    'stale_cache_ttl_seconds' => (int) env('TINH_THANH_PHO_STALE_TTL', 60 * 60 * 24 * 30),
+
     'cache_key_version' => (string) env('TINH_THANH_PHO_CACHE_VERSION', 'v2025'),
 
 ];

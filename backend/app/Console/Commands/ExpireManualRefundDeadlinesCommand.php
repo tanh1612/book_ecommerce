@@ -60,14 +60,14 @@ class ExpireManualRefundDeadlinesCommand extends Command
                         ]);
 
                     $locked->update([
-                        'current_status' => OrderStatus::REFUND_CLOSED,
+                        'current_status' => OrderStatus::REFUND_EXPIRED,
                         'payment_status' => PaymentStatus::REFUND_EXPIRED,
                         'refund_deadline_at' => null,
                     ]);
 
                     OrderTimeline::query()->create([
                         'order_id' => $locked->id,
-                        'status' => OrderStatus::REFUND_CLOSED->value,
+                        'status' => OrderStatus::REFUND_EXPIRED->value,
                         'note' => OrderStatusTransitionService::TIMELINE_NOTE_REFUND_EXPIRED_NO_CONTACT,
                     ]);
                 });

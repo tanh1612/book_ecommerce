@@ -134,6 +134,164 @@ class CatalogCacheService
         }
     }
 
+    public function forgetBookStockAfterCommit(int $bookId): void
+    {
+        $this->runAfterCommit(fn (): mixed => $this->forgetBookStock($bookId));
+    }
+
+    public function forgetBookBySlugAfterCommit(?string $slug): void
+    {
+        $slug = $slug !== null ? trim($slug) : '';
+        if ($slug === '') {
+            return;
+        }
+
+        $this->runAfterCommit(fn (): mixed => $this->forgetBookBySlug($slug));
+    }
+
+    /**
+     * @param  iterable<string>  $slugs
+     */
+    public function forgetBookSlugsAfterCommit(iterable $slugs): void
+    {
+        $normalized = [];
+        foreach ($slugs as $slug) {
+            if (! is_string($slug)) {
+                continue;
+            }
+            $slug = trim($slug);
+            if ($slug !== '') {
+                $normalized[$slug] = true;
+            }
+        }
+
+        if ($normalized === []) {
+            return;
+        }
+
+        $slugList = array_keys($normalized);
+        $this->runAfterCommit(function () use ($slugList): void {
+            foreach ($slugList as $slug) {
+                $this->forgetBookBySlug($slug);
+            }
+        });
+    }
+
+    public function forgetBookByIdAfterCommit(int $bookId): void
+    {
+        if ($bookId <= 0) {
+            return;
+        }
+
+        try {
+            $slug = Book::query()->whereKey($bookId)->value('slug');
+            if (! is_string($slug) || $slug === '') {
+                return;
+            }
+
+            $this->forgetBookBySlugAfterCommit($slug);
+        } catch (Throwable $e) {
+            Log::warning('Catalog book detail cache after-commit registration failed', [
+                'book_id' => $bookId,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    /**
+     * @param  iterable<int|string>  $bookIds
+     */
+    public function forgetBooksByIdsAfterCommit(iterable $bookIds): void
+    {
+        $ids = [];
+        foreach ($bookIds as $rawId) {
+            $id = (int) $rawId;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        $ids = array_values(array_unique($ids));
+        if ($ids === []) {
+            return;
+        }
+
+        try {
+            $slugs = Book::query()->whereIn('id', $ids)->pluck('slug');
+            $this->forgetBookSlugsAfterCommit($slugs);
+        } catch (Throwable $e) {
+            Log::warning('Catalog book detail cache batch after-commit registration failed', [
+                'book_ids_count' => count($ids),
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    public function forgetFiltersMetadataAfterCommit(): void
+    {
+        $this->runAfterCommit(fn (): mixed => $this->forgetFiltersMetadata());
+    }
+
+    public function forgetBooksByPublisherIdAfterCommit(int $publisherId): void
+    {
+        if ($publisherId <= 0) {
+            return;
+        }
+
+        try {
+            $slugs = Book::query()->where('publisher_id', $publisherId)->pluck('slug');
+            $this->forgetBookSlugsAfterCommit($slugs);
+        } catch (Throwable $e) {
+            Log::warning('Catalog cache after-commit forget by publisher registration failed', [
+                'publisher_id' => $publisherId,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    public function forgetBooksForAuthorAfterCommit(int $authorId): void
+    {
+        if ($authorId <= 0) {
+            return;
+        }
+
+        try {
+            $bookIds = DB::table('book_authors')->where('author_id', $authorId)->pluck('book_id');
+            $this->forgetBooksByIdsAfterCommit($bookIds);
+        } catch (Throwable $e) {
+            Log::warning('Catalog cache after-commit forget by author registration failed', [
+                'author_id' => $authorId,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<int>  $categoryIds
+     */
+    public function forgetBooksLinkedToCategoriesAfterCommit(array $categoryIds): void
+    {
+        $categoryIds = array_values(array_unique(array_filter($categoryIds)));
+        if ($categoryIds === []) {
+            return;
+        }
+
+        try {
+            $bookIds = DB::table('book_categories')->whereIn('category_id', $categoryIds)->distinct()->pluck('book_id');
+            $this->forgetBooksByIdsAfterCommit($bookIds);
+        } catch (Throwable $e) {
+            Log::warning('Catalog cache after-commit forget by categories registration failed', [
+                'category_ids' => $categoryIds,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
     public function forgetBookBySlug(?string $slug): void
     {
         if ($slug === null || trim($slug) === '') {
@@ -262,6 +420,18 @@ class CatalogCacheService
         } catch (Throwable $e) {
             Log::warning('Catalog cache forget by categories failed', [
                 'category_ids' => $categoryIds,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    private function runAfterCommit(callable $callback): void
+    {
+        try {
+            DB::afterCommit($callback);
+        } catch (Throwable $e) {
+            Log::warning('Catalog cache after-commit registration failed', [
                 'error' => $e->getMessage(),
                 'exception' => $e::class,
             ]);

@@ -18,17 +18,17 @@ class BookObserver
 
     public function saved(Book $book): void
     {
-        $this->catalogCache->forgetBookBySlug((string) $book->slug);
-
+        $slugs = [(string) $book->slug];
         if ($book->wasChanged('slug')) {
             $originalSlug = $book->getOriginal('slug');
             if (is_string($originalSlug) && $originalSlug !== '') {
-                $this->catalogCache->forgetBookBySlug($originalSlug);
+                $slugs[] = $originalSlug;
             }
         }
+        $this->catalogCache->forgetBookSlugsAfterCommit($slugs);
 
         if ($book->wasRecentlyCreated || $book->wasChanged(['is_active', 'supplier_id', 'publisher_id'])) {
-            $this->catalogCache->forgetFiltersMetadata();
+            $this->catalogCache->forgetFiltersMetadataAfterCommit();
         }
 
         if ($book->wasChanged('is_active') && ! $book->is_active) {
@@ -53,8 +53,8 @@ class BookObserver
      */
     public function deleting(Book $book): void
     {
-        $this->catalogCache->forgetBookBySlug((string) $book->slug);
-        $this->catalogCache->forgetFiltersMetadata();
+        $this->catalogCache->forgetBookBySlugAfterCommit((string) $book->slug);
+        $this->catalogCache->forgetFiltersMetadataAfterCommit();
 
         $images = $book->images()->get(['public_id']);
 

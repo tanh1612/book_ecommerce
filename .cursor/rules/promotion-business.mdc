@@ -40,7 +40,12 @@ alwaysApply: false
 
 ## Catalog cache
 
-- Book detail cache (`catalog:book:slug:{slug}`) is invalidated when `Promotion` / `PromotionItem` rows change (`PromotionObserver`, `PromotionItemObserver`). Flash Sale payload on book detail is not part of the cached book blob but resolved at response time; invalidation keeps related reads consistent after admin edits.
+- **Do not** invalidate `catalog:book:slug:{slug}` when `Promotion` / `PromotionItem` rows change. There is no `PromotionObserver` or `PromotionItemObserver`; re-adding promotion-driven detail-cache bust is redundant and was removed on purpose.
+- `CatalogCacheService::rememberBookDetail()` caches the `Book` row and eager-loaded relations (authors, categories, publisher, detail, images, etc.). **`selling_price` / `original_price` come from the book row**; Flash Sale is not stored in that blob.
+- **`flash_sale`** on book detail is built **per request** in `BookDetailResource` via `FlashSaleCatalogService` → `FlashSaleResolver` (active campaign window, item limits, inventory, optional `account_id` for per-user caps). Cart quotes and checkout use the same resolver/quote services — not the book-detail cache key.
+- Admin edits to discount, schedule, or `stock_limit` appear on the next storefront read without flushing detail cache (see `BookDetailCacheTest` — detail key survives `PromotionItem` update; `flash_sale.discount_percent` still updates).
+- Stock shown on book detail uses the separate **`catalog:book:stock:{id}`** micro-cache (invalidated after commit on inventory changes), independent of promotion rows.
+- For catalog invalidation scope and `afterCommit` timing, follow [cache-strategy.mdc](.cursor/rules/cache-strategy.mdc) and book/catalog observers — not promotion models.
 
 ## Legacy data
 

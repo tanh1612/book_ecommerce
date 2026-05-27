@@ -17,7 +17,7 @@ class AuthorObserver
 
     public function saved(Author $author): void
     {
-        $this->catalogCache->forgetBooksForAuthor((int) $author->id);
+        $this->catalogCache->forgetBooksForAuthorAfterCommit((int) $author->id);
 
         if ($author->wasChanged('name')) {
             $this->meilisearchSync->dispatchMany(
@@ -28,7 +28,7 @@ class AuthorObserver
 
     public function deleting(Author $author): void
     {
-        $this->catalogCache->forgetBooksForAuthor((int) $author->id);
+        $this->catalogCache->forgetBooksForAuthorAfterCommit((int) $author->id);
 
         try {
             $this->meilisearchSync->dispatchMany(

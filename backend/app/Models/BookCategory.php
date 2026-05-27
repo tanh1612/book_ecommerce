@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Services\Catalog\CatalogCacheService;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
 use Illuminate\Database\Eloquent\Relations\Pivot;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -34,25 +33,7 @@ class BookCategory extends Pivot
             return;
         }
 
-        try {
-            DB::afterCommit(function () use ($bookId): void {
-                try {
-                    app(CatalogCacheService::class)->forgetBookById($bookId);
-                } catch (Throwable $e) {
-                    Log::warning('Book category cache invalidation failed', [
-                        'book_id' => $bookId,
-                        'error' => $e->getMessage(),
-                        'exception' => $e::class,
-                    ]);
-                }
-            });
-        } catch (Throwable $e) {
-            Log::warning('Book category cache invalidation registration failed', [
-                'book_id' => $bookId,
-                'error' => $e->getMessage(),
-                'exception' => $e::class,
-            ]);
-        }
+        app(CatalogCacheService::class)->forgetBookByIdAfterCommit($bookId);
 
         try {
             app(BookMeilisearchSyncDispatcher::class)->dispatch($bookId);

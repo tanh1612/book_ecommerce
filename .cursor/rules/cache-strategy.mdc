@@ -43,7 +43,8 @@ Module-specific TTLs (e.g. RAG chat history **24h**) **override** this table whe
 
 ## Invalidation
 
-- On **writes** that affect public catalog (books, categories, suppliers, promotions, inventory visibility): delete or bump keys for affected **book-detail slugs**, **curated list** keys (featured / bestseller / new-arrival), and filter/version keys; prefer **tag-based** invalidation if the cache driver supports tags (`redis` with tags enabled); otherwise maintain explicit key lists or version suffix (`catalog:filters:v{n}`) and increment `n` in one place on bulk changes.
+- On **writes** that affect public catalog (books, categories, suppliers, authors, publishers, inventory visibility): delete or bump keys for affected **book-detail slugs**, **curated list** keys (featured / bestseller / new-arrival), and filter/version keys; prefer **tag-based** invalidation if the cache driver supports tags (`redis` with tags enabled); otherwise maintain explicit key lists or version suffix (`catalog:filters:v{n}`) and increment `n` in one place on bulk changes.
+- **Flash Sale** (`Promotion` / `PromotionItem`) changes do **not** invalidate book detail cache — pricing is resolved per request (see [promotion-business.mdc](.cursor/rules/promotion-business.mdc)).
 - Wire invalidation from **Observers**, **Events/Listeners**, or **service layer** after successful DB commit — not only from controllers.
 
 ## Stampede and consistency

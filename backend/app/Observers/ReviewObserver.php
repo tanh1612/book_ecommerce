@@ -63,7 +63,7 @@ class ReviewObserver
                 ]);
             });
 
-            $this->catalogCache->forgetBookById($bookId);
+            $this->catalogCache->forgetBookByIdAfterCommit($bookId);
         } catch (Throwable $e) {
             Log::error('Failed to recalculate book rating aggregates', [
                 'book_id' => $bookId,

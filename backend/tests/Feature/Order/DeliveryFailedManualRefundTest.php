@@ -190,13 +190,13 @@ test('expire manual refund command closes order when past deadline', function ()
     $this->artisan('orders:expire-manual-refunds')->assertSuccessful();
 
     $order->refresh();
-    expect($order->current_status)->toBe(OrderStatus::REFUND_CLOSED)
+    expect($order->current_status)->toBe(OrderStatus::REFUND_EXPIRED)
         ->and($order->payment_status)->toBe(PaymentStatus::REFUND_EXPIRED)
         ->and($order->refund_deadline_at)->toBeNull();
 
     $timeline = OrderTimeline::query()
         ->where('order_id', $order->id)
-        ->where('status', OrderStatus::REFUND_CLOSED->value)
+        ->where('status', OrderStatus::REFUND_EXPIRED->value)
         ->latest('id')
         ->first();
     expect($timeline)->not->toBeNull()

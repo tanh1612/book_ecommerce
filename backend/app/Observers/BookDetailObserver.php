@@ -15,13 +15,13 @@ class BookDetailObserver
 
     public function saved(BookDetail $bookDetail): void
     {
-        $this->catalogCache->forgetBookById((int) $bookDetail->book_id);
+        $this->catalogCache->forgetBookByIdAfterCommit((int) $bookDetail->book_id);
         $this->meilisearchSync->dispatch((int) $bookDetail->book_id);
     }
 
     public function deleted(BookDetail $bookDetail): void
     {
-        $this->catalogCache->forgetBookById((int) $bookDetail->book_id);
+        $this->catalogCache->forgetBookByIdAfterCommit((int) $bookDetail->book_id);
         $this->meilisearchSync->dispatch((int) $bookDetail->book_id);
     }
 }

@@ -19,8 +19,37 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->withoutMiddleware(VerifyCsrfToken::class);
+    $this->disableCookieEncryption();
+    $this->withCredentials();
     Cache::flush();
 });
+
+function registerTestGuestCartCookieFrom(\Illuminate\Testing\TestResponse $response): void
+{
+    $cookieName = (string) config('cart.guest_token_cookie');
+
+    foreach ($response->baseResponse->headers->getCookies() as $cookie) {
+        if ($cookie->getName() !== $cookieName) {
+            continue;
+        }
+
+        test()->withCookie(
+            $cookie->getName(),
+            $cookie->getValue(),
+            $cookie->getExpiresTime(),
+            $cookie->getPath(),
+            $cookie->getDomain(),
+            $cookie->isSecure(),
+            $cookie->isHttpOnly(),
+            false,
+            $cookie->getSameSite(),
+        );
+
+        return;
+    }
+
+    test()->fail('Guest cart cookie missing from response');
+}
 
 test('customer can register an account', function () {
     Mail::fake();
@@ -158,13 +187,15 @@ test('guest cart attaches to new account on register', function () {
         'reserved_quantity' => 0,
     ]);
 
-    $this->getJson('/api/v1/cart')->assertOk();
-    $this->postJson('/api/v1/cart/items', [
+    $guestAdd = $this->postJson('/api/v1/cart/items', [
         'book_id' => $book->id,
         'quantity' => 2,
     ])->assertCreated();
+    registerTestGuestCartCookieFrom($guestAdd);
+
     $itemId = CartItem::query()->firstOrFail()->id;
-    $this->patchJson("/api/v1/cart/items/{$itemId}", ['selected' => false])->assertOk();
+    $patchResponse = $this->patchJson("/api/v1/cart/items/{$itemId}", ['selected' => false])->assertOk();
+    registerTestGuestCartCookieFrom($patchResponse);
 
     $this->postJson('/api/v1/auth/register/send-otp', ['email' => $email])->assertOk();
     $otp = Mail::queued(RegistrationOtpMail::class)->first()->otp;

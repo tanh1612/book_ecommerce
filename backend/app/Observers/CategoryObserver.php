@@ -20,7 +20,7 @@ class CategoryObserver
     public function saved(Category $category): void
     {
         $this->invalidateBranchBooks($category);
-        $this->catalogCache->forgetFiltersMetadata();
+        $this->catalogCache->forgetFiltersMetadataAfterCommit();
     }
 
     public function deleting(Category $category): void
@@ -53,14 +53,14 @@ class CategoryObserver
         }
 
         $this->invalidateBranchBooks($category);
-        $this->catalogCache->forgetFiltersMetadata();
+        $this->catalogCache->forgetFiltersMetadataAfterCommit();
     }
 
     private function invalidateBranchBooks(Category $category): void
     {
         try {
             $categoryIds = array_merge([(int) $category->id], $category->getDescendantIds());
-            $this->catalogCache->forgetBooksLinkedToCategories($categoryIds);
+            $this->catalogCache->forgetBooksLinkedToCategoriesAfterCommit($categoryIds);
         } catch (Throwable $e) {
             Log::warning('Catalog cache invalidation failed (category branch)', [
                 'category_id' => $category->id,

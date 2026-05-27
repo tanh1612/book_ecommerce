@@ -41,10 +41,10 @@ test('needs admin processing scope includes active fulfillment statuses only', f
     $shipping = orderForProcessingScopeTest(OrderStatus::SHIPPING);
     $completed = orderForProcessingScopeTest(OrderStatus::COMPLETED);
     $cancelled = orderForProcessingScopeTest(OrderStatus::CANCELLED);
-    $refundClosed = orderForProcessingScopeTest(OrderStatus::REFUND_CLOSED);
+    $refundExpired = orderForProcessingScopeTest(OrderStatus::REFUND_EXPIRED);
 
     $ids = Order::query()->needsAdminProcessing()->pluck('id')->all();
 
     expect($ids)->toContain($pending->id, $confirmed->id, $processing->id, $shipping->id)
-        ->and($ids)->not->toContain($completed->id, $cancelled->id, $refundClosed->id);
+        ->and($ids)->not->toContain($completed->id, $cancelled->id, $refundExpired->id);
 });

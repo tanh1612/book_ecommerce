@@ -17,16 +17,17 @@ class PublisherObserver
 
     public function saved(Publisher $publisher): void
     {
-        $this->catalogCache->forgetFiltersMetadata();
-        $this->catalogCache->forgetBooksByPublisherId((int) $publisher->id);
+        $this->catalogCache->forgetFiltersMetadataAfterCommit();
+        $this->catalogCache->forgetBooksByPublisherIdAfterCommit((int) $publisher->id);
     }
 
     public function deleting(Publisher $publisher): void
     {
+        $bookIds = $publisher->books()->pluck('id');
+        $this->catalogCache->forgetBooksByIdsAfterCommit($bookIds);
+
         try {
-            $this->meilisearchSync->dispatchMany(
-                $publisher->books()->pluck('id')
-            );
+            $this->meilisearchSync->dispatchMany($bookIds);
         } catch (Throwable $e) {
             Log::warning('Meilisearch reindex dispatch failed (publisher delete)', [
                 'publisher_id' => $publisher->id,
@@ -38,6 +39,6 @@ class PublisherObserver
 
     public function deleted(Publisher $publisher): void
     {
-        $this->catalogCache->forgetFiltersMetadata();
+        $this->catalogCache->forgetFiltersMetadataAfterCommit();
     }
 }

@@ -122,6 +122,10 @@ test('order list item shape excludes sensitive and internal fields', function ()
     $row = $response->json('data.0');
     expect($row)->toHaveKeys([
         'id',
+        'payment_method',
+        'payment_status',
+        'payment_expires_at',
+        'can_pay',
         'current_status',
         'created_at',
         'total_quantity',
@@ -133,8 +137,6 @@ test('order list item shape excludes sensitive and internal fields', function ()
         ->and($row)->not->toHaveKeys([
             'shipping_phone',
             'shipping_address',
-            'payment_method',
-            'payment_status',
             'cancel_block_reason',
             'timeline',
         ]);

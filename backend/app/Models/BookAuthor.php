@@ -33,8 +33,9 @@ class BookAuthor extends Pivot
             return;
         }
 
+        app(CatalogCacheService::class)->forgetBookByIdAfterCommit($bookId);
+
         try {
-            app(CatalogCacheService::class)->forgetBookById($bookId);
             app(BookMeilisearchSyncDispatcher::class)->dispatch($bookId);
         } catch (Throwable $e) {
             Log::warning('Book author pivot side effects failed', [
