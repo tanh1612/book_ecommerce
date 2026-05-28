@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Book;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Services\Recommendation\InteractionTrackingService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,7 @@ class CartService
 
     public function __construct(
         private GuestCartTokenService $guestCartTokenService,
+        private InteractionTrackingService $interactionTrackingService,
     ) {}
 
     /**
@@ -99,7 +101,7 @@ class CartService
     public function addItem(int $bookId, int $quantity): CartItem
     {
         try {
-            return DB::transaction(function () use ($bookId, $quantity): CartItem {
+            $cartItem = DB::transaction(function () use ($bookId, $quantity): CartItem {
                 $cart = Cart::query()->whereKey($this->getCurrentCart()->id)->lockForUpdate()->firstOrFail();
 
                 $book = Book::query()
@@ -144,6 +146,10 @@ class CartService
                     'selected' => true,
                 ]);
             });
+
+            $this->trackCartAddInteraction($cartItem, $bookId);
+
+            return $cartItem;
         } catch (ValidationException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -267,5 +273,43 @@ class CartService
             ->where('book_id', $bookId)
             ->selectRaw('COALESCE(SUM(GREATEST(quantity - reserved_quantity, 0)), 0) as available')
             ->value('available');
+    }
+
+    private function trackCartAddInteraction(CartItem $cartItem, int $bookId): void
+    {
+        $cart = Cart::query()
+            ->select(['id', 'account_id'])
+            ->whereKey($cartItem->cart_id)
+            ->first();
+
+        if ($cart?->account_id === null) {
+            return;
+        }
+
+        try {
+            $account = Account::query()->find($cart->account_id);
+            $book = Book::query()->find($bookId);
+
+            if ($account === null || $book === null) {
+                Log::warning('Track cart add interaction skipped due to missing entities', [
+                    'cart_item_id' => $cartItem->id,
+                    'cart_id' => $cartItem->cart_id,
+                    'account_id' => $cart->account_id,
+                    'book_id' => $bookId,
+                ]);
+
+                return;
+            }
+
+            $this->interactionTrackingService->trackCartAdd($account, $book);
+        } catch (Throwable $e) {
+            Log::error('Track cart add interaction failed', [
+                'cart_item_id' => $cartItem->id,
+                'cart_id' => $cartItem->cart_id,
+                'account_id' => $cart->account_id,
+                'book_id' => $bookId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

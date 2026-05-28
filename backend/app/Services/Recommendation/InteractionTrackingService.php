@@ -19,6 +19,31 @@ class InteractionTrackingService
 {
     private const VIEW_LOCK_SECONDS = 10;
 
+    public function trackCartAdd(Account $account, Book $book, ?string $source = null): bool
+    {
+        try {
+            BookInteractionEvent::query()->create([
+                'account_id' => $account->id,
+                'book_id' => $book->id,
+                'event_type' => BookInteractionType::CartAdd,
+                'source' => $source,
+                'created_at' => now(),
+            ]);
+
+            return true;
+        } catch (Throwable $e) {
+            Log::error('Track cart add interaction failed', [
+                'account_id' => $account->id,
+                'book_id' => $book->id,
+                'source' => $source,
+                'event_type' => BookInteractionType::CartAdd->value,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
     public function trackView(Account $account, Book $book, ?string $source = null): bool
     {
         $lockKey = $this->viewLockKey((int) $account->id, (int) $book->id);

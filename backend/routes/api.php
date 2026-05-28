@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\Promotion\FlashSaleController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewEligibilityController;
 use App\Http\Controllers\Api\V1\Recommendation\InteractionController;
+use App\Http\Controllers\Api\V1\Recommendation\RecommendationController;
 use App\Http\Controllers\Api\V1\Checkout\CheckoutController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
 use App\Http\Controllers\Api\V1\Payment\VnPayReturnController;
@@ -181,3 +182,7 @@ Route::post('v1/shipping/quote', [ShippingQuoteController::class, 'store'])
 // Recommendation interactions
 Route::post('v1/recommendations/interactions/books/{book}/view', [InteractionController::class, 'trackBookView'])
     ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:60,1']);
+
+// Recommendation feed
+Route::get('v1/recommendations', [RecommendationController::class, 'index'])
+    ->middleware(['web', 'throttle:120,1']);
