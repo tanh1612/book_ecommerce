@@ -12,3 +12,12 @@ Schedule::command('payments:expire-vnpay')->everyFiveMinutes();
 Schedule::command('promotions:sync-status')->everyMinute();
 Schedule::command('orders:expire-manual-refunds')->daily();
 Schedule::command('inventory:notify-low-stock')->daily();
+Schedule::command('recommendations:build-popular')
+    ->everySixHours()
+    ->withoutOverlapping(30);
+Schedule::command('recommendations:build-users')
+    ->hourly()
+    ->withoutOverlapping(30);
+Schedule::command('recommendations:prune-interactions')
+    ->daily()
+    ->withoutOverlapping(30);

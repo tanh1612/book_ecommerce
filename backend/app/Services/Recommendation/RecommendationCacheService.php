@@ -13,6 +13,11 @@ class RecommendationCacheService
         return 'reco:popular';
     }
 
+    public function userKey(int $accountId): string
+    {
+        return sprintf('reco:user:%d', $accountId);
+    }
+
     /**
      * @return array{strategy: string, generated_at: string, book_ids: array<int, int>}|null
      */
@@ -76,6 +81,78 @@ class RecommendationCacheService
         } catch (Throwable $e) {
             Log::warning('Recommendation popular cache forget failed', [
                 'key' => $key,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    /**
+     * @return array{strategy: string, generated_at: string, book_ids: array<int, int>}|null
+     */
+    public function getUser(int $accountId): ?array
+    {
+        $key = $this->userKey($accountId);
+
+        try {
+            $payload = Cache::get($key);
+
+            if (! is_array($payload)) {
+                return null;
+            }
+
+            return $this->normalizePayload($payload);
+        } catch (Throwable $e) {
+            Log::warning('Recommendation user cache read failed', [
+                'key' => $key,
+                'account_id' => $accountId,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<int, int>  $bookIds
+     */
+    public function putUser(int $accountId, array $bookIds, string $strategy = 'content_based'): void
+    {
+        $key = $this->userKey($accountId);
+        $ttlSeconds = max((int) config('recommendation.personalized_ttl_seconds', 3600), 1);
+        $payload = [
+            'strategy' => $strategy,
+            'generated_at' => now()->toIso8601String(),
+            'book_ids' => array_values(array_unique(array_map('intval', $bookIds))),
+        ];
+
+        try {
+            Cache::put($key, $payload, $ttlSeconds);
+        } catch (Throwable $e) {
+            Log::error('Recommendation user cache write failed', [
+                'key' => $key,
+                'account_id' => $accountId,
+                'book_ids_count' => count($payload['book_ids']),
+                'ttl_seconds' => $ttlSeconds,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            throw $e;
+        }
+    }
+
+    public function forgetUser(int $accountId): void
+    {
+        $key = $this->userKey($accountId);
+
+        try {
+            Cache::forget($key);
+        } catch (Throwable $e) {
+            Log::warning('Recommendation user cache forget failed', [
+                'key' => $key,
+                'account_id' => $accountId,
                 'error' => $e->getMessage(),
                 'exception' => $e::class,
             ]);

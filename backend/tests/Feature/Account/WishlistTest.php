@@ -3,8 +3,10 @@
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Wishlist;
+use App\Jobs\Recommendation\BuildUserRecommendations;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
@@ -96,6 +98,7 @@ test('wishlist list orders newest first', function (): void {
 test('authenticated user can add book to wishlist', function (): void {
     $account = Account::factory()->create();
     $book = Book::factory()->create();
+    Bus::fake();
 
     $this->actingAs($account, 'web');
 
@@ -109,6 +112,8 @@ test('authenticated user can add book to wishlist', function (): void {
         'account_id' => $account->id,
         'book_id' => $book->id,
     ]);
+
+    Bus::assertDispatched(BuildUserRecommendations::class, fn (BuildUserRecommendations $job): bool => $job->accountId === $account->id);
 });
 
 test('adding same book twice is idempotent', function (): void {
@@ -173,6 +178,7 @@ test('cannot add invalid book_id to wishlist', function (): void {
 test('authenticated user can remove own wishlist item', function (): void {
     $account = Account::factory()->create();
     $book = Book::factory()->create();
+    Bus::fake();
 
     Wishlist::factory()->create([
         'account_id' => $account->id,
@@ -188,6 +194,8 @@ test('authenticated user can remove own wishlist item', function (): void {
         'account_id' => $account->id,
         'book_id' => $book->id,
     ]);
+
+    Bus::assertDispatched(BuildUserRecommendations::class, fn (BuildUserRecommendations $job): bool => $job->accountId === $account->id);
 });
 
 test('removing book not in wishlist returns not found', function (): void {

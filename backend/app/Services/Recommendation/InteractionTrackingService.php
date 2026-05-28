@@ -19,6 +19,10 @@ class InteractionTrackingService
 {
     private const VIEW_LOCK_SECONDS = 10;
 
+    public function __construct(
+        private RecommendationRefreshService $recommendationRefreshService,
+    ) {}
+
     public function trackCartAdd(Account $account, Book $book, ?string $source = null): bool
     {
         try {
@@ -29,6 +33,11 @@ class InteractionTrackingService
                 'source' => $source,
                 'created_at' => now(),
             ]);
+
+            $this->recommendationRefreshService->refreshUserRecommendations(
+                (int) $account->id,
+                'cart_add',
+            );
 
             return true;
         } catch (Throwable $e) {
@@ -102,6 +111,11 @@ class InteractionTrackingService
                     'created_at' => now(),
                 ]);
 
+                $this->registerRecommendationRefreshAfterCommit(
+                    (int) $account->id,
+                    'view',
+                );
+
                 return true;
             });
         } catch (Throwable $e) {
@@ -151,5 +165,25 @@ class InteractionTrackingService
     private function viewLockKey(int $accountId, int $bookId): string
     {
         return sprintf('reco:track:view:%d:%d', $accountId, $bookId);
+    }
+
+    private function registerRecommendationRefreshAfterCommit(int $accountId, string $reason): void
+    {
+        if ($accountId <= 0) {
+            return;
+        }
+
+        try {
+            DB::afterCommit(function () use ($accountId, $reason): void {
+                $this->recommendationRefreshService->refreshUserRecommendations($accountId, $reason);
+            });
+        } catch (Throwable $e) {
+            Log::warning('Register recommendation refresh after commit failed for interaction tracking', [
+                'account_id' => $accountId,
+                'reason' => $reason,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
     }
 }

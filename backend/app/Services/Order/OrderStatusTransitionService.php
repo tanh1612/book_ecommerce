@@ -13,6 +13,7 @@ use App\Models\Order;
 use App\Models\OrderTimeline;
 use App\Models\PaymentTransaction;
 use App\Services\Promotion\PromotionAllocationService;
+use App\Services\Recommendation\RecommendationRefreshService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -65,6 +66,7 @@ class OrderStatusTransitionService
     public function __construct(
         private OrderInventoryService $orderInventory,
         private PromotionAllocationService $promotionAllocation,
+        private RecommendationRefreshService $recommendationRefreshService,
     ) {}
 
     public function processOrder(Order $order, Account $actor, ?string $note = null): Order
@@ -337,6 +339,11 @@ class OrderStatusTransitionService
                     'order_id' => $locked->id,
                     'actor_id' => $actor->id,
                 ]);
+
+                $this->registerRecommendationRefreshAfterCommit(
+                    (int) $locked->account_id,
+                    'order_completed',
+                );
 
                 return $locked->fresh();
             });
@@ -938,5 +945,25 @@ class OrderStatusTransitionService
             'note' => $noteText !== '' ? $noteText : $defaultNote,
             'actor' => $actor->email,
         ]);
+    }
+
+    private function registerRecommendationRefreshAfterCommit(int $accountId, string $reason): void
+    {
+        if ($accountId <= 0) {
+            return;
+        }
+
+        try {
+            DB::afterCommit(function () use ($accountId, $reason): void {
+                $this->recommendationRefreshService->refreshUserRecommendations($accountId, $reason);
+            });
+        } catch (Throwable $e) {
+            Log::warning('Register recommendation refresh after commit failed for order transition', [
+                'account_id' => $accountId,
+                'reason' => $reason,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
     }
 }

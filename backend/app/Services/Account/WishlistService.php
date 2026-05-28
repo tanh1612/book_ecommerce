@@ -5,6 +5,8 @@ namespace App\Services\Account;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Wishlist;
+use App\Services\Recommendation\RecommendationRefreshService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +14,10 @@ use Throwable;
 
 class WishlistService
 {
+    public function __construct(
+        private RecommendationRefreshService $recommendationRefreshService,
+    ) {}
+
     /**
      * @var list<string>
      */
@@ -68,6 +74,8 @@ class WishlistService
             throw $e;
         }
 
+        $this->registerRecommendationRefreshAfterCommit((int) $account->id, 'wishlist_add');
+
         return $this->loadBookForResource($book);
     }
 
@@ -89,6 +97,8 @@ class WishlistService
 
             throw $e;
         }
+
+        $this->registerRecommendationRefreshAfterCommit((int) $account->id, 'wishlist_remove');
     }
 
     private function loadBookForResource(Book $book): Book
@@ -104,5 +114,21 @@ class WishlistService
         $sqlState = $exception->errorInfo[0] ?? null;
 
         return in_array($sqlState, ['23000', '23505'], true);
+    }
+
+    private function registerRecommendationRefreshAfterCommit(int $accountId, string $reason): void
+    {
+        try {
+            DB::afterCommit(function () use ($accountId, $reason): void {
+                $this->recommendationRefreshService->refreshUserRecommendations($accountId, $reason);
+            });
+        } catch (Throwable $e) {
+            Log::warning('Register recommendation refresh after commit failed for wishlist', [
+                'account_id' => $accountId,
+                'reason' => $reason,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
     }
 }

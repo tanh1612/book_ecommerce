@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Recommendation\BookInteractionType;
+use App\Jobs\Recommendation\BuildUserRecommendations;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\BookInteractionEvent;
@@ -9,6 +10,7 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
@@ -28,6 +30,7 @@ test('guest cannot track book view interaction', function (): void {
 test('member can track first book view', function (): void {
     $account = Account::factory()->create();
     $book = Book::factory()->create();
+    Bus::fake();
 
     $this->actingAs($account, 'web');
 
@@ -41,6 +44,8 @@ test('member can track first book view', function (): void {
         'event_type' => BookInteractionType::View->value,
         'source' => 'book_detail',
     ]);
+
+    Bus::assertDispatched(BuildUserRecommendations::class, fn (BuildUserRecommendations $job): bool => $job->accountId === $account->id);
 });
 
 test('member view deduplicates same book within thirty minutes', function (): void {

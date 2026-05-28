@@ -4,18 +4,21 @@ namespace App\Jobs\Recommendation;
 
 use App\Services\Recommendation\RecommendationCacheService;
 use App\Services\Recommendation\RecommendationCandidateService;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class BuildPopularRecommendations implements ShouldQueue
+class BuildPopularRecommendations implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
     public int $tries = 3;
 
     public int $backoff = 30;
+
+    public int $uniqueFor = 1800;
 
     public function handle(
         RecommendationCandidateService $recommendationCandidateService,
@@ -47,5 +50,10 @@ class BuildPopularRecommendations implements ShouldQueue
             'error' => $e->getMessage(),
             'exception' => $e::class,
         ]);
+    }
+
+    public function uniqueId(): string
+    {
+        return 'recommendation:popular';
     }
 }
