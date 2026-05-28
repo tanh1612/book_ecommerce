@@ -3,10 +3,13 @@
 namespace App\Http\Resources;
 
 use App\Models\Book;
+use App\Models\Wishlist;
 use App\Services\Catalog\BookStockAvailabilityService;
 use App\Services\Promotion\FlashSaleCatalogService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * @mixin Book
@@ -36,6 +39,7 @@ class BookDetailResource extends JsonResource
             'average_rating' => $this->average_rating,
             'review_count' => $this->review_count,
             'is_active' => (bool) $this->is_active,
+            'is_in_wishlist' => $this->resolveIsInWishlist($request),
             'available_stock' => $availability['available_stock'],
             'in_stock' => $availability['in_stock'],
             'authors' => $this->whenLoaded('authors', fn () => $this->authors->map(fn ($author) => [
@@ -99,5 +103,28 @@ class BookDetailResource extends JsonResource
         }
 
         return app(BookStockAvailabilityService::class)->getAvailability((int) $this->id);
+    }
+
+    private function resolveIsInWishlist(Request $request): bool
+    {
+        $accountId = $request->user()?->id;
+        if ($accountId === null) {
+            return false;
+        }
+
+        try {
+            return Wishlist::query()
+                ->where('account_id', (int) $accountId)
+                ->where('book_id', (int) $this->id)
+                ->exists();
+        } catch (Throwable $e) {
+            Log::warning('Wishlist lookup failed on book detail', [
+                'account_id' => (int) $accountId,
+                'book_id' => (int) $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 }

@@ -2,8 +2,10 @@
 
 use App\Models\Book;
 use App\Models\Category;
+use App\Models\Account;
 use App\Models\Publisher;
 use App\Models\Supplier;
+use App\Models\Wishlist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -52,6 +54,41 @@ test('book show returns detail for active slug', function (): void {
         ->assertJsonPath('data.slug', 'active-book')
         ->assertJsonPath('data.name', 'Active Title')
         ->assertJsonPath('data.detail.language', 'vi');
+});
+
+test('book show returns is_in_wishlist false for guest', function (): void {
+    $book = Book::factory()->create(['slug' => 'wishlist-guest-book']);
+
+    $this->getJson('/api/v1/books/'.$book->slug)
+        ->assertOk()
+        ->assertJsonPath('data.is_in_wishlist', false);
+});
+
+test('book show returns is_in_wishlist true when authenticated user has wishlisted book', function (): void {
+    $account = Account::factory()->create();
+    $book = Book::factory()->create(['slug' => 'wishlist-member-true']);
+
+    Wishlist::factory()->create([
+        'account_id' => $account->id,
+        'book_id' => $book->id,
+    ]);
+
+    $this->actingAs($account, 'web');
+
+    $this->getJson('/api/v1/books/'.$book->slug)
+        ->assertOk()
+        ->assertJsonPath('data.is_in_wishlist', true);
+});
+
+test('book show returns is_in_wishlist false when authenticated user has not wishlisted book', function (): void {
+    $account = Account::factory()->create();
+    $book = Book::factory()->create(['slug' => 'wishlist-member-false']);
+
+    $this->actingAs($account, 'web');
+
+    $this->getJson('/api/v1/books/'.$book->slug)
+        ->assertOk()
+        ->assertJsonPath('data.is_in_wishlist', false);
 });
 
 test('books index filters by parent category including descendants', function (): void {

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Account\AddressController;
 use App\Http\Controllers\Api\V1\Account\OrderController;
 use App\Http\Controllers\Api\V1\Account\ReviewController;
+use App\Http\Controllers\Api\V1\Account\WishlistController;
 use App\Http\Controllers\Api\V1\Account\OrderRefundBankInfoController;
 use App\Http\Controllers\Api\V1\Account\PasswordController;
 use App\Http\Controllers\Api\V1\Account\ProfileController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\V1\Catalog\BookController;
 use App\Http\Controllers\Api\V1\Promotion\FlashSaleController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewEligibilityController;
+use App\Http\Controllers\Api\V1\Recommendation\InteractionController;
 use App\Http\Controllers\Api\V1\Checkout\CheckoutController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
 use App\Http\Controllers\Api\V1\Payment\VnPayReturnController;
@@ -157,6 +159,15 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum', 'account.active'
     // Submit review for a purchased order item
     Route::post('order-items/{orderItem}/review', [ReviewController::class, 'store'])
         ->middleware('throttle:10,1');
+
+    // Wishlist
+    Route::get('wishlist', [WishlistController::class, 'index']);
+
+    // Add item to wishlist
+    Route::post('wishlist/items', [WishlistController::class, 'store']);
+
+    // Remove item from wishlist
+    Route::delete('wishlist/items/{book}', [WishlistController::class, 'destroy']);
 });
 
 // Checkout
@@ -165,4 +176,8 @@ Route::post('v1/checkout', [CheckoutController::class, 'store'])
 
 // Shipping quote
 Route::post('v1/shipping/quote', [ShippingQuoteController::class, 'store'])
+    ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:60,1']);
+
+// Recommendation interactions
+Route::post('v1/recommendations/interactions/books/{book}/view', [InteractionController::class, 'trackBookView'])
     ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:60,1']);

@@ -86,6 +86,16 @@ class Book extends Model
         return $this->hasMany(Review::class);
     }
 
+    public function wishlists(): HasMany
+    {
+        return $this->hasMany(Wishlist::class);
+    }
+
+    public function interactionEvents(): HasMany
+    {
+        return $this->hasMany(BookInteractionEvent::class);
+    }
+
     /**
      * Storefront chỉ hiển thị sách đang bật; dùng chung cho API catalog và metadata bộ lọc.
      */

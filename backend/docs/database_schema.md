@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS `accounts` (
 `deleted_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 UNIQUE KEY `accounts_email_unique` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `addresses` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -121,6 +121,21 @@ KEY `book_images_book_id_foreign` (`book_id`),
 CONSTRAINT `book_images_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2568 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `book_interaction_events` (
+`id` bigint unsigned NOT NULL AUTO_INCREMENT,
+`account_id` bigint unsigned NOT NULL,
+`book_id` bigint unsigned NOT NULL,
+`event_type` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+`source` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+`created_at` timestamp NULL DEFAULT NULL,
+PRIMARY KEY (`id`),
+KEY `bie_account_type_created_at_index` (`account_id`,`event_type`,`created_at`),
+KEY `bie_account_book_created_at_index` (`account_id`,`book_id`,`created_at`),
+KEY `bie_book_type_created_at_index` (`book_id`,`event_type`,`created_at`),
+CONSTRAINT `book_interaction_events_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+CONSTRAINT `book_interaction_events_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `cache` (
 `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `value` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -148,7 +163,7 @@ PRIMARY KEY (`id`),
 UNIQUE KEY `carts_account_id_unique` (`account_id`),
 UNIQUE KEY `carts_guest_token_hash_unique` (`guest_token_hash`),
 CONSTRAINT `carts_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `cart_items` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -163,7 +178,7 @@ UNIQUE KEY `cart_items_cart_id_book_id_unique` (`cart_id`,`book_id`),
 KEY `cart_items_book_id_foreign` (`book_id`),
 CONSTRAINT `cart_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
 CONSTRAINT `cart_items_cart_id_foreign` FOREIGN KEY (`cart_id`) REFERENCES `carts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `categories` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -188,7 +203,7 @@ CREATE TABLE IF NOT EXISTS `failed_import_rows` (
 PRIMARY KEY (`id`),
 KEY `failed_import_rows_import_id_foreign` (`import_id`),
 CONSTRAINT `failed_import_rows_import_id_foreign` FOREIGN KEY (`import_id`) REFERENCES `imports` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6295 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `failed_jobs` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -267,7 +282,7 @@ CREATE TABLE IF NOT EXISTS `migrations` (
 `migration` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `batch` int NOT NULL,
 PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `notifications` (
 `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -310,7 +325,7 @@ KEY `orders_created_at_index` (`created_at`),
 KEY `orders_account_id_current_status_index` (`account_id`,`current_status`),
 CONSTRAINT `orders_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE RESTRICT,
 CONSTRAINT `orders_shipping_method_id_foreign` FOREIGN KEY (`shipping_method_id`) REFERENCES `shipping_methods` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `order_items` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -335,7 +350,7 @@ CONSTRAINT `order_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `boo
 CONSTRAINT `order_items_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
 CONSTRAINT `order_items_promotion_id_foreign` FOREIGN KEY (`promotion_id`) REFERENCES `promotions` (`id`) ON DELETE SET NULL,
 CONSTRAINT `order_items_promotion_item_id_foreign` FOREIGN KEY (`promotion_item_id`) REFERENCES `promotion_items` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `order_timelines` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -347,7 +362,7 @@ CREATE TABLE IF NOT EXISTS `order_timelines` (
 PRIMARY KEY (`id`),
 KEY `order_timelines_order_id_foreign` (`order_id`),
 CONSTRAINT `order_timelines_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
 `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -404,7 +419,7 @@ PRIMARY KEY (`id`),
 KEY `promotions_status_index` (`status`),
 KEY `promotions_start_at_end_at_index` (`start_at`,`end_at`),
 CONSTRAINT `promotions_end_after_start_check` CHECK ((`end_at` > `start_at`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `promotion_allocations` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -426,7 +441,7 @@ CONSTRAINT `promotion_allocations_order_id_foreign` FOREIGN KEY (`order_id`) REF
 CONSTRAINT `promotion_allocations_order_item_id_foreign` FOREIGN KEY (`order_item_id`) REFERENCES `order_items` (`id`) ON DELETE SET NULL,
 CONSTRAINT `promotion_allocations_promotion_item_id_foreign` FOREIGN KEY (`promotion_item_id`) REFERENCES `promotion_items` (`id`) ON DELETE CASCADE,
 CONSTRAINT `promotion_allocations_quantity_positive_check` CHECK ((`quantity` > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `promotion_items` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -445,7 +460,7 @@ CONSTRAINT `promotion_items_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES 
 CONSTRAINT `promotion_items_promotion_id_foreign` FOREIGN KEY (`promotion_id`) REFERENCES `promotions` (`id`) ON DELETE CASCADE,
 CONSTRAINT `promotion_items_discount_percent_check` CHECK (((`discount_value` > 0) and (`discount_value` <= 100) and (`discount_value` = floor(`discount_value`)))),
 CONSTRAINT `promotion_items_sold_within_stock_check` CHECK (((`stock_limit` is null) or (`sold_quantity` <= `stock_limit`)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `publishers` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -498,7 +513,7 @@ CREATE TABLE IF NOT EXISTS `shipping_methods` (
 `created_at` timestamp NULL DEFAULT NULL,
 `updated_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `shipping_rates` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -511,7 +526,7 @@ PRIMARY KEY (`id`),
 KEY `shipping_rates_shipping_method_id_foreign` (`shipping_method_id`),
 KEY `shipping_rates_province_code_index` (`province_code`),
 CONSTRAINT `shipping_rates_shipping_method_id_foreign` FOREIGN KEY (`shipping_method_id`) REFERENCES `shipping_methods` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `suppliers` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -545,6 +560,19 @@ CREATE TABLE IF NOT EXISTS `warehouses` (
 `created_at` timestamp NULL DEFAULT NULL,
 PRIMARY KEY (`id`),
 UNIQUE KEY `warehouses_singleton_key_unique` (`singleton_key`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wishlists` (
+`id` bigint unsigned NOT NULL AUTO_INCREMENT,
+`account_id` bigint unsigned NOT NULL,
+`book_id` bigint unsigned NOT NULL,
+`created_at` timestamp NULL DEFAULT NULL,
+`updated_at` timestamp NULL DEFAULT NULL,
+PRIMARY KEY (`id`),
+UNIQUE KEY `wishlists_account_id_book_id_unique` (`account_id`,`book_id`),
+KEY `wishlists_book_id_index` (`book_id`),
+CONSTRAINT `wishlists_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+CONSTRAINT `wishlists_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /_!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') _/;
