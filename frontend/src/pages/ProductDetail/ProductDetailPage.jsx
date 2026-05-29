@@ -50,7 +50,6 @@ const ProductDetailPage = () => {
     addToCart(book, quantity);
   };
 
-  // 🔥 Xử lý Mua ngay
   const handleBuyNow = () => {
     if (stock <= 0) return toast.error("Sản phẩm hiện đã hết hàng!");
     if (quantity > stock) return toast.error(`Chỉ còn ${stock} sản phẩm trong kho!`);
@@ -73,9 +72,26 @@ const ProductDetailPage = () => {
   if (!book) return <div className="py-20 text-center text-gray-500">Sách không tồn tại.</div>;
 
   const title = book.name || "Đang cập nhật";
-  const sellingPrice = Number(book.selling_price || 0); // Ép kiểu số
-  const originalPrice = Number(book.original_price || sellingPrice);
-  const discountPercent = originalPrice > sellingPrice ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100) : 0;
+  
+  // 🌟 THUẬT TOÁN XỬ LÝ GIÁ MỚI: Ưu tiên Flash Sale
+  let originalPrice = Number(book.original_price || 0);
+  let sellingPrice = Number(book.selling_price || originalPrice);
+  let discountPercent = 0;
+
+  if (book.flash_sale) {
+    // Nếu API trả về cục flash_sale, lấy % giảm ra (hỗ trợ cả 2 key phòng ngừa Backend đổi tên)
+    const fsDiscount = Number(book.flash_sale.discount_percent || book.flash_sale.discount_value || 0);
+    if (fsDiscount > 0) {
+      discountPercent = fsDiscount;
+      // Tự động tính lại giá bán thực tế
+      sellingPrice = originalPrice - (originalPrice * (discountPercent / 100));
+    }
+  } else {
+    // Tính giá giảm bình thường nếu không có Flash Sale
+    discountPercent = originalPrice > sellingPrice 
+      ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100) 
+      : 0;
+  }
   
   const authorDisplay = Array.isArray(book.authors) ? book.authors.map(a => a.name).join(', ') : "Đang cập nhật";
   const publisherName = book.publisher?.name || "Đang cập nhật";
@@ -94,7 +110,6 @@ const ProductDetailPage = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20 pt-4">
-      {/* ... Phần Breadcrumb và Tiêu đề giữ nguyên ... */}
       <div className="container mx-auto px-4 mb-4 text-sm text-gray-500 flex items-center gap-2">
         <Link to="/" className="hover:text-[#007b22]">Trang chủ</Link>
         <FiChevronRight size={14} />
@@ -193,7 +208,6 @@ const ProductDetailPage = () => {
           </div>
         </div>
 
-        {/* ... Phần Mô tả và Thông tin chi tiết giữ nguyên ... */}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           <div className="w-full lg:w-[60%] bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-4 pb-4 border-b border-gray-100">Mô tả sản phẩm</h3>

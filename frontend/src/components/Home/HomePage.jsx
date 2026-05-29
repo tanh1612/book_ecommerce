@@ -10,41 +10,44 @@ import bookApi from "../../services/bookApi";
 
 const HomePage = () => {
   const [books, setBooks] = useState([]);
+  const [flashSaleBooks, setFlashSaleBooks] = useState([]); // 🔥 State mới lưu sách Flash Sale thật
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchBooks = async () => {
+    const fetchAllData = async () => {
       try {
-        const res = await bookApi.getBooks({ per_page: 20 });
-        
-        // BỘ LỌC THÔNG MINH: Tự động tìm mảng dữ liệu (Array) từ cục response của Laravel
+        // 1. Gọi API lấy sách bình thường (Cho mục Sách Mới & Gợi Ý)
+        const resBooks = await bookApi.getBooks({ per_page: 20 });
         let booksArray = [];
-        if (Array.isArray(res.data)) {
-          booksArray = res.data; // Trường hợp trả về mảng trực tiếp
-        } else if (res.data?.data && Array.isArray(res.data.data)) {
-          booksArray = res.data.data; // Trường hợp bọc 1 lớp data
-        } else if (res.data?.data?.data && Array.isArray(res.data.data.data)) {
-          booksArray = res.data.data.data; // Trường hợp bọc 2 lớp data (Pagination Resource)
-        }
-        
+        if (Array.isArray(resBooks.data)) booksArray = resBooks.data;
+        else if (resBooks.data?.data && Array.isArray(resBooks.data.data)) booksArray = resBooks.data.data;
+        else if (resBooks.data?.data?.data && Array.isArray(resBooks.data.data.data)) booksArray = resBooks.data.data.data;
         setBooks(booksArray);
+
+        // 2. 🔥 Gọi API lấy sách Flash Sale xịn từ Backend
+        try {
+          const resFlashSale = await bookApi.getActiveFlashSale();
+          const fsData = resFlashSale.data?.data || resFlashSale.data;
+          
+          // API Flash Sale trả về cấu trúc { id, start_at, items: [...] }
+          if (fsData && Array.isArray(fsData.items)) {
+            setFlashSaleBooks(fsData.items);
+          }
+        } catch (fsError) {
+          console.log("Hiện không có Flash Sale nào đang chạy", fsError);
+        }
+
       } catch (error) {
-        console.error("Lỗi tải sách trang chủ", error);
-        setBooks([]); // Đảm bảo fallback là mảng rỗng nếu có lỗi
+        console.error("Lỗi tải trang chủ", error);
+        setBooks([]); 
       } finally {
         setIsLoading(false);
       }
     };
-    fetchBooks();
+    fetchAllData();
   }, []);
 
-  // Lớp khiên bảo vệ 2: Đảm bảo biến books luôn là Array trước khi dùng các hàm lọc
   const safeBooks = Array.isArray(books) ? books : [];
-
-  // Lọc sách Flash Sale: Đồng bộ trường selling_price theo API mới
-  const flashSaleBooks = safeBooks.filter(b => 
-    b.discount_percent > 0 || (b.original_price && b.selling_price && b.original_price > b.selling_price)
-  );
   
   const newBooks = safeBooks.slice(0, 8);
   const suggestBooks = safeBooks.slice(0, 10);
@@ -57,11 +60,10 @@ const HomePage = () => {
     <div className="flex flex-col gap-10 pb-12 bg-gray-50">
       <section className="w-full"><BannerSlider /></section>
 
-      {/* SECTION: FLASH SALE [MỚI] */}
+      {/* SECTION: FLASH SALE */}
       {flashSaleBooks.length > 0 && (
         <section className="container mx-auto px-4">
           <div className="bg-gradient-to-r from-[#0a4d1a] via-[#157a2c] to-[#0e5c1f] rounded-2xl p-5 md:p-8 shadow-xl relative overflow-hidden">
-            {/* Hiệu ứng tia sét mờ làm nền */}
             <FiZap className="absolute -right-10 -top-10 text-white/5 w-64 h-64 rotate-12" />
             
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 relative z-10 gap-4">

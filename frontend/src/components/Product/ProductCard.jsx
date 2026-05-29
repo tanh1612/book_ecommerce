@@ -8,38 +8,52 @@ const ProductCard = ({ book }) => {
   const navigate = useNavigate();
   const { addToCart, buyNow } = useCart();
 
-  const title = book.name || "Đang cập nhật";
-  const salePrice = Number(book.selling_price || 0); // Ép kiểu số
-  const originalPrice = Number(book.original_price || salePrice);
-  const thumbnail = book.thumbnail_url || "https://placehold.co/300x400/EEE/31343C?text=No+Image";
+  // 1. Tương thích thông minh: Lấy dữ liệu lõi bất kể là API Sách thường hay API Flash Sale
+  const bookInfo = book.book || book; 
+
+  const title = bookInfo.name || "Đang cập nhật";
+  const slug = bookInfo.slug || "";
+  const thumbnail = bookInfo.thumbnail_url || "https://placehold.co/300x400/EEE/31343C?text=No+Image";
   
-  const author = Array.isArray(book.authors) 
-    ? book.authors.map(a => a.name).join(', ') 
+  const author = Array.isArray(bookInfo.authors) 
+    ? bookInfo.authors.map(a => a.name).join(', ') 
     : "Nhiều tác giả";
 
-  const discountPercent = originalPrice > salePrice 
-    ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) 
-    : 0;
+  // 2. Thuật toán tính giá: Ưu tiên chiết khấu của Flash Sale nếu có
+  let originalPrice = Number(book.original_price || bookInfo.original_price || 0);
+  let salePrice = Number(book.selling_price || bookInfo.selling_price || originalPrice);
+  let discountPercent = 0;
+
+  // Kiểm tra xem dữ liệu có phải là từ đợt Flash Sale đang chạy hay không
+  if (book.discount_percent > 0) {
+    discountPercent = Number(book.discount_percent);
+    // Tự động tính lại giá bán thực tế cho khách dựa trên % giảm giá
+    salePrice = originalPrice - (originalPrice * (discountPercent / 100));
+  } else {
+    // Nếu là sách bình thường, tính % giảm dựa trên chênh lệch giá gốc và giá bán
+    discountPercent = originalPrice > salePrice 
+      ? Math.round(((originalPrice - salePrice) / originalPrice) * 100) 
+      : 0;
+  }
 
   const handleAddToCart = (e) => {
     e.preventDefault();
-    addToCart(book, 1);
+    addToCart(bookInfo, 1);
   };
 
-  // 🔥 Xử lý sự kiện Mua ngay
   const handleBuyNow = (e) => {
     e.preventDefault();
-    buyNow(book, 1, navigate);
+    buyNow(bookInfo, 1, navigate);
   };
 
   return (
     <div className="bg-white rounded border border-gray-100 hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full overflow-hidden p-4">
-      <Link to={`/book/${book.slug}`} className="block overflow-hidden mb-4 flex-shrink-0">
+      <Link to={`/book/${slug}`} className="block overflow-hidden mb-4 flex-shrink-0">
         <img src={thumbnail} alt={title} className="w-full h-52 object-contain group-hover:scale-105 transition-transform duration-500" />
       </Link>
 
       <div className="flex flex-col flex-grow text-left">
-        <Link to={`/book/${book.slug}`}>
+        <Link to={`/book/${slug}`}>
           <h3 className="text-[14px] text-gray-800 font-medium line-clamp-2 hover:text-[#157a2c] transition-colors mb-1 min-h-[40px]">
             {title}
           </h3>
