@@ -23,6 +23,7 @@ return [
     ],
 
     'chat' => [
+        'history_store' => env('AI_CHAT_HISTORY_STORE', 'redis'),
         'history_ttl_seconds' => (int) env('AI_CHAT_HISTORY_TTL_SECONDS', 86400),
         'history_max_turns' => (int) env('AI_CHAT_HISTORY_MAX_TURNS', 10),
         'min_question_length' => (int) env('AI_CHAT_MIN_QUESTION_LENGTH', 2),

@@ -11,8 +11,11 @@ class ChatController extends Controller
 {
     public function store(ChatRequest $request, ChatbotService $chatbotService): ChatMessageResource
     {
-        $sessionId = $request->validated('session_id');
-        $payload = $chatbotService->buildStubResponse($sessionId);
+        $payload = $chatbotService->handleStub(
+            sessionId: $request->validated('session_id'),
+            question: $request->validated('question'),
+            accountId: $request->user()?->id,
+        );
 
         return (new ChatMessageResource($payload))
             ->additional(['meta' => $payload['meta']]);

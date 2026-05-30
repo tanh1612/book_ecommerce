@@ -1,13 +1,16 @@
 <?php
 
 use App\Models\Account;
+use App\Models\AiChatMessage;
+use App\Services\Ai\ChatHistoryStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    Cache::flush();
+    Cache::store((string) config('ai.chat.history_store'))->flush();
 });
 
 function validChatPayload(array $overrides = []): array
@@ -23,12 +26,14 @@ function postChat(array $payload = []): \Illuminate\Testing\TestResponse
     return test()->postJson('/api/v1/ai/chat', validChatPayload($payload));
 }
 
-test('guest chat returns stub response with expected contract', function (): void {
+test('guest chat returns stub response with expected contract and logs message', function (): void {
     $sessionId = '550e8400-e29b-41d4-a716-446655440000';
 
-    postChat(['session_id' => $sessionId])
+    $response = postChat(['session_id' => $sessionId]);
+
+    $response
         ->assertOk()
-        ->assertJsonPath('data.message_id', null)
+        ->assertJsonPath('data.message_id', fn ($id) => is_int($id) && $id > 0)
         ->assertJsonPath('data.answer', config('ai.chat.stub_message'))
         ->assertJsonPath('data.sources', [])
         ->assertJsonPath('meta.session_id', $sessionId)
@@ -37,16 +42,74 @@ test('guest chat returns stub response with expected contract', function (): voi
         ->assertJsonPath('meta.retrieval.top_score', null)
         ->assertJsonPath('meta.retrieval.matched', false)
         ->assertJsonPath('meta.evaluation', null);
+
+    $messageId = (int) $response->json('data.message_id');
+
+    $this->assertDatabaseHas('ai_chat_messages', [
+        'id' => $messageId,
+        'session_id' => $sessionId,
+        'account_id' => null,
+        'question' => 'Toi muon tim sach ve ky nang giao tiep',
+        'answer' => config('ai.chat.stub_message'),
+        'model_version' => config('ai.gemini.chat_model'),
+        'retrieval_strategy' => 'none',
+        'retrieval_matched' => false,
+        'error_code' => null,
+    ]);
 });
 
-test('authenticated member can chat and receives stub response', function (): void {
+test('authenticated member chat logs account_id and persists redis history', function (): void {
     $account = Account::factory()->create();
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
 
-    $this->actingAs($account)
-        ->postJson('/api/v1/ai/chat', validChatPayload())
+    $this->actingAs($account, 'web')
+        ->postJson('/api/v1/ai/chat', validChatPayload(['session_id' => $sessionId]))
+        ->assertOk()
+        ->assertJsonPath('meta.retrieval.strategy', 'none');
+
+    $this->assertDatabaseHas('ai_chat_messages', [
+        'session_id' => $sessionId,
+        'account_id' => $account->id,
+    ]);
+
+    $history = app(ChatHistoryStore::class)->getAll($sessionId);
+
+    expect($history)->toHaveCount(2)
+        ->and($history[0]['role'])->toBe('user')
+        ->and($history[1]['role'])->toBe('assistant');
+});
+
+test('redis history is appended even when db log fails', function (): void {
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+
+    Schema::drop('ai_chat_messages');
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => 'Cau hoi khi db loi',
+    ])
         ->assertOk()
         ->assertJsonPath('data.message_id', null)
-        ->assertJsonPath('meta.retrieval.strategy', 'none');
+        ->assertJsonPath('data.answer', config('ai.chat.stub_message'));
+
+    expect(app(ChatHistoryStore::class)->getAll($sessionId))->toHaveCount(2);
+});
+
+test('multiple chats with same session_id append redis history', function (): void {
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => 'Cau hoi 1',
+    ])->assertOk();
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => 'Cau hoi 2',
+    ])->assertOk();
+
+    expect(app(ChatHistoryStore::class)->getAll($sessionId))->toHaveCount(4);
+    expect(AiChatMessage::query()->where('session_id', $sessionId)->count())->toBe(2);
 });
 
 test('chat requires session_id', function (): void {
@@ -101,12 +164,12 @@ test('member chat is throttled per account_id', function (): void {
     $account = Account::factory()->create();
 
     for ($i = 0; $i < 3; $i++) {
-        $this->actingAs($account)
+        $this->actingAs($account, 'web')
             ->postJson('/api/v1/ai/chat', validChatPayload())
             ->assertOk();
     }
 
-    $this->actingAs($account)
+    $this->actingAs($account, 'web')
         ->postJson('/api/v1/ai/chat', validChatPayload())
         ->assertStatus(429)
         ->assertJsonPath('message', 'Ban dang gui qua nhieu tin nhan, vui long thu lai sau.');

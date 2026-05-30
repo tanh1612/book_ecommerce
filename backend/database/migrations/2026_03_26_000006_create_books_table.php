@@ -22,6 +22,11 @@ return new class extends Migration
             $table->decimal('average_rating', 3, 2)->default(0.00);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            $table->index('is_active');
+            $table->index('selling_price');
+            $table->index('average_rating');
+            $table->index('created_at');
         });
     }
 

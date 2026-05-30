@@ -17,6 +17,9 @@ return new class extends Migration
             $table->text('comment')->nullable();
             $table->string('status', 50)->nullable();
             $table->timestamps();
+
+            $table->index('status');
+            $table->index(['book_id', 'rating']);
         });
     }
 
