@@ -6,7 +6,10 @@ use App\Services\Media\BookImageStorageService;
 use App\Services\Promotion\FlashSaleScheduleMutex;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use League\Flysystem\Config;
 use League\Flysystem\UnableToDeleteFile;
@@ -36,6 +39,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('ai-chat', function (Request $request): Limit {
+            if ($request->user()) {
+                return Limit::perMinute((int) config('ai.rate_limits.member_per_minute'))
+                    ->by('ai-chat:member:'.$request->user()->id);
+            }
+
+            $sessionId = (string) $request->input('session_id', 'missing');
+
+            return Limit::perMinute((int) config('ai.rate_limits.guest_per_minute'))
+                ->by('ai-chat:guest:'.$request->ip().'|'.$sessionId);
+        });
+
         \App\Models\Book::observe(\App\Observers\BookObserver::class);
         \App\Models\BookImage::observe(\App\Observers\BookImageObserver::class);
         \App\Models\Review::observe(\App\Observers\ReviewObserver::class);

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Ai\ChatController;
 use App\Http\Controllers\Api\V1\Account\AddressController;
 use App\Http\Controllers\Api\V1\Account\OrderController;
 use App\Http\Controllers\Api\V1\Account\ReviewController;
@@ -186,3 +187,7 @@ Route::post('v1/recommendations/interactions/books/{book}/view', [InteractionCon
 // Recommendation feed
 Route::get('v1/recommendations', [RecommendationController::class, 'index'])
     ->middleware(['web', 'throttle:120,1']);
+
+// AI chatbot
+Route::post('v1/ai/chat', [ChatController::class, 'store'])
+    ->middleware(['web', 'throttle:ai-chat']);
