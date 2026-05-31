@@ -17,6 +17,7 @@ use App\Models\Publisher;
 use App\Models\Review;
 use App\Models\ShippingMethod;
 use App\Models\Supplier;
+use App\Services\Ai\MeilisearchRagDocumentWriter;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
 use Filament\Actions\Imports\Jobs\ImportCsv;
 use Filament\Actions\Imports\Models\Import;
@@ -44,6 +45,14 @@ function bindRecordingScoutEngineForTriggers(): RecordingScoutEngine
     ]);
 
     return $engine;
+}
+
+function runSyncBookToMeilisearchJob(int $bookId): void
+{
+    $writer = Mockery::mock(MeilisearchRagDocumentWriter::class);
+    $writer->shouldReceive('getDocumentVectors')->andReturn(null);
+
+    (new SyncBookToMeilisearch($bookId))->handle($writer);
 }
 
 test('book detail save dispatches meilisearch sync job', function (): void {
@@ -101,7 +110,7 @@ test('detaching category dispatches reindex and document drops removed category'
     Queue::assertPushed(SyncBookToMeilisearch::class, fn (SyncBookToMeilisearch $job): bool => $job->bookId === $book->id);
 
     $engine = bindRecordingScoutEngineForTriggers();
-    (new SyncBookToMeilisearch($book->id))->handle();
+    runSyncBookToMeilisearchJob($book->id);
 
     expect($engine->lastDocument()['category_ids'] ?? null)->toBe([$remaining->id]);
 });
@@ -118,7 +127,7 @@ test('author delete dispatches reindex and document drops removed author', funct
     Queue::assertPushed(SyncBookToMeilisearch::class, fn (SyncBookToMeilisearch $job): bool => $job->bookId === $book->id);
 
     $engine = bindRecordingScoutEngineForTriggers();
-    (new SyncBookToMeilisearch($book->id))->handle();
+    runSyncBookToMeilisearchJob($book->id);
 
     $document = $engine->lastDocument();
 
@@ -137,7 +146,7 @@ test('publisher delete dispatches reindex and document clears publisher_id', fun
     Queue::assertPushed(SyncBookToMeilisearch::class, fn (SyncBookToMeilisearch $job): bool => $job->bookId === $book->id);
 
     $engine = bindRecordingScoutEngineForTriggers();
-    (new SyncBookToMeilisearch($book->id))->handle();
+    runSyncBookToMeilisearchJob($book->id);
 
     expect($book->fresh()->publisher_id)->toBeNull()
         ->and($engine->lastDocument())->not->toBeNull()

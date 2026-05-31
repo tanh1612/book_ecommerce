@@ -238,6 +238,8 @@ return [
         'hybrid_semantic_ratio' => (float) env('AI_RAG_HYBRID_SEMANTIC_RATIO', 0.6),
         'sync_batch_size' => (int) env('AI_RAG_SYNC_BATCH_SIZE', 20),
         'sync_batch_sleep_ms' => (int) env('AI_RAG_SYNC_BATCH_SLEEP_MS', 500),
+        'embed_batch_size' => (int) env('AI_RAG_EMBED_BATCH_SIZE', 25),
+        'rate_limit_stop_on_429' => (bool) env('AI_RAG_SYNC_STOP_ON_429', true),
     ],
 
     'chat' => [
@@ -273,6 +275,8 @@ AI_RAG_RRF_MIN_SCORE=0.02
 AI_RAG_HYBRID_SEMANTIC_RATIO=0.6
 AI_RAG_SYNC_BATCH_SIZE=20
 AI_RAG_SYNC_BATCH_SLEEP_MS=500
+AI_RAG_EMBED_BATCH_SIZE=25
+AI_RAG_SYNC_STOP_ON_429=true
 AI_CHAT_HISTORY_TTL_SECONDS=86400
 AI_CHAT_HISTORY_MAX_TURNS=10
 AI_CHAT_MAX_QUESTION_LENGTH=1000
@@ -290,7 +294,9 @@ Ghi chu model:
 
 - `gemini-1.5-flash` va `text-embedding-004` da shutdown (09/2025 va 01/2026); khong dung lai.
 - LLM MVP: `gemini-2.5-flash-lite` — khong co thinking mac dinh, latency/chi phi thap hon `gemini-2.5-flash`. Neu chat quality khong dat sau manual test, doi `GEMINI_CHAT_MODEL=gemini-2.5-flash` (co the can `thinkingBudget=0` de giam latency).
-- Embedding: `gemini-embedding-2` mac dinh 3072 chieu; bat buoc truyen `output_dimensionality` = `AI_RAG_EMBEDDING_DIMENSIONS` (768) trong moi request `embedContent`. Vector truncated duoc model tu normalize.
+- Embedding: `gemini-embedding-2` mac dinh 3072 chieu; bat buoc truyen `output_dimensionality` = `AI_RAG_EMBEDDING_DIMENSIONS` (768) trong moi request `embedContent` va moi item cua `batchEmbedContents`. Vector truncated duoc model tu normalize.
+- Full sync khong goi 1 request Gemini cho tung sach neu co nhieu sach. Dung `batchEmbedContents` voi `AI_RAG_EMBED_BATCH_SIZE` de giam request/day. Vi du 1.800 sach voi batch 25 chi can khoang 72 embedding requests thay vi 1.800 requests.
+- Batch embedding chi giam request count, khong giam tong input tokens. Van phai dieu tiet `AI_RAG_SYNC_BATCH_SLEEP_MS` theo TPM/RPM cua Google AI Studio, dac biet free tier co RPD/RPM/TPM thap.
 - Doi embedding model hoac dimension bat buoc re-index toan bo Meilisearch va doi `AI_RAG_EMBEDDER_NAME` tuong ung.
 
 ## 7. Du lieu embedding cua sach
@@ -464,9 +470,12 @@ Co che batch/debounce de tranh fanout:
 - Redis set/list tam: `ai:rag:sync:pending_book_ids`.
 - Observer add `book_id` vao pending set sau commit; trung lap tu nhieu observer chi giu mot lan.
 - Job/command batch lay toi da `AI_RAG_SYNC_BATCH_SIZE`, mac dinh 20 book/lua.
-- Giua cac batch sleep `AI_RAG_SYNC_BATCH_SLEEP_MS`, mac dinh 500ms, de giam nguy co bi Gemini throttle.
+- Trong moi batch sach, service chia tiep thanh cac request `batchEmbedContents` co toi da `AI_RAG_EMBED_BATCH_SIZE`, mac dinh 25 embedding texts/lua. Neu batch sach nho hon embed batch thi chi tao 1 request Gemini.
+- Giua cac batch sleep `AI_RAG_SYNC_BATCH_SLEEP_MS`, mac dinh 500ms. Khi dung free tier nen cau hinh sleep theo TPM/RPM/RPD thuc te tren Google AI Studio; batch embedding giam RPD nhung van co the cham TPM neu text qua dai hoac batch qua lon.
 - Queue cho sync nen tach rieng, vi du `ai-rag-sync`, de khong canh tranh voi checkout/payment/order jobs.
-- Neu mot NXB co 500 sach, he thong tao pending set 500 id nhung worker xu ly theo 25 batch nho thay vi dispatch 500 request Gemini cung luc.
+- Neu mot NXB co 500 sach, he thong tao pending set 500 id nhung worker xu ly theo cac batch nho, moi batch tao it request `batchEmbedContents` thay vi dispatch 500 request Gemini rieng le.
+- Khi Gemini tra HTTP 429 trong full sync, command phai dung som neu `AI_RAG_SYNC_STOP_ON_429=true`, ghi cac book chua xu ly vao pending set hoac in range resume, khong tiep tuc fail hang loat.
+- Pending worker khong duoc lam mat book id khi sync fail; failed ids phai duoc re-add vao pending set hoac dua vao dead-letter co command retry ro rang.
 
 Thanh phan goi y:
 
@@ -569,7 +578,7 @@ Quy tac:
 | `App\Http\Resources\Ai\ChatMessageResource` | Response chat |
 | `App\Services\Ai\ChatbotService` | Orchestrate toan bo pipeline |
 | `App\Services\Ai\PromptBuilder` | Build system prompt, history, context |
-| `App\Services\Ai\GeminiClient` | Goi chat va embedding API |
+| `App\Services\Ai\GeminiClient` | Goi chat, single embedding va batch embedding API |
 | `App\Services\Ai\BookRagRetriever` | Hybrid retrieval tu Meilisearch |
 | `App\Services\Ai\BookRagDocumentFactory` | Tao text embedding va payload context |
 | `App\Services\Ai\ChatHistoryStore` | Doc/ghi Redis history |
@@ -853,6 +862,7 @@ Pham vi:
 
 - Tao `GeminiClient`.
 - Method `embedText(string $text): array` — goi `embedContent` voi `output_dimensionality` tu `config('ai.rag.embedding_dimensions')`.
+- Method `embedTexts(array $texts): array` — goi `batchEmbedContents`, moi item truyen cung model va `output_dimensionality`; response phai giu dung thu tu input.
 - Method `generateAnswer(array $payload): GeminiChatResult`.
 - Timeout va retry theo config.
 - Bat timeout, rate-limit, 5xx.
@@ -862,6 +872,7 @@ Pham vi:
 Ket qua demo:
 
 - Service co the goi fake Gemini va parse cau tra loi.
+- Service co the goi fake Gemini batch embedding va map dung vector ve tung input text.
 - Khi fake timeout, API tra fallback message, khong 500.
 
 ### Lat 4: RAG document text va Meilisearch vector config
@@ -893,25 +904,30 @@ Pham vi:
 - Tao job `SyncBookRagDocument` de sync mot sach.
 - Tao `QueueBookRagSyncService` va `SyncPendingBookRagDocuments` de gom pending `book_id` theo batch.
 - Lay sach active va relation can thiet: detail, authors, categories, publisher, inventories.
-- Goi Gemini embedding cho embedding text (model `gemini-embedding-2`, `output_dimensionality` = 768).
+- Ho tro `BookRagSyncService::syncMany(array $bookIds)` de load nhieu sach, build embedding texts, goi Gemini `batchEmbedContents`, map vector ve tung book theo thu tu, roi upsert documents vao Meilisearch.
+- Goi Gemini embedding cho embedding text (model `gemini-embedding-2`, `output_dimensionality` = 768). Single-book path dung `embedContent`; multi-book path dung `batchEmbedContents`.
 - Ghi `_vectors.{embedder_name}` vao Meilisearch.
 - Ho tro option `--book-id=` de sync mot sach.
-- Ho tro chunking de sync nhieu sach voi batch size tu `AI_RAG_SYNC_BATCH_SIZE`.
+- Ho tro option `--all`, `--pending`, `--from-id=`, `--limit=`, `--missing-vectors`, `--dry-run`.
+- Ho tro chunking sach voi `AI_RAG_SYNC_BATCH_SIZE` va chunking embedding request voi `AI_RAG_EMBED_BATCH_SIZE`.
 - Observer khong dispatch 1 job Gemini cho tung sach; observer chi enqueue `book_id` vao pending set.
 - Batch worker lay pending set theo lo, sleep giua cac lo theo `AI_RAG_SYNC_BATCH_SLEEP_MS`.
+- `SyncPendingBookRagDocuments` nen dung `ShouldBeUniqueUntilProcessing` hoac co co che dispatch batch tiep theo sau khi unique lock da release. Khong de pending set con ids nhung khong con worker tiep tuc xu ly.
 - Dispatch incremental sync qua queue rieng `ai-rag-sync` khi `Book`, `BookDetail`, tac gia, danh muc hoac nha xuat ban anh huong den embedding text.
 - Them schedule sync bo tro hang dem neu can chong miss event.
-- Log loi tung sach nhung khong lam dung ca batch neu co the tiep tuc.
+- Log loi tung sach nhung khong lam dung ca batch neu co the tiep tuc. Rieng HTTP 429/rate-limit phai dung som hoac requeue failed/chua xu ly de tranh fail hang loat va mat ids.
 - Test command voi fake Gemini/Meilisearch client.
 
 Ket qua demo:
 
 - Chay command sync duoc mot sach vao Meilisearch voi vector 768 chieu.
-- Khi cap nhat mot NXB co nhieu sach, he thong chi tao pending ids va batch worker xu ly theo lo, khong tao dot bien hang tram request Gemini cung luc.
+- Chay full sync 1.800 sach khong tao 1.800 request Gemini rieng le; voi `AI_RAG_EMBED_BATCH_SIZE=25`, chi can khoang 72 request embedding truoc khi tinh retry.
+- Khi cap nhat mot NXB co nhieu sach, he thong chi tao pending ids va batch worker xu ly theo lo, moi lo dung batch embedding, khong tao dot bien hang tram request Gemini cung luc.
 
 Ghi chu:
 
 - Neu model embedding thay doi, can chay lai full sync.
+- Batch embedding giam request/day nhung khong giam token/minute. Neu dung free tier, can chon `AI_RAG_EMBED_BATCH_SIZE` va `AI_RAG_SYNC_BATCH_SLEEP_MS` theo Rate Limit page.
 
 ### Lat 6: BookRagRetriever voi hybrid search
 
@@ -1071,8 +1087,11 @@ Ket qua demo:
 - `BookRagRetriever` check threshold dung.
 - `BookRagRetriever` merge RRF dung rank khi fallback.
 - `GeminiClient` parse response, token usage, va `output_dimensionality` embedding dung.
+- `GeminiClient` batch embedding goi `batchEmbedContents`, validate count/dimension, va giu dung thu tu vector theo input.
 - `QueueBookRagSyncService` deduplicate pending book ids va batch theo config.
-- `SyncPendingBookRagDocuments` khong goi Gemini vuot batch size trong mot lo.
+- `BookRagSyncService::syncMany` gom nhieu sach vao it request Gemini theo `AI_RAG_EMBED_BATCH_SIZE` va upsert dung vector cho tung book.
+- `SyncPendingBookRagDocuments` khong goi Gemini vuot batch size trong mot lo va khong lam mat pending ids khi tung book/batch fail.
+- Command full sync dung som hoac requeue khi Gemini tra 429, co test khong fail hang loat sau rate limit.
 - `ChatEvaluationService` khong flag gia/nam/so trang khi claim khop structured facts tu MySQL.
 
 ### 16.3. Manual test cases
@@ -1102,12 +1121,13 @@ Ket qua demo:
 - Rate limiting ngan spam Gemini API.
 - History dua vao prompt bi gioi han boi `AI_CHAT_HISTORY_MAX_TURNS`.
 - Vector document dung `_vectors.{embedder_name}` voi embedder user-provided (`gemini_embedding_2_768`, dimension 768).
-- `GeminiClient` truyen `output_dimensionality` khi embed.
+- `GeminiClient` truyen `output_dimensionality` khi embed single va batch.
 - Text embedding khong include gia/rating/ton kho.
 - Context prompt luon lay gia/rating/ton kho moi tu MySQL cho top K.
 - `rag_embedding_text` khong nam trong `searchableAttributes`.
 - Sync vector co duong incremental khi du lieu sach/tac gia/danh muc/nha xuat ban thay doi.
 - Incremental sync quan he lon phai qua pending set va batch worker, khong dispatch hang tram job Gemini cung luc.
+- Full sync nhieu sach phai dung batch embedding de khong vuot request/day khi dataset co khoang 1.800 sach.
 - Evaluation doi chieu regex candidate voi structured facts tu MySQL truoc khi flag hallucination risk.
 
 ## 18. File/thanh phan du kien thay doi
@@ -1144,7 +1164,11 @@ Ket qua demo:
 | Fallback Gemini bi luu vao history | Lam nhieu context cac luot sau | Chi luu Redis khi co cau tra loi that tu Gemini |
 | Feedback bi chan sai khi doi thiet bi/dang nhap sau | User khong danh gia duoc cau tra loi hop le | Authorization feedback dung rule OR: `session_id` khop hoac `account_id` khop |
 | Meilisearch khong ho tro hybrid API | Retrieval khong chay duoc | Test version truoc khi code; neu can fallback RRF theo rank |
-| Observer fanout khi doi NXB/danh muc/tac gia | Dot bien request Gemini, bi throttle hoac tang chi phi | Observer chi enqueue pending ids; batch worker xu ly theo `AI_RAG_SYNC_BATCH_SIZE` va sleep giua batch |
+| Full sync tao 1 request embedding cho moi sach | Dataset 1.800 sach vuot free tier RPD 1K va fail 429 hang loat | Dung `batchEmbedContents` voi `AI_RAG_EMBED_BATCH_SIZE`, them `--limit`/`--from-id`/`--missing-vectors`, va dung som khi 429 |
+| Batch embedding qua lon | Giam RPD nhung van vuot TPM/RPM, bi 429 | Bat dau `AI_RAG_EMBED_BATCH_SIZE=25`, tang sleep theo Rate Limit page, theo doi token/request |
+| Pending worker mat id khi sync fail | Sach fail khong duoc retry, index thieu vector | Re-add failed ids vao pending hoac dead-letter; khong pop vinh vien khi loi tam thoi |
+| Unique lock chan batch worker tiep theo | Pending set con id nhung khong co job tiep tuc xu ly | Dung `ShouldBeUniqueUntilProcessing` hoac dispatch worker tiep theo sau khi lock release |
+| Observer fanout khi doi NXB/danh muc/tac gia | Dot bien request Gemini, bi throttle hoac tang chi phi | Observer chi enqueue pending ids; batch worker xu ly theo `AI_RAG_SYNC_BATCH_SIZE`, dung batch embedding va sleep giua batch |
 | Regex evaluation false positive | Cau tra loi dung bi gan warning | Regex chi tim candidate claim; risk chi flag sau khi doi chieu structured facts tu MySQL |
 
 ## 20. Lenh van hanh du kien
@@ -1154,7 +1178,11 @@ php artisan migrate
 php artisan config:clear
 php artisan scout:sync-index-settings
 php artisan ai:meilisearch-configure
-php artisan ai:sync-book-rag-documents
+php artisan ai:sync-book-rag-documents --book-id=1
+php artisan ai:sync-book-rag-documents --all --limit=500
+php artisan ai:sync-book-rag-documents --all --from-id=501 --limit=500
+php artisan ai:sync-book-rag-documents --missing-vectors --limit=500
+php artisan ai:sync-book-rag-documents --pending
 php artisan test --filter=Ai
 ```
 
@@ -1163,3 +1191,14 @@ Ghi chu:
 - `scout:sync-index-settings` giu cau hinh search hien co cua index `books`.
 - `ai:meilisearch-configure` chi quan ly phan vector embedder.
 - `ai:sync-book-rag-documents` can `GEMINI_API_KEY` va Meilisearch dang chay.
+- Với free tier Gemini Embedding 2, cau hinh an toan ban dau:
+
+```env
+AI_RAG_EMBED_BATCH_SIZE=25
+AI_RAG_SYNC_BATCH_SIZE=25
+AI_RAG_SYNC_BATCH_SLEEP_MS=30000
+AI_RAG_SYNC_STOP_ON_429=true
+```
+
+- Neu Rate Limit page cho thay TPM con du, co the tang `AI_RAG_EMBED_BATCH_SIZE` len 50. Neu con gap 429, giam batch hoac tang sleep.
+- Khong chay lai `--all` tu dau khi dang bi 429. Dung `--from-id`, `--limit`, `--missing-vectors` hoac `--pending` de resume/retry.

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Services\Search\BookSearchDocumentFactory;
+use App\Services\Ai\BookRagDocumentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -114,7 +114,7 @@ class Book extends Model
      */
     public function toSearchableArray(): array
     {
-        return app(BookSearchDocumentFactory::class)->make($this);
+        return app(BookRagDocumentFactory::class)->makeDocument($this);
     }
 
     /**
@@ -127,8 +127,9 @@ class Book extends Model
     {
         return $query->with([
             'authors:id,name',
-            'categories:id',
-            'detail:book_id,description',
+            'categories:id,name',
+            'detail:book_id,description,language,format,publication_year,num_pages',
+            'publisher:id,name',
             'inventories:id,book_id,quantity,reserved_quantity',
         ]);
     }

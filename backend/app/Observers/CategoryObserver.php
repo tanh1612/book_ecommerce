@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Category;
+use App\Services\Ai\BookRagSyncDispatcher;
 use App\Services\Catalog\CatalogCacheService;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
 use Illuminate\Support\Facades\DB;
@@ -15,12 +16,17 @@ class CategoryObserver
     public function __construct(
         private CatalogCacheService $catalogCache,
         private BookMeilisearchSyncDispatcher $meilisearchSync,
+        private BookRagSyncDispatcher $bookRagSync,
     ) {}
 
     public function saved(Category $category): void
     {
         $this->invalidateBranchBooks($category);
         $this->catalogCache->forgetFiltersMetadataAfterCommit();
+
+        if ($category->wasChanged('name')) {
+            $this->dispatchRagSyncForBranchBooks($category);
+        }
     }
 
     public function deleting(Category $category): void
@@ -63,6 +69,25 @@ class CategoryObserver
             $this->catalogCache->forgetBooksLinkedToCategoriesAfterCommit($categoryIds);
         } catch (Throwable $e) {
             Log::warning('Catalog cache invalidation failed (category branch)', [
+                'category_id' => $category->id,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    private function dispatchRagSyncForBranchBooks(Category $category): void
+    {
+        try {
+            $categoryIds = array_merge([(int) $category->id], $category->getDescendantIds());
+            $bookIds = DB::table('book_categories')
+                ->whereIn('category_id', $categoryIds)
+                ->distinct()
+                ->pluck('book_id');
+
+            $this->bookRagSync->dispatchMany($bookIds);
+        } catch (Throwable $e) {
+            Log::warning('Book RAG sync dispatch failed (category rename)', [
                 'category_id' => $category->id,
                 'error' => $e->getMessage(),
                 'exception' => $e::class,

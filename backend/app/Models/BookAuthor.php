@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Ai\BookRagSyncDispatcher;
 use App\Services\Catalog\CatalogCacheService;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
 use Illuminate\Database\Eloquent\Relations\Pivot;
@@ -37,6 +38,7 @@ class BookAuthor extends Pivot
 
         try {
             app(BookMeilisearchSyncDispatcher::class)->dispatch($bookId);
+            app(BookRagSyncDispatcher::class)->dispatch($bookId);
         } catch (Throwable $e) {
             Log::warning('Book author pivot side effects failed', [
                 'book_id' => $bookId,

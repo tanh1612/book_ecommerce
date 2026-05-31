@@ -3,6 +3,7 @@
 namespace App\Jobs\Search;
 
 use App\Models\Book;
+use App\Services\Ai\MeilisearchRagDocumentWriter;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -23,7 +24,7 @@ class SyncBookToMeilisearch implements ShouldBeUniqueUntilProcessing, ShouldQueu
         public int $bookId,
     ) {}
 
-    public function handle(): void
+    public function handle(MeilisearchRagDocumentWriter $documentWriter): void
     {
         $book = Book::query()->find($this->bookId);
 
@@ -31,10 +32,28 @@ class SyncBookToMeilisearch implements ShouldBeUniqueUntilProcessing, ShouldQueu
             return;
         }
 
+        $preservedVector = $documentWriter->getDocumentVectors($this->bookId);
+
         try {
             $book->searchableSync();
         } catch (Throwable $e) {
             Log::error('SyncBookToMeilisearch failed', [
+                'book_id' => $this->bookId,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            throw $e;
+        }
+
+        if ($preservedVector === null) {
+            return;
+        }
+
+        try {
+            $documentWriter->upsertVectors($this->bookId, $preservedVector);
+        } catch (Throwable $e) {
+            Log::error('SyncBookToMeilisearch vector preserve failed', [
                 'book_id' => $this->bookId,
                 'error' => $e->getMessage(),
                 'exception' => $e::class,

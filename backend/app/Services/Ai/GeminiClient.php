@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Exceptions\Ai\GeminiClientException;
+use App\Services\Ai\Dto\GeminiBatchEmbeddingResult;
 use App\Services\Ai\Dto\GeminiChatResult;
 use App\Services\Ai\Dto\GeminiEmbeddingResult;
 use App\Services\Ai\Dto\GeminiGenerateContentRequest;
@@ -48,6 +49,66 @@ class GeminiClient
 
         return new GeminiEmbeddingResult(
             vector: $vector,
+            dimensions: $dimensions,
+            latencyMs: $latencyMs,
+            model: $model,
+        );
+    }
+
+    /**
+     * @param  list<string>  $texts
+     */
+    public function embedTexts(array $texts): GeminiBatchEmbeddingResult
+    {
+        $this->ensureApiKey();
+
+        $model = (string) config('ai.gemini.embedding_model');
+        $dimensions = (int) config('ai.rag.embedding_dimensions', 768);
+
+        if ($texts === []) {
+            return new GeminiBatchEmbeddingResult(
+                vectors: [],
+                dimensions: $dimensions,
+                latencyMs: 0,
+                model: $model,
+            );
+        }
+
+        $startedAt = hrtime(true);
+        $modelResource = str_starts_with($model, 'models/') ? $model : "models/{$model}";
+
+        $requests = array_map(
+            static fn (string $text): array => [
+                'model' => $modelResource,
+                'content' => [
+                    'parts' => [
+                        ['text' => $text],
+                    ],
+                ],
+                'outputDimensionality' => $dimensions,
+            ],
+            $texts,
+        );
+
+        $response = $this->requestWithRetry(
+            operation: 'batch_embed',
+            model: $model,
+            method: 'post',
+            url: $this->modelPath($model, 'batchEmbedContents'),
+            payload: ['requests' => $requests],
+            startedAt: $startedAt,
+        );
+
+        $latencyMs = $this->elapsedMilliseconds($startedAt);
+        $vectors = $this->parseBatchEmbeddingVectors($response->json(), count($texts), $dimensions, $latencyMs);
+
+        $this->logSuccess('batch_embed', $model, $startedAt, [
+            'batch_size' => count($texts),
+            'embedding_dimensions' => $dimensions,
+        ]);
+
+        return new GeminiBatchEmbeddingResult(
+            vectors: $vectors,
             dimensions: $dimensions,
             latencyMs: $latencyMs,
             model: $model,
@@ -222,6 +283,72 @@ class GeminiClient
             httpStatus: $status,
             latencyMs: $this->elapsedMilliseconds($startedAt),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $body
+     * @return list<array<int, float>>
+     */
+    private function parseBatchEmbeddingVectors(
+        ?array $body,
+        int $expectedCount,
+        int $expectedDimensions,
+        int $latencyMs,
+    ): array {
+        $embeddings = $body['embeddings'] ?? null;
+
+        if (! is_array($embeddings) || count($embeddings) !== $expectedCount) {
+            throw new GeminiClientException(
+                sprintf(
+                    'Gemini batch embedding count mismatch: expected %d, got %d',
+                    $expectedCount,
+                    is_array($embeddings) ? count($embeddings) : 0,
+                ),
+                GeminiClientException::INVALID_RESPONSE,
+                latencyMs: $latencyMs,
+            );
+        }
+
+        $vectors = [];
+
+        foreach ($embeddings as $index => $embedding) {
+            if (! is_array($embedding)) {
+                throw new GeminiClientException(
+                    sprintf('Gemini batch embedding at index %d is invalid', $index),
+                    GeminiClientException::INVALID_RESPONSE,
+                    latencyMs: $latencyMs,
+                );
+            }
+
+            $values = $embedding['values'] ?? $embedding['embedding']['values'] ?? null;
+
+            if (! is_array($values) || $values === []) {
+                throw new GeminiClientException(
+                    sprintf('Gemini batch embedding at index %d is missing vector values', $index),
+                    GeminiClientException::INVALID_RESPONSE,
+                    latencyMs: $latencyMs,
+                );
+            }
+
+            $vector = array_map(static fn ($value): float => (float) $value, $values);
+
+            if (count($vector) !== $expectedDimensions) {
+                throw new GeminiClientException(
+                    sprintf(
+                        'Gemini batch embedding at index %d dimension mismatch: expected %d, got %d',
+                        $index,
+                        $expectedDimensions,
+                        count($vector),
+                    ),
+                    GeminiClientException::INVALID_RESPONSE,
+                    latencyMs: $latencyMs,
+                );
+            }
+
+            $vectors[] = $vector;
+        }
+
+        return $vectors;
     }
 
     /**

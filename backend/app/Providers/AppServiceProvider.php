@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\Ai\BookRagSyncDispatcher;
+use App\Services\Ai\QueueBookRagSyncService;
 use App\Services\Media\BookImageStorageService;
 use App\Services\Promotion\FlashSaleScheduleMutex;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
@@ -30,6 +32,8 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->scoped(BookMeilisearchSyncDispatcher::class);
+        $this->app->scoped(BookRagSyncDispatcher::class);
+        $this->app->scoped(QueueBookRagSyncService::class);
 
         $this->app->singleton(FlashSaleScheduleMutex::class);
     }
