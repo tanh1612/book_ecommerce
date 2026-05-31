@@ -21,6 +21,7 @@ return [
         'hybrid_semantic_ratio' => (float) env('AI_RAG_HYBRID_SEMANTIC_RATIO', 0.6),
         'sync_batch_size' => (int) env('AI_RAG_SYNC_BATCH_SIZE', 20),
         'sync_batch_sleep_ms' => (int) env('AI_RAG_SYNC_BATCH_SLEEP_MS', 500),
+        'embedding_text_max_description_chars' => (int) env('AI_RAG_EMBEDDING_TEXT_MAX_DESCRIPTION_CHARS', 3000),
     ],
 
     'chat' => [
