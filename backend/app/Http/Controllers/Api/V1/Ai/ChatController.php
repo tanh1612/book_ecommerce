@@ -11,7 +11,7 @@ class ChatController extends Controller
 {
     public function store(ChatRequest $request, ChatbotService $chatbotService): ChatMessageResource
     {
-        $payload = $chatbotService->handleStub(
+        $payload = $chatbotService->handle(
             sessionId: $request->validated('session_id'),
             question: $request->validated('question'),
             accountId: $request->user()?->id,

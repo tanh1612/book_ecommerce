@@ -3,6 +3,7 @@
 return [
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
+        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
         'chat_model' => env('GEMINI_CHAT_MODEL', 'gemini-2.5-flash-lite'),
         'embedding_model' => env('GEMINI_EMBEDDING_MODEL', 'gemini-embedding-2'),
         'timeout_seconds' => (int) env('AI_CHAT_TIMEOUT_SECONDS', 15),
