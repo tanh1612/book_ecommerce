@@ -26,6 +26,7 @@ return [
         'embed_batch_size' => (int) env('AI_RAG_EMBED_BATCH_SIZE', 25),
         'rate_limit_stop_on_429' => (bool) env('AI_RAG_SYNC_STOP_ON_429', true),
         'embedding_text_max_description_chars' => (int) env('AI_RAG_EMBEDDING_TEXT_MAX_DESCRIPTION_CHARS', 3000),
+        'prompt_context_max_description_chars' => (int) env('AI_RAG_PROMPT_CONTEXT_MAX_DESCRIPTION_CHARS', 500),
         'sync_pending_key' => env('AI_RAG_SYNC_PENDING_KEY', 'ai:rag:sync:pending_book_ids'),
         'sync_queue' => env('AI_RAG_SYNC_QUEUE', 'ai-rag-sync'),
         'sync_job_unique_for' => (int) env('AI_RAG_SYNC_JOB_UNIQUE_FOR', 3600),

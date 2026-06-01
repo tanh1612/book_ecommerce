@@ -2,7 +2,9 @@
 
 use App\Models\Account;
 use App\Models\AiChatMessage;
+use App\Services\Ai\BookRagRetriever;
 use App\Services\Ai\ChatHistoryStore;
+use App\Services\Ai\Dto\BookRagRetrievalResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -14,7 +16,20 @@ beforeEach(function (): void {
     config(['ai.gemini.api_key' => 'test-api-key']);
     Cache::store((string) config('ai.chat.history_store'))->flush();
     Http::preventStrayRequests();
+    bindDefaultBookRagRetriever();
 });
+
+function bindDefaultBookRagRetriever(): void
+{
+    $mock = Mockery::mock(BookRagRetriever::class);
+    $mock->shouldReceive('retrieve')->andReturn(new BookRagRetrievalResult(
+        matched: false,
+        topScore: null,
+        documents: [],
+        strategy: 'none',
+    ));
+    app()->instance(BookRagRetriever::class, $mock);
+}
 
 function validChatPayload(array $overrides = []): array
 {
