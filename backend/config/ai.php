@@ -52,5 +52,7 @@ return [
     'rate_limits' => [
         'guest_per_minute' => (int) env('AI_CHAT_RATE_LIMIT_GUEST', 20),
         'member_per_minute' => (int) env('AI_CHAT_RATE_LIMIT_MEMBER', 60),
+        'feedback_guest_per_minute' => (int) env('AI_CHAT_FEEDBACK_RATE_LIMIT_GUEST', 30),
+        'feedback_member_per_minute' => (int) env('AI_CHAT_FEEDBACK_RATE_LIMIT_MEMBER', 60),
     ],
 ];

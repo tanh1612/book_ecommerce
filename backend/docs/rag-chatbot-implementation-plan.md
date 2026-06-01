@@ -184,32 +184,38 @@ Quy tac response:
 Endpoint:
 
 ```text
-POST /api/v1/ai/chat/messages/{message}/feedback
+POST /api/v1/ai/messages/{message}/feedback
 ```
 
-Request:
+Request guest:
 
 ```json
 {
-  "rating": "helpful",
-  "reason": "answer_correct",
-  "comment": "Tra loi dung nhu minh can"
+  "session_id": "uuid-v4-string",
+  "rating": "up"
+}
+```
+
+Request member cho message cua minh:
+
+```json
+{
+  "rating": "down"
 }
 ```
 
 Gia tri `rating`:
 
-- `helpful`
-- `not_helpful`
+- `up`
+- `down`
 
-Gia tri `reason` goi y:
+Khong nhan `reason`/`comment` trong MVP de giam ma sat feedback.
 
-- `answer_correct`
-- `answer_incorrect`
-- `missing_information`
-- `hard_to_understand`
-- `irrelevant`
-- `other`
+Quy tac authorization:
+
+- Guest message (`ai_chat_messages.account_id = null`): request phai co `session_id` khop message.
+- Member message (`ai_chat_messages.account_id != null`): user dang nhap phai co `id` khop `account_id`; khong chap nhan chi dua vao `session_id`.
+- User da dang nhap van co the feedback guest message cu neu gui dung `session_id` cu.
 
 ## 6. Cau hinh moi
 
@@ -557,25 +563,23 @@ Muc dich: luu danh gia cua nguoi dung.
 | `message_id` | `bigint unsigned` | FK `ai_chat_messages.id` |
 | `account_id` | `bigint unsigned nullable` | Neu da dang nhap |
 | `session_id` | `char(36)` | De guest feedback |
-| `rating` | `varchar(20)` | `helpful`, `not_helpful` |
-| `reason` | `varchar(50) nullable` | Ly do chon san |
-| `comment` | `text nullable` | Ghi chu tu nguoi dung |
+| `rating` | `varchar(10)` | `up`, `down` |
 | `created_at`, `updated_at` | `timestamp nullable` | Theo Laravel |
 
 Index:
 
-- `message_id`
+- unique `message_id`
 - `account_id, created_at`
 - `session_id, created_at`
 
 Quy tac:
 
-- Guest: moi `message_id + session_id` chi nen co mot feedback moi nhat, hoac cho phep update feedback cu.
-- Member: moi `message_id + account_id` chi nen co mot feedback moi nhat, hoac cho phep update feedback cu.
-- Feedback hop le neu `session_id` request khop `ai_chat_messages.session_id`, hoac user dang nhap co `account_id` khop `ai_chat_messages.account_id`.
-- Khong yeu cau dong thoi ca `session_id` va `account_id` cung khop.
+- Moi `message_id` chi co mot feedback; gui lai thi update rating cu.
+- Guest message (`account_id = null`): request phai co `session_id` khop `ai_chat_messages.session_id`.
+- Member message (`account_id != null`): user dang nhap phai co `id` khop `ai_chat_messages.account_id`; khong cho phep feedback member message chi bang `session_id`.
 - Guest chat roi dang nhap sau do van duoc feedback message cu neu gui dung `session_id` cu.
 - Member chat tren thiet bi A va feedback tren thiet bi B van hop le neu `account_id` khop, du `session_id` khac.
+- MVP khong luu `reason`/`comment`.
 
 ## 10. Service va thanh phan du kien
 
@@ -773,7 +777,7 @@ Quy tac: so lieu trong answer chi bi coi la risk neu khong khop voi bat ky struc
 Chap nhan string matching don gian o MVP:
 
 - Normalize lowercase.
-- Khong bo dau tieng Viet mac dinh. Neu bat accent-insensitive matching sau nay, phai co test vi cac cap tu khac dau co the trung nhau sau normalize.
+- `ChatEvaluationService::normalizeText()` dung accent-folding (`VietnameseAccentFolder`) de match cau Gemini co dau voi phrase/rule khong dau. Can test false-positive neu hai cum tu khac nghia trung nhau sau fold.
 - Gom whitespace.
 - So sanh contains.
 
@@ -1240,13 +1244,14 @@ Pham vi:
 
 - Tao migration/model `AiChatFeedback`.
 - Tao feedback route.
-- Validate `rating`, `reason`, `comment`.
+- Validate `rating` (`up`, `down`) va `session_id` cho guest.
 - Cho guest feedback bang `session_id`.
-- Cho member feedback neu `account_id` khop message hoac `session_id` khop message.
+- Cho member feedback member message neu `account_id` khop message.
 - Ho tro guest chat truoc, dang nhap sau, feedback message cu bang session_id cu.
 - Ho tro member feedback tren thiet bi khac bang account_id khop.
-- Cho phep update feedback cu thay vi tao trung lap neu can.
-- Test helpful/not_helpful, ownership va validation.
+- Cho phep update feedback cu thay vi tao trung lap.
+- Khong nhan `reason`/`comment` trong MVP.
+- Test `up`/`down`, ownership va validation.
 
 Ket qua demo:
 
@@ -1262,7 +1267,7 @@ Pham vi:
 - Gui `session_id` va `question` den API.
 - Hien thi loading, answer va error fallback.
 - Hien thi sources neu backend tra ve.
-- Hien thi nut helpful/not helpful khi co `message_id`.
+- Hien thi nut thumbs up/down khi co `message_id`.
 - Khong hien debug metric cho user cuoi.
 
 Ket qua demo:
@@ -1350,7 +1355,7 @@ Ket qua demo:
 - Response co `model_version`, retrieval meta va evaluation meta.
 - Response cho phep `message_id = null` va frontend an feedback khi khong co message id.
 - Feedback cua user duoc luu.
-- Feedback authorization dung rule OR: `session_id` khop hoac `account_id` khop.
+- Feedback authorization tach theo loai message: guest message can `session_id` khop; member message can `account_id` khop.
 - Rate limiting ngan spam Gemini API.
 - History dua vao prompt bi gioi han boi `AI_CHAT_HISTORY_MAX_TURNS`.
 - Vector document dung `_vectors.{embedder_name}` voi embedder user-provided (`gemini_embedding_2_768`, dimension 768).
@@ -1396,7 +1401,7 @@ Ket qua demo:
 | Retrieved context qua lon | Tang token/cost | Luu DB chi book_id/score, prompt cat description/context |
 | Du lieu gia/ton kho cu trong Meilisearch | Tra loi sai | Bat buoc fetch lai MySQL cho top K truoc khi build context |
 | Fallback Gemini bi luu vao history | Lam nhieu context cac luot sau | Chi luu Redis khi co cau tra loi that tu Gemini |
-| Feedback bi chan sai khi doi thiet bi/dang nhap sau | User khong danh gia duoc cau tra loi hop le | Authorization feedback dung rule OR: `session_id` khop hoac `account_id` khop |
+| Feedback bi chan sai khi doi thiet bi/dang nhap sau | User khong danh gia duoc cau tra loi hop le | Guest message cho phep `session_id` khop, member message cho phep `account_id` khop |
 | Meilisearch khong ho tro hybrid API | Retrieval khong chay duoc | Chi fallback RRF khi loi la hybrid unsupported; loi auth/index/filter/embedder degrade va log de khong che loi cau hinh |
 | RRF threshold qua cao | Exact title hoac vector-only top 1 bi `matched = false` khi fallback | Ha `AI_RAG_RRF_MIN_SCORE` ve khoang `0.016` hoac them rule keyword top 1 exact/high score |
 | Full sync tao 1 request embedding cho moi sach | Dataset 1.800 sach vuot free tier RPD 1K va fail 429 hang loat | Dung `batchEmbedContents` voi `AI_RAG_EMBED_BATCH_SIZE`, them `--limit`/`--from-id`/`--missing-vectors`, va dung som khi 429 |

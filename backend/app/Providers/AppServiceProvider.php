@@ -55,6 +55,18 @@ class AppServiceProvider extends ServiceProvider
                 ->by('ai-chat:guest:'.$request->ip().'|'.$sessionId);
         });
 
+        RateLimiter::for('ai-chat-feedback', function (Request $request): Limit {
+            if ($request->user()) {
+                return Limit::perMinute((int) config('ai.rate_limits.feedback_member_per_minute'))
+                    ->by('ai-chat-feedback:member:'.$request->user()->id);
+            }
+
+            $sessionId = (string) $request->input('session_id', 'missing');
+
+            return Limit::perMinute((int) config('ai.rate_limits.feedback_guest_per_minute'))
+                ->by('ai-chat-feedback:guest:'.$request->ip().'|'.$sessionId);
+        });
+
         \App\Models\Book::observe(\App\Observers\BookObserver::class);
         \App\Models\BookImage::observe(\App\Observers\BookImageObserver::class);
         \App\Models\Review::observe(\App\Observers\ReviewObserver::class);

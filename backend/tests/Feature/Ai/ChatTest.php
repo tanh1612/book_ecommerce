@@ -85,7 +85,10 @@ test('guest chat returns gemini answer with expected contract and logs message',
         ->assertJsonPath('meta.retrieval.strategy', 'none')
         ->assertJsonPath('meta.retrieval.top_score', null)
         ->assertJsonPath('meta.retrieval.matched', false)
-        ->assertJsonPath('meta.evaluation', null);
+        ->assertJsonPath('meta.evaluation.verdict', fn ($verdict) => in_array($verdict, ['pass', 'warning', 'fail'], true))
+        ->assertJsonPath('meta.evaluation.groundedness_score', fn ($score) => is_numeric($score))
+        ->assertJsonPath('meta.evaluation.relevance_score', fn ($score) => is_numeric($score))
+        ->assertJsonPath('meta.evaluation.has_hallucination_risk', fn ($risk) => is_bool($risk));
 
     $messageId = (int) $response->json('data.message_id');
 
@@ -99,6 +102,11 @@ test('guest chat returns gemini answer with expected contract and logs message',
         'retrieval_strategy' => 'none',
         'retrieval_matched' => false,
         'error_code' => null,
+    ]);
+
+    $this->assertDatabaseHas('ai_chat_evaluations', [
+        'message_id' => $messageId,
+        'verdict' => $response->json('meta.evaluation.verdict'),
     ]);
 
     expect(app(ChatHistoryStore::class)->getAll($sessionId))->toHaveCount(2);
@@ -142,7 +150,8 @@ test('gemini failure returns fallback without appending redis history', function
         ->assertOk()
         ->assertJsonPath('data.answer', config('ai.chat.fallback_message'))
         ->assertJsonPath('meta.model', null)
-        ->assertJsonPath('meta.error_code', 'gemini_chat_failed');
+        ->assertJsonPath('meta.error_code', 'gemini_chat_failed')
+        ->assertJsonPath('meta.evaluation', null);
 
     expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
 
@@ -171,7 +180,8 @@ test('redis history is appended when gemini succeeds even if db log fails', func
     $sessionId = '550e8400-e29b-41d4-a716-446655440000';
     $answer = 'Tra loi khi db loi nhung gemini ok.';
 
-    Schema::drop('ai_chat_messages');
+    Schema::dropIfExists('ai_chat_evaluations');
+    Schema::dropIfExists('ai_chat_messages');
     fakeGeminiChatSuccess($answer);
 
     postChat([
@@ -180,7 +190,8 @@ test('redis history is appended when gemini succeeds even if db log fails', func
     ])
         ->assertOk()
         ->assertJsonPath('data.message_id', null)
-        ->assertJsonPath('data.answer', $answer);
+        ->assertJsonPath('data.answer', $answer)
+        ->assertJsonPath('meta.evaluation', null);
 
     $history = app(ChatHistoryStore::class)->getAll($sessionId);
 

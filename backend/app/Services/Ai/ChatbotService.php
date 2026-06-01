@@ -3,8 +3,10 @@
 namespace App\Services\Ai;
 
 use App\Exceptions\Ai\GeminiClientException;
+use App\Models\AiChatEvaluation;
 use App\Models\AiChatMessage;
 use App\Services\Ai\Dto\BookRagRetrievalResult;
+use App\Services\Ai\Dto\ChatEvaluationResult;
 use App\Services\Ai\Dto\GeminiGenerateContentRequest;
 use App\Services\Ai\Dto\RetrievedBookPromptContext;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +20,7 @@ class ChatbotService
         private readonly RetrievedBookContextLoader $retrievedBookContextLoader,
         private readonly PromptBuilder $promptBuilder,
         private readonly GeminiClient $geminiClient,
+        private readonly ChatEvaluationService $chatEvaluationService,
     ) {}
 
     /**
@@ -91,6 +94,14 @@ class ChatbotService
                 errorCode: null,
             );
 
+            $evaluationMeta = $this->evaluateAndPersist(
+                message: $message,
+                question: $question,
+                answer: $chatResult->text,
+                retrievalMatched: $effectiveMatched,
+                bookContexts: $bookContexts,
+            );
+
             return $this->buildSuccessResponse(
                 sessionId: $sessionId,
                 answer: $chatResult->text,
@@ -99,6 +110,7 @@ class ChatbotService
                 bookContexts: $bookContexts,
                 effectiveMatched: $effectiveMatched,
                 messageId: $message?->id,
+                evaluation: $evaluationMeta,
             );
         } catch (GeminiClientException $e) {
             Log::warning('Gemini chat failed, returning fallback', [
@@ -138,6 +150,7 @@ class ChatbotService
         array $bookContexts,
         bool $effectiveMatched,
         ?int $messageId,
+        ?array $evaluation = null,
     ): array {
         return [
             'message_id' => $messageId,
@@ -147,7 +160,7 @@ class ChatbotService
                 'session_id' => $sessionId,
                 'model' => $model,
                 'retrieval' => $this->mapRetrievalMeta($retrieval, $effectiveMatched),
-                'evaluation' => null,
+                'evaluation' => $evaluation,
             ],
         ];
     }
@@ -305,6 +318,79 @@ class ChatbotService
             documents: [],
             strategy: 'none',
         );
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     * @return array{
+     *     verdict: string,
+     *     groundedness_score: float,
+     *     relevance_score: float,
+     *     has_hallucination_risk: bool
+     * }|null
+     */
+    private function evaluateAndPersist(
+        ?AiChatMessage $message,
+        string $question,
+        string $answer,
+        bool $retrievalMatched,
+        array $bookContexts,
+    ): ?array {
+        if ($message === null) {
+            return null;
+        }
+
+        try {
+            $result = $this->chatEvaluationService->evaluate(
+                question: $question,
+                answer: $answer,
+                retrievalMatched: $retrievalMatched,
+                bookContexts: $bookContexts,
+            );
+
+            $this->persistEvaluation($message->id, $result);
+
+            return $this->mapEvaluationMeta($result);
+        } catch (Throwable $e) {
+            Log::error('AI chat evaluation failed', [
+                'message_id' => $message->id,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            return null;
+        }
+    }
+
+    private function persistEvaluation(int $messageId, ChatEvaluationResult $result): void
+    {
+        AiChatEvaluation::query()->create([
+            'message_id' => $messageId,
+            'groundedness_score' => $result->groundednessScore,
+            'relevance_score' => $result->relevanceScore,
+            'has_hallucination_risk' => $result->hasHallucinationRisk,
+            'verdict' => $result->verdict,
+            'risk_flags' => $result->riskFlags !== [] ? $result->riskFlags : null,
+            'evaluated_at' => now(),
+        ]);
+    }
+
+    /**
+     * @return array{
+     *     verdict: string,
+     *     groundedness_score: float,
+     *     relevance_score: float,
+     *     has_hallucination_risk: bool
+     * }
+     */
+    private function mapEvaluationMeta(ChatEvaluationResult $result): array
+    {
+        return [
+            'verdict' => $result->verdict,
+            'groundedness_score' => $result->groundednessScore,
+            'relevance_score' => $result->relevanceScore,
+            'has_hallucination_risk' => $result->hasHallucinationRisk,
+        ];
     }
 
     private function elapsedMilliseconds(int $startedAt): int

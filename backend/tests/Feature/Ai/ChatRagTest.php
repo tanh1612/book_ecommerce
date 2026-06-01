@@ -109,7 +109,9 @@ test('high match chat injects mysql context logs retrieval metadata and returns 
         ->assertJsonPath('data.sources.0.slug', 'dac-nhan-tam')
         ->assertJsonPath('meta.retrieval.strategy', 'hybrid')
         ->assertJsonPath('meta.retrieval.matched', true)
-        ->assertJsonPath('meta.retrieval.top_score', 0.82);
+        ->assertJsonPath('meta.retrieval.top_score', 0.82)
+        ->assertJsonPath('meta.evaluation.verdict', 'pass')
+        ->assertJsonPath('meta.evaluation.has_hallucination_risk', false);
 
     $messageId = (int) $response->json('data.message_id');
 
@@ -130,7 +132,9 @@ test('high match chat injects mysql context logs retrieval metadata and returns 
     ])
         ->and($message->retrieved_books)->toMatchArray([
             ['book_id' => $book->id, 'score' => 0.82],
-        ]);
+        ])
+        ->and($message->evaluation)->not->toBeNull()
+        ->and($message->evaluation->verdict)->toBe('pass');
 
     Http::assertSent(function ($request): bool {
         $body = $request->data();
@@ -164,7 +168,8 @@ test('low match chat uses no context wording and returns empty sources', functio
         ->assertOk()
         ->assertJsonPath('data.sources', [])
         ->assertJsonPath('meta.retrieval.matched', false)
-        ->assertJsonPath('meta.retrieval.strategy', 'hybrid');
+        ->assertJsonPath('meta.retrieval.strategy', 'hybrid')
+        ->assertJsonPath('meta.evaluation.verdict', 'pass');
 
     Http::assertSent(function ($request): bool {
         $body = $request->data();
@@ -238,7 +243,8 @@ test('gemini failure preserves retrieval metadata and does not append redis hist
         ->assertJsonPath('data.answer', config('ai.chat.fallback_message'))
         ->assertJsonPath('meta.error_code', 'gemini_chat_failed')
         ->assertJsonPath('meta.retrieval.strategy', 'hybrid')
-        ->assertJsonPath('meta.retrieval.matched', true);
+        ->assertJsonPath('meta.retrieval.matched', true)
+        ->assertJsonPath('meta.evaluation', null);
 
     expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
 
@@ -268,7 +274,8 @@ test('embedding failure returns fallback and does not append redis history', fun
         ->assertJsonPath('data.answer', config('ai.chat.fallback_message'))
         ->assertJsonPath('meta.error_code', 'embedding_failed')
         ->assertJsonPath('meta.retrieval.strategy', 'none')
-        ->assertJsonPath('meta.retrieval.matched', false);
+        ->assertJsonPath('meta.retrieval.matched', false)
+        ->assertJsonPath('meta.evaluation', null);
 
     expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
 
