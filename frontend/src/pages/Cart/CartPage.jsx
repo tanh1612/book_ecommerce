@@ -1,36 +1,34 @@
 // src/pages/Cart/CartPage.jsx
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiTrash2, FiMinus, FiPlus, FiChevronRight } from 'react-icons/fi';
 import { formatCurrency } from '../../utils/formatters';
 import { useCart } from '../../context/CartContext';
-import bookApi from '../../services/bookApi'; // Thêm API để đối chiếu Flash Sale
+import cartApi from '../../services/cartApi'; // Import API giỏ hàng
 
 const CartPage = () => {
   const navigate = useNavigate();
   const { cartItems, isLoadingCart, updateQuantity, removeFromCart, toggleSelect, toggleAll, fetchCart } = useCart();
   
-  // 🌟 Kho chứa % giảm giá từ đợt Flash Sale đang chạy
-  const [flashSales, setFlashSales] = useState({});
+  // Lưu trữ dữ liệu gốc từ Backend
+  const [cartInfo, setCartInfo] = useState(null);
 
   useEffect(() => {
     fetchCart();
-    
-    // Tự động tải bảng giá Flash Sale ngầm để đối chiếu với Giỏ hàng
-    bookApi.getActiveFlashSale()
-      .then(res => {
-        const fsData = res.data?.data || res.data;
-        if (fsData && Array.isArray(fsData.items)) {
-          const fsMap = {};
-          fsData.items.forEach(item => {
-            // Lưu theo ID sách: fsMap[123] = 20 (%)
-            fsMap[item.book.id] = Number(item.discount_percent || item.discount_value || 0);
-          });
-          setFlashSales(fsMap);
-        }
-      })
-      .catch(() => console.log("Hiện không có Flash Sale nào."));
   }, []);
+
+  // ĐỒNG BỘ DATA BACKEND: Mỗi khi có sự thay đổi item trong giỏ, lấy lại data tổng
+  useEffect(() => {
+    let isMounted = true;
+    if (cartItems.length > 0) {
+      cartApi.getCart().then(res => {
+        if (isMounted) setCartInfo(res.data?.data || res.data);
+      }).catch(console.error);
+    } else {
+      setCartInfo(null);
+    }
+    return () => { isMounted = false; };
+  }, [cartItems]);
 
   const handleUpdateQuantity = (cartItemId, newQuantity, inStock) => {
     if (newQuantity >= 1 && newQuantity <= (inStock || 999)) {
@@ -40,29 +38,9 @@ const CartPage = () => {
 
   const isAllSelected = cartItems.length > 0 && cartItems.every(item => item.selected);
   
-  // 🌟 ĐỒNG BỘ THUẬT TOÁN GIÁ TỔNG (Cross-check với flashSales)
-  const cartSummary = useMemo(() => {
-    const selectedItems = cartItems.filter(item => item.selected);
-    const totalItems = selectedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    
-    const totalPrice = selectedItems.reduce((sum, item) => {
-      const bookData = item.book || item; 
-      
-      let original = Number(bookData.original_price || bookData.price || 0);
-      let price = Number(bookData.selling_price || original);
-      
-      // Ưu tiên lấy % giảm giá từ kho flashSales vừa tải về
-      let discount = Number(flashSales[bookData.id] || bookData.discount_percent || 0);
-      
-      if (discount > 0) {
-        price = original - (original * (discount / 100));
-      }
-      
-      return sum + (price * (item.quantity || 1));
-    }, 0);
-    
-    return { totalItems, totalPrice };
-  }, [cartItems, flashSales]);
+  // TỔNG TIỀN CHUẨN BACKEND: Không tự tính, lấy thẳng selected_subtotal_after_discount
+  const totalItems = cartItems.filter(item => item.selected).reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const totalPrice = cartInfo?.selected_subtotal_after_discount || 0;
 
   if (isLoadingCart && cartItems.length === 0) {
     return <div className="py-20 flex justify-center"><div className="w-10 h-10 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>;
@@ -103,16 +81,10 @@ const CartPage = () => {
                 {cartItems.map((item, index) => {
                   const bookData = item.book || item;
                   
-                  // 🌟 ĐỒNG BỘ THUẬT TOÁN TỪNG DÒNG SẢN PHẨM
-                  let itemOriginal = Number(bookData.original_price || bookData.price || 0);
-                  let itemPrice = Number(bookData.selling_price || itemOriginal);
-                  
-                  // Dò tìm ID sách trong kho Flash Sale
-                  let discount = Number(flashSales[bookData.id] || bookData.discount_percent || 0);
-                  
-                  if (discount > 0) {
-                    itemPrice = itemOriginal - (itemOriginal * (discount / 100));
-                  }
+                  // 🔥 CẬP NHẬT CHUẨN KỸ SƯ: Sử dụng effective_unit_price từ Backend
+                  const itemOriginal = Number(bookData.original_price || bookData.price || 0);
+                  const itemPrice = Number(item.effective_unit_price ?? bookData.selling_price ?? itemOriginal);
+                  const itemTotal = Number(item.line_total ?? (itemPrice * item.quantity));
 
                   const itemTitle = bookData.name || bookData.title || "Đang cập nhật";
                   const itemThumbnail = bookData.thumbnail_url || bookData.thumbnail || "https://placehold.co/100x150";
@@ -143,13 +115,12 @@ const CartPage = () => {
                       </div>
 
                       <div className="w-1/4 text-right font-bold text-[#157a2c] text-lg">
-                        {formatCurrency(itemPrice * item.quantity)}
+                        {/* 🔥 Dùng item.line_total Backend gửi về */}
+                        {formatCurrency(itemTotal)}
                       </div>
 
                       <div className="w-1/12 flex justify-center">
-                        <button onClick={() => { if(window.confirm('Bỏ sản phẩm này?')) removeFromCart(item.id); }} className="text-gray-400 hover:text-red-500 transition p-2">
-                          <FiTrash2 size={20} />
-                        </button>
+                        <button onClick={() => { if(window.confirm('Bỏ sản phẩm này?')) removeFromCart(item.id); }} className="text-gray-400 hover:text-red-500 transition p-2"><FiTrash2 size={20} /></button>
                       </div>
                     </div>
                   )
@@ -161,19 +132,16 @@ const CartPage = () => {
               <div className="bg-white p-6 rounded-lg shadow-sm sticky top-4">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Tổng kết đơn hàng</h2>
                 <div className="flex justify-between items-center mb-4 text-sm text-gray-600">
-                  <span>Tổng sản phẩm chọn:</span>
-                  <span className="font-medium">{cartSummary.totalItems}</span>
+                  <span>Tổng sản phẩm chọn:</span><span className="font-medium">{totalItems}</span>
                 </div>
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-gray-800 font-medium">Tổng tiền:</span>
-                  <span className="text-2xl font-bold text-[#157a2c]">{formatCurrency(cartSummary.totalPrice)}</span>
+                  <span className="text-2xl font-bold text-[#157a2c]">{formatCurrency(totalPrice)}</span>
                 </div>
                 <div className="text-xs text-gray-500 italic text-right mb-6">(Chưa bao gồm phí vận chuyển)</div>
                 <button 
-                  className={`w-full py-3 rounded-md font-bold text-lg transition shadow-sm ${
-                    cartSummary.totalItems > 0 ? 'bg-[#157a2c] text-white hover:bg-green-800 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                  disabled={cartSummary.totalItems === 0}
+                  className={`w-full py-3 rounded-md font-bold text-lg transition shadow-sm ${totalItems > 0 ? 'bg-[#157a2c] text-white hover:bg-green-800 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                  disabled={totalItems === 0}
                   onClick={() => navigate('/checkout')}
                 >
                   THANH TOÁN

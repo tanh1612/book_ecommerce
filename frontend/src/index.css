@@ -4,3 +4,11 @@
   /* Khai báo màu đỏ đặc trưng của Fahasa để dùng lại nhiều lần */
   --color-primary: #157a2c; 
 }
+/* Ép khung Container chuẩn E-commerce (Giống Fahasa, Tiki, Shopee) */
+.container {
+  max-width: 1200px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}

@@ -14,32 +14,35 @@ const CategoryPage = () => {
   const [filtersData, setFiltersData] = useState({ categories: [], publishers: [], suppliers: [], suggested_price_ranges: [] });
   const [isLoading, setIsLoading] = useState(true);
 
+  // 🔥 STATE PHÂN TRANG (MỚI)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+
   const currentCategory = searchParams.get('category') || '';
   const currentPublisher = searchParams.get('publisher') || '';
   const currentPriceMin = searchParams.get('price_min') || '';
   const currentPriceMax = searchParams.get('price_max') || '';
   const currentSort = searchParams.get('sort') || 'newest';
   
-  // Tải bộ lọc tĩnh (Danh mục, NXB, Mức giá)
   useEffect(() => {
     bookApi.getFilters()
       .then(res => setFiltersData(res.data?.data || res.data || {}))
       .catch(err => console.error("Lỗi tải bộ lọc:", err));
   }, []);
 
-  // Kiểm tra an toàn trước khi gọi .some() để tránh crash web
   const safeCategories = Array.isArray(filtersData?.categories) ? filtersData.categories : [];
   const isRootCategory = safeCategories.some(c => c.slug === currentCategory);
   const showCategoryFilter = currentCategory === '' || isRootCategory;
 
-  // Tải danh sách sách dựa theo URL params
   useEffect(() => {
     const fetchBooks = async () => {
       setIsLoading(true);
       try {
         const apiParams = Object.fromEntries([...searchParams]);
         
-        // Đảm bảo sort hợp lệ, nếu không có thì mặc định là newest
+        // Mặc định gọi trang 1 nếu không có tham số page trên URL
+        if (!apiParams.page) apiParams.page = 1;
+
         const validSorts = ['newest', 'price_asc', 'price_desc', 'rating_desc'];
         if (apiParams.sort && !validSorts.includes(apiParams.sort)) {
           apiParams.sort = 'newest'; 
@@ -47,9 +50,17 @@ const CategoryPage = () => {
 
         const res = await bookApi.getBooks(apiParams);
         
-        // BỘ LỌC THÔNG MINH: Xử lý dữ liệu phân trang từ Laravel
         let booksArray = [];
-        if (Array.isArray(res.data)) {
+        let metaData = null;
+        
+        // 🔥 GIẢI MÃ PHÂN TRANG TỪ BACKEND LARAVEL
+        if (res.data?.meta) {
+          booksArray = res.data.data;
+          metaData = res.data.meta;
+        } else if (res.data?.data?.meta) {
+          booksArray = res.data.data.data;
+          metaData = res.data.data.meta;
+        } else if (Array.isArray(res.data)) {
           booksArray = res.data;
         } else if (res.data?.data && Array.isArray(res.data.data)) {
           booksArray = res.data.data;
@@ -58,9 +69,28 @@ const CategoryPage = () => {
         }
         
         setBooks(booksArray);
+
+        // Lưu thông tin số trang
+        if (metaData) {
+          setCurrentPage(metaData.current_page || 1);
+          setLastPage(metaData.last_page || 1);
+        } else if (res.data?.last_page) {
+          setCurrentPage(res.data.current_page || 1);
+          setLastPage(res.data.last_page || 1);
+        } else if (res.data?.data?.last_page) {
+          setCurrentPage(res.data.data.current_page || 1);
+          setLastPage(res.data.data.last_page || 1);
+        } else {
+          setCurrentPage(1);
+          setLastPage(1);
+        }
+
+        // Tự động cuộn lên đầu trang sau khi tải xong sách
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
       } catch (err) {
         toast.error("Lỗi tải danh sách sách!");
-        setBooks([]); // Set mảng rỗng để tránh crash khi lỗi
+        setBooks([]); 
       } finally {
         setIsLoading(false);
       }
@@ -68,17 +98,18 @@ const CategoryPage = () => {
     fetchBooks();
   }, [searchParams]);
 
-  // Hàm cập nhật URL params mà không làm mất các param cũ
-  const updateUrlParams = (newParams) => {
+  // 🔥 ĐÃ CẬP NHẬT: Thêm cờ resetPage để phân biệt lúc Lọc và lúc Chuyển Trang
+  const updateUrlParams = (newParams, resetPage = true) => {
     const params = Object.fromEntries([...searchParams]);
-    const finalParams = { ...params, ...newParams, page: 1 };
+    const finalParams = { ...params, ...newParams };
     
-    // Xóa các param rỗng để URL sạch đẹp
+    // Nếu thay đổi bộ lọc (Giá, NXB, Sort...) thì phải ép về trang 1
+    if (resetPage) finalParams.page = 1;
+    
     Object.keys(finalParams).forEach(key => (finalParams[key] === '' || finalParams[key] == null) && delete finalParams[key]);
     setSearchParams(finalParams);
   };
 
-  // Hàm đệ quy in ra danh mục cha con an toàn
   const renderCategories = (categories, level = 0) => {
     if (!Array.isArray(categories) || categories.length === 0) return null;
     
@@ -101,7 +132,58 @@ const CategoryPage = () => {
     ));
   };
 
-  // Đảm bảo biến books luôn là Array
+  // 🔥 THUẬT TOÁN TẠO THANH PHÂN TRANG (Render Pagination)
+  const renderPagination = () => {
+    if (lastPage <= 1) return null; // Nếu chỉ có 1 trang thì ẩn luôn thanh chuyển trang
+    
+    let pages = [];
+    for (let i = 1; i <= lastPage; i++) {
+      // Chỉ hiển thị: Trang 1, Trang Cuối, và 1 Trang trước/sau Trang hiện tại
+      if (i === 1 || i === lastPage || (i >= currentPage - 1 && i <= currentPage + 1)) {
+        pages.push(
+          <button
+            key={i}
+            onClick={() => updateUrlParams({ page: i }, false)}
+            className={`px-3.5 py-1.5 min-w-[38px] border rounded transition-colors ${
+              currentPage === i 
+              ? 'bg-[#157a2c] text-white border-[#157a2c] font-bold shadow-sm' 
+              : 'border-gray-300 text-gray-600 hover:bg-green-50 hover:text-[#157a2c] hover:border-[#157a2c]'
+            }`}
+          >
+            {i}
+          </button>
+        );
+      } else if (i === currentPage - 2 || i === currentPage + 2) {
+        // Chèn dấu "..." để rút gọn nếu số trang quá nhiều
+        pages.push(<span key={`dots-${i}`} className="px-2 text-gray-400">...</span>);
+      }
+    }
+    
+    return (
+      <div className="flex justify-center items-center mt-12 mb-4 gap-2">
+        <button 
+          onClick={() => updateUrlParams({ page: currentPage - 1 }, false)}
+          disabled={currentPage === 1}
+          className="px-4 py-1.5 border border-gray-300 rounded text-gray-600 font-medium hover:bg-green-50 hover:text-[#157a2c] hover:border-[#157a2c] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 disabled:hover:border-gray-300 disabled:cursor-not-allowed transition-colors"
+        >
+          Trang trước
+        </button>
+        
+        <div className="flex items-center gap-1.5 mx-2">
+          {pages}
+        </div>
+
+        <button 
+          onClick={() => updateUrlParams({ page: currentPage + 1 }, false)}
+          disabled={currentPage === lastPage}
+          className="px-4 py-1.5 border border-gray-300 rounded text-gray-600 font-medium hover:bg-green-50 hover:text-[#157a2c] hover:border-[#157a2c] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 disabled:hover:border-gray-300 disabled:cursor-not-allowed transition-colors"
+        >
+          Trang sau
+        </button>
+      </div>
+    );
+  };
+
   const safeBooks = Array.isArray(books) ? books : [];
 
   return (
@@ -112,7 +194,6 @@ const CategoryPage = () => {
         <aside className="w-full md:w-64 flex-shrink-0">
           <h2 className="font-bold text-[#157a2c] text-lg mb-6 border-b pb-2">Bộ lọc tìm kiếm</h2>
 
-          {/* Khối Lọc Danh Mục */}
           {showCategoryFilter ? (
             <div className="mb-8">
               <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Danh mục</h3>
@@ -140,7 +221,6 @@ const CategoryPage = () => {
             </div>
           )}
 
-          {/* Khối Lọc Khoảng Giá */}
           <div className="mb-8">
             <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Khoảng giá</h3>
             <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer mb-3 hover:text-[#157a2c]">
@@ -165,7 +245,6 @@ const CategoryPage = () => {
             ))}
           </div>
 
-          {/* Khối Lọc Nhà Xuất Bản */}
           <div className="mb-8">
             <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Nhà xuất bản</h3>
             <select
@@ -182,13 +261,12 @@ const CategoryPage = () => {
         </aside>
 
         {/* DANH SÁCH SÁCH BÊN PHẢI */}
-        <div className="flex-grow">
+        <div className="flex-grow flex flex-col min-h-full">
           <div className="flex justify-between items-center mb-6 border-b pb-4">
             <h1 className="text-xl font-bold text-gray-800">
               {keyword ? `Kết quả tìm kiếm cho: "${keyword}"` : 'Danh mục sách'}
             </h1>
             
-            {/* Thanh Sắp xếp */}
             <div className="relative">
               <select
                 className="appearance-none bg-[#157a2c] text-white text-sm font-medium pl-4 pr-10 py-2 rounded outline-none cursor-pointer"
@@ -204,17 +282,21 @@ const CategoryPage = () => {
             </div>
           </div>
 
-          {/* Vùng hiển thị sách */}
           {isLoading ? (
-            <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>
+            <div className="py-20 flex justify-center flex-grow"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>
           ) : safeBooks.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {safeBooks.map((book) => (
-                <ProductCard key={book.id} book={book} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-grow content-start">
+                {safeBooks.map((book) => (
+                  <ProductCard key={book.id} book={book} />
+                ))}
+              </div>
+              
+              {/* THANH PHÂN TRANG */}
+              {renderPagination()}
+            </>
           ) : (
-            <div className="py-10 text-center text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+            <div className="py-10 text-center text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-grow">
               Không tìm thấy tựa sách nào phù hợp với bộ lọc của bạn.
             </div>
           )}

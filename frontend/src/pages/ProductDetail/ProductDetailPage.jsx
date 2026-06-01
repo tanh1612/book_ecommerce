@@ -12,7 +12,9 @@ const ProductDetailPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { addToCart, buyNow } = useCart();
-  const { wishlistItems, toggleWishlist } = useWishlist(); 
+  
+  // 🔥 ĐÃ ĐỒNG BỘ: Sử dụng các hàm chuẩn từ WishlistContext mới
+  const { checkInWishlist, addToWishlist, removeFromWishlist } = useWishlist(); 
 
   const [book, setBook] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -56,15 +58,17 @@ const ProductDetailPage = () => {
     buyNow(book, quantity, navigate);
   };
 
-  const isFavorited = wishlistItems?.some(item => item.id === book?.id);
+  // 🔥 KIỂM TRA TRẠNG THÁI YÊU THÍCH XUYÊN SUỐT TOÀN APP
+  const isFavorited = book ? checkInWishlist(book.id) : false;
 
-  const handleToggleWishlist = () => {
+  // 🔥 XỬ LÝ CLICK YÊU THÍCH MƯỢT MÀ
+  const handleToggleWishlist = async () => {
     if (!book) return;
-    toggleWishlist(book);
+    
     if (isFavorited) {
-      toast.info("Đã xóa khỏi danh sách yêu thích!");
+      await removeFromWishlist(book.id);
     } else {
-      toast.success("Đã thêm vào danh sách yêu thích!");
+      await addToWishlist(book);
     }
   };
 
@@ -73,21 +77,17 @@ const ProductDetailPage = () => {
 
   const title = book.name || "Đang cập nhật";
   
-  // 🌟 THUẬT TOÁN XỬ LÝ GIÁ MỚI: Ưu tiên Flash Sale
   let originalPrice = Number(book.original_price || 0);
   let sellingPrice = Number(book.selling_price || originalPrice);
   let discountPercent = 0;
 
   if (book.flash_sale) {
-    // Nếu API trả về cục flash_sale, lấy % giảm ra (hỗ trợ cả 2 key phòng ngừa Backend đổi tên)
     const fsDiscount = Number(book.flash_sale.discount_percent || book.flash_sale.discount_value || 0);
     if (fsDiscount > 0) {
       discountPercent = fsDiscount;
-      // Tự động tính lại giá bán thực tế
       sellingPrice = originalPrice - (originalPrice * (discountPercent / 100));
     }
   } else {
-    // Tính giá giảm bình thường nếu không có Flash Sale
     discountPercent = originalPrice > sellingPrice 
       ? Math.round(((originalPrice - sellingPrice) / originalPrice) * 100) 
       : 0;

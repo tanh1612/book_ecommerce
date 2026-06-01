@@ -1,42 +1,96 @@
 // src/context/WishlistContext.jsx
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import wishlistApi from '../services/wishlistApi';
+import { useAuth } from './AuthContext'; // Import AuthContext để check đăng nhập
 
 const WishlistContext = createContext();
 
 export const WishlistProvider = ({ children }) => {
-  // Lấy dữ liệu yêu thích từ localStorage nếu có
-  const [wishlistItems, setWishlistItems] = useState(() => {
-    const saved = localStorage.getItem('wishlist');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [isLoadingWishlist, setIsLoadingWishlist] = useState(false);
+  
+  // Lấy trạng thái user từ AuthContext
+  const { user } = useAuth();
 
-  const saveWishlist = (items) => {
-    setWishlistItems(items);
-    localStorage.setItem('wishlist', JSON.stringify(items));
-  };
-
-  // Hàm thả tim (Nếu đã có thì xóa đi, nếu chưa có thì thêm vào)
-  const toggleWishlist = (book) => {
-    const exists = wishlistItems.find(item => item.id === book.id);
-    if (exists) {
-      saveWishlist(wishlistItems.filter(item => item.id !== book.id));
-    } else {
-      saveWishlist([...wishlistItems, book]);
+  // 1. HÀM TẢI DANH SÁCH YÊU THÍCH TỪ BACKEND
+  const fetchWishlist = async () => {
+    if (!user) {
+      setWishlistItems([]); // Khách vãng lai thì làm rỗng danh sách
+      return;
+    }
+    
+    setIsLoadingWishlist(true);
+    try {
+      const res = await wishlistApi.getWishlist();
+      setWishlistItems(res.data?.data || res.data || []);
+    } catch (error) {
+      console.error("Lỗi tải danh sách yêu thích:", error);
+    } finally {
+      setIsLoadingWishlist(false);
     }
   };
 
-  // Hàm xóa khỏi danh sách yêu thích
-  const removeFromWishlist = (id) => {
-    saveWishlist(wishlistItems.filter(item => item.id !== id));
+  // Tự động tải lại Wishlist mỗi khi trạng thái đăng nhập (user) thay đổi
+  useEffect(() => {
+    fetchWishlist();
+  }, [user]);
+
+  // 2. HÀM THÊM VÀO YÊU THÍCH
+  const addToWishlist = async (book) => {
+    if (!user) {
+      toast.warning("Vui lòng đăng nhập để lưu sách yêu thích!");
+      return;
+    }
+
+    // Kiểm tra xem sách đã có trong danh sách chưa
+    const isExist = wishlistItems.some(item => item.id === book.id);
+    if (isExist) {
+      toast.info("Cuốn sách này đã có trong danh sách yêu thích!");
+      return;
+    }
+
+    try {
+      await wishlistApi.addToWishlist(book.id);
+      toast.success(`Đã thả tim "${book.name || book.title}"!`);
+      fetchWishlist(); // Gọi lại API để đồng bộ dữ liệu mới nhất
+    } catch (error) {
+      toast.error("Không thể thêm vào danh sách yêu thích lúc này.");
+    }
   };
 
-  // Hàm kiểm tra sách đã được thả tim chưa
-  const isInWishlist = (id) => {
-    return wishlistItems.some(item => item.id === id);
+  // 3. HÀM XÓA KHỎI YÊU THÍCH
+  const removeFromWishlist = async (bookId) => {
+    if (!user) return;
+    
+    // Tối ưu hóa UI: Cập nhật state ngay lập tức cho người dùng đỡ phải chờ (Optimistic Update)
+    const previousItems = [...wishlistItems];
+    setWishlistItems(prev => prev.filter(item => item.id !== bookId));
+
+    try {
+      await wishlistApi.removeFromWishlist(bookId);
+      toast.success("Đã xóa khỏi danh sách yêu thích.");
+    } catch (error) {
+      // Nếu API lỗi, khôi phục lại dữ liệu cũ
+      setWishlistItems(previousItems);
+      toast.error("Lỗi hệ thống khi xóa sách yêu thích.");
+    }
+  };
+
+  // 4. HÀM KIỂM TRA TRẠNG THÁI (Dùng cho icon Trái tim sáng/tối ở trang Chi tiết)
+  const checkInWishlist = (bookId) => {
+    return wishlistItems.some(item => item.id === bookId);
   };
 
   return (
-    <WishlistContext.Provider value={{ wishlistItems, toggleWishlist, removeFromWishlist, isInWishlist }}>
+    <WishlistContext.Provider value={{
+      wishlistItems,
+      isLoadingWishlist,
+      fetchWishlist,
+      addToWishlist,
+      removeFromWishlist,
+      checkInWishlist
+    }}>
       {children}
     </WishlistContext.Provider>
   );
