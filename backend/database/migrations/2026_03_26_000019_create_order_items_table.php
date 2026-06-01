@@ -20,6 +20,8 @@ return new class extends Migration
             $table->decimal('discount_amount', 15, 2)->nullable();
             $table->boolean('is_reviewed')->default(false);
             $table->timestamps();
+
+            $table->index('is_reviewed');
         });
     }
 

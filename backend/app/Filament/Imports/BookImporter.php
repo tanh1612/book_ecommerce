@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\Publisher;
 use App\Models\Supplier;
 use App\Services\Media\BookImageStorageService;
+use App\Services\Ai\BookRagSyncDispatcher;
 use App\Services\Search\BookMeilisearchSyncDispatcher;
 use App\Support\Catalog\CategoryBreadcrumbIndex;
 use App\Traits\GeneratesUniqueSlug;
@@ -188,15 +189,20 @@ class BookImporter extends Importer
     public function __invoke(array $data): void
     {
         $meilisearchSync = app(BookMeilisearchSyncDispatcher::class);
+        $bookRagSync = app(BookRagSyncDispatcher::class);
 
-        Book::withoutSyncingToSearch(function () use ($data, $meilisearchSync): void {
-            DB::transaction(function () use ($data, $meilisearchSync): void {
-                $meilisearchSync->withoutDispatching(function () use ($data): void {
-                    parent::__invoke($data);
+        Book::withoutSyncingToSearch(function () use ($data, $meilisearchSync, $bookRagSync): void {
+            DB::transaction(function () use ($data, $meilisearchSync, $bookRagSync): void {
+                $meilisearchSync->withoutDispatching(function () use ($data, $bookRagSync): void {
+                    $bookRagSync->withoutDispatching(function () use ($data): void {
+                        parent::__invoke($data);
+                    });
                 });
 
                 try {
-                    $meilisearchSync->dispatch((int) $this->record->getKey());
+                    $bookId = (int) $this->record->getKey();
+                    $meilisearchSync->dispatch($bookId);
+                    $bookRagSync->dispatch($bookId);
                 } catch (Throwable $e) {
                     Log::error('Meilisearch sync dispatch failed after book import row', [
                         'book_id' => $this->record->getKey(),

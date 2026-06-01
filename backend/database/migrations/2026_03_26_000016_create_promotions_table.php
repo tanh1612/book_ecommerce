@@ -16,6 +16,9 @@ return new class extends Migration
             $table->timestamp('end_at');
             $table->string('status', 50)->default('scheduled');
             $table->timestamps();
+
+            $table->index('status');
+            $table->index(['start_at', 'end_at']);
         });
     }
 

@@ -6,6 +6,7 @@ use App\Models\Book;
 use App\Models\CartItem;
 use App\Services\Catalog\CatalogCacheService;
 use App\Services\Media\BookImageStorageService;
+use App\Services\Ai\BookRagSyncDispatcher;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -14,6 +15,7 @@ class BookObserver
     public function __construct(
         private BookImageStorageService $bookImageStorage,
         private CatalogCacheService $catalogCache,
+        private BookRagSyncDispatcher $bookRagSync,
     ) {}
 
     public function saved(Book $book): void
@@ -33,6 +35,10 @@ class BookObserver
 
         if ($book->wasChanged('is_active') && ! $book->is_active) {
             $this->removeBookFromAllCarts($book);
+        }
+
+        if ($book->wasChanged(['name', 'is_active', 'publisher_id'])) {
+            $this->bookRagSync->dispatch((int) $book->id);
         }
     }
 

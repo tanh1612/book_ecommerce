@@ -14,6 +14,8 @@ return new class extends Migration
             $table->string('province_code', 20)->nullable();
             $table->decimal('base_fee', 15, 2);
             $table->timestamps();
+
+            $table->index('province_code');
         });
     }
 

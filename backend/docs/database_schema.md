@@ -39,6 +39,61 @@ KEY `addresses_account_id_is_default_index` (`account_id`,`is_default`),
 CONSTRAINT `addresses_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `ai_chat_messages` (
+`id` bigint unsigned NOT NULL AUTO_INCREMENT,
+`session_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+`account_id` bigint unsigned DEFAULT NULL,
+`question` text COLLATE utf8mb4_unicode_ci NOT NULL,
+`answer` text COLLATE utf8mb4_unicode_ci NOT NULL,
+`model_version` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+`retrieval_strategy` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+`retrieval_top_score` decimal(6,4) DEFAULT NULL,
+`retrieval_matched` tinyint(1) NOT NULL,
+`retrieved_books` json DEFAULT NULL,
+`token_usage` json DEFAULT NULL,
+`latency_ms` int unsigned DEFAULT NULL,
+`error_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+`created_at` timestamp NULL DEFAULT NULL,
+`updated_at` timestamp NULL DEFAULT NULL,
+PRIMARY KEY (`id`),
+KEY `ai_chat_messages_session_created_at_index` (`session_id`,`created_at`),
+KEY `ai_chat_messages_account_created_at_index` (`account_id`,`created_at`),
+KEY `ai_chat_messages_retrieval_matched_created_at_index` (`retrieval_matched`,`created_at`),
+CONSTRAINT `ai_chat_messages_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ai_chat_evaluations` (
+`id` bigint unsigned NOT NULL AUTO_INCREMENT,
+`message_id` bigint unsigned NOT NULL,
+`groundedness_score` decimal(4,3) NOT NULL,
+`relevance_score` decimal(4,3) NOT NULL,
+`has_hallucination_risk` tinyint(1) NOT NULL,
+`verdict` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+`risk_flags` json DEFAULT NULL,
+`evaluated_at` timestamp NOT NULL,
+`created_at` timestamp NULL DEFAULT NULL,
+`updated_at` timestamp NULL DEFAULT NULL,
+PRIMARY KEY (`id`),
+UNIQUE KEY `ai_chat_evaluations_message_id_unique` (`message_id`),
+CONSTRAINT `ai_chat_evaluations_message_id_foreign` FOREIGN KEY (`message_id`) REFERENCES `ai_chat_messages` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ai_chat_feedback` (
+`id` bigint unsigned NOT NULL AUTO_INCREMENT,
+`message_id` bigint unsigned NOT NULL,
+`session_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+`account_id` bigint unsigned DEFAULT NULL,
+`rating` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+`created_at` timestamp NULL DEFAULT NULL,
+`updated_at` timestamp NULL DEFAULT NULL,
+PRIMARY KEY (`id`),
+UNIQUE KEY `ai_chat_feedback_message_id_unique` (`message_id`),
+KEY `ai_chat_feedback_account_created_at_index` (`account_id`,`created_at`),
+KEY `ai_chat_feedback_session_created_at_index` (`session_id`,`created_at`),
+CONSTRAINT `ai_chat_feedback_message_id_foreign` FOREIGN KEY (`message_id`) REFERENCES `ai_chat_messages` (`id`) ON DELETE CASCADE,
+CONSTRAINT `ai_chat_feedback_account_id_foreign` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `authors` (
 `id` bigint unsigned NOT NULL AUTO_INCREMENT,
 `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -282,7 +337,7 @@ CREATE TABLE IF NOT EXISTS `migrations` (
 `migration` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 `batch` int NOT NULL,
 PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `notifications` (
 `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,

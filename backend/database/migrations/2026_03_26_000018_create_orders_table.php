@@ -27,6 +27,10 @@ return new class extends Migration
             $table->string('current_status', 50);
             $table->timestamps();
 
+            $table->index('current_status');
+            $table->index('payment_status');
+            $table->index('created_at');
+            $table->index(['account_id', 'current_status']);
             $table->unique(['account_id', 'checkout_idempotency_key'], 'orders_account_checkout_idempotency_unique');
         });
     }

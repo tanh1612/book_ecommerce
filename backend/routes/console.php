@@ -21,3 +21,6 @@ Schedule::command('recommendations:build-users')
 Schedule::command('recommendations:prune-interactions')
     ->daily()
     ->withoutOverlapping(30);
+Schedule::command('ai:sync-book-rag-documents --pending')
+    ->dailyAt('02:30')
+    ->withoutOverlapping(60);
