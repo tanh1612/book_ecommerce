@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use Illuminate\Support\Facades\Log;
 use Meilisearch\Client;
+use Meilisearch\Contracts\DocumentsQuery;
 use Throwable;
 
 class MeilisearchRagDocumentWriter
@@ -73,7 +74,17 @@ class MeilisearchRagDocumentWriter
         $embedderName = (string) config('ai.rag.embedder_name');
 
         try {
-            $document = $this->client()->index($indexName)->getDocument((string) $bookId);
+            $query = (new DocumentsQuery())
+                ->setIds([$bookId])
+                ->setFields(['id', '_vectors'])
+                ->setRetrieveVectors(true);
+
+            $documents = $this->client()
+                ->index($indexName)
+                ->getDocuments($query)
+                ->getResults();
+
+            $document = $documents[0] ?? null;
             $vectors = $document['_vectors'][$embedderName] ?? null;
 
             return is_array($vectors) ? array_values($vectors) : null;

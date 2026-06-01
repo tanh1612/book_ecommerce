@@ -233,8 +233,8 @@ return [
         'embedder_name' => env('AI_RAG_EMBEDDER_NAME', 'gemini_embedding_2_768'),
         'embedding_dimensions' => (int) env('AI_RAG_EMBEDDING_DIMENSIONS', 768),
         'top_k' => (int) env('AI_RAG_TOP_K', 5),
-        'min_score' => (float) env('AI_RAG_MIN_SCORE', 0.65),
-        'rrf_min_score' => (float) env('AI_RAG_RRF_MIN_SCORE', 0.02),
+        'min_score' => (float) env('AI_RAG_MIN_SCORE', 0.80),
+        'rrf_min_score' => (float) env('AI_RAG_RRF_MIN_SCORE', 0.016),
         'hybrid_semantic_ratio' => (float) env('AI_RAG_HYBRID_SEMANTIC_RATIO', 0.6),
         'sync_batch_size' => (int) env('AI_RAG_SYNC_BATCH_SIZE', 20),
         'sync_batch_sleep_ms' => (int) env('AI_RAG_SYNC_BATCH_SLEEP_MS', 500),
@@ -247,7 +247,7 @@ return [
         'history_max_turns' => (int) env('AI_CHAT_HISTORY_MAX_TURNS', 10),
         'max_question_length' => (int) env('AI_CHAT_MAX_QUESTION_LENGTH', 1000),
         'fallback_message' => env('AI_CHAT_FALLBACK_MESSAGE', 'Chatbot dang ban, vui long thu lai sau.'),
-        'no_context_message' => env('AI_CHAT_NO_CONTEXT_MESSAGE', 'Minh chua tim thay thong tin phu hop trong du lieu Bookify.'),
+        'no_context_message' => env('AI_CHAT_NO_CONTEXT_MESSAGE', 'Minh chua tim thay thong tin phu hop trong du lieu hien co.'),
     ],
 
     'rate_limits' => [
@@ -270,8 +270,8 @@ AI_RAG_INDEX_NAME=books
 AI_RAG_EMBEDDER_NAME=gemini_embedding_2_768
 AI_RAG_EMBEDDING_DIMENSIONS=768
 AI_RAG_TOP_K=5
-AI_RAG_MIN_SCORE=0.65
-AI_RAG_RRF_MIN_SCORE=0.02
+AI_RAG_MIN_SCORE=0.80
+AI_RAG_RRF_MIN_SCORE=0.016
 AI_RAG_HYBRID_SEMANTIC_RATIO=0.6
 AI_RAG_SYNC_BATCH_SIZE=20
 AI_RAG_SYNC_BATCH_SLEEP_MS=500
@@ -429,8 +429,15 @@ Muc tieu:
 Tham so de cau hinh:
 
 - `top_k`: mac dinh 5.
-- `min_score`: mac dinh 0.65.
+- `min_score`: mac dinh 0.80 sau khi smoke test full-vector; `0.65` qua thap voi score scale hybrid thuc te va de match cau ngoai domain.
 - `hybrid_semantic_ratio`: mac dinh 0.6; khoang khuyen nghi 0.5–0.7 (Meilisearch ecommerce). Tang neu cau hoi ngu nghia nhieu, giam neu exact match ten sach/tac gia quan trong hon.
+
+Ghi chu khi chua sync du vector:
+
+- Co the trien khai retriever khi vector coverage chua dat 100%, vi keyword search van tim duoc sach theo ten sach/tac gia/mo ta da index.
+- Chatbot khong duoc hieu `matched = false` la "Bookify chac chan khong co sach phu hop" khi vector coverage con thap. Chi dien giai la "chua tim thay thong tin phu hop trong du lieu hien co".
+- Manual test semantic query chi co gia tri khi cac sach lien quan da co `_vectors`. Truoc demo can ghi nhan coverage: tong active books, so active books co vector, ty le phan tram.
+- Uu tien chay `php artisan ai:sync-book-rag-documents --missing-vectors --limit=...` de lap day cac vector con thieu truoc khi danh gia chat luong semantic.
 
 Neu Meilisearch local chua ho tro hybrid dung API version hien tai, fallback co kiem soat:
 
@@ -448,7 +455,10 @@ Quy tac fallback RRF:
 
 - Rank bat dau tu 1 trong tung danh sach keyword/vector.
 - Ket qua co trong ca hai danh sach se duoc cong diem hai lan.
-- Khi dung RRF fallback, `min_score = 0.65` khong ap dung. Dung threshold rieng `AI_RAG_RRF_MIN_SCORE`, mac dinh `0.02`.
+- Khi dung RRF fallback, `min_score = 0.80` khong ap dung. Dung threshold rieng `AI_RAG_RRF_MIN_SCORE`.
+- Voi cong thuc tren, top 1 chi xuat hien trong mot list co diem `1 / 61 = 0.0164`. Neu giu threshold `0.02`, ket qua chi co o keyword hoac chi co o vector se khong `matched`. De MVP than thien hon voi exact title va du lieu vector chua day du, threshold RRF nen la `0.016` hoac co rule rieng cho keyword top 1 score cao/exact title.
+- Chi fallback sang RRF khi loi la hybrid unsupported, vi du unknown field `hybrid` hoac invalid hybrid parameter. Khong fallback cho loi cau hinh/quyen truy cap nhu 401/403, index khong ton tai, filter invalid, embedder invalid; cac loi nay phai log va degrade `strategy = none`.
+- Neu hybrid tra ve hit nhung diem thap, giu `strategy = hybrid`, `top_score` va `documents`, chi dat `matched = false`. Chi dung `strategy = none` khi khong co hit hoac retrieval loi.
 - Truoc khi code fallback, can test Meilisearch version local/production co ho tro hybrid `semanticRatio` hay khong de quyet dinh co can RRF path.
 
 ### 8.4. Dong bo khi du lieu sach thay doi
@@ -931,29 +941,245 @@ Ghi chu:
 
 ### Lat 6: BookRagRetriever voi hybrid search
 
-Muc tieu: truy xuat top K ngu canh sach tu cau hoi.
+Muc tieu: truy xuat top K ngu canh sach tu cau hoi, tra ve ket qua co cau truc cho Lat 7 (`PromptBuilder`, log `retrieval_*`).
 
-Pham vi:
+#### 6.1. Trang thai du lieu hien tai (vector coverage chua day du)
 
-- Tao `BookRagRetriever`.
-- Embed cau hoi.
-- Goi hybrid search tren Meilisearch.
-- Filter `is_active = true`.
-- Lay top K va score.
-- Check `min_score`.
-- Neu Meilisearch khong ho tro hybrid, fallback merge keyword + vector bang RRF trong service.
-- Tra ve object gom:
-  - `matched`
-  - `top_score`
-  - `documents`
-  - `strategy`
-- Test exact match title, semantic query va low-similarity.
+Lat 5 co the bi dung som do Gemini HTTP 429 (free tier RPM/TPM/RPD). Day **khong chan** Lat 6:
 
-Ket qua demo:
+| Kha nang retrieval | Can vector? | Hoat dong khi coverage thap |
+| --- | --- | --- |
+| Exact title / tac gia / SKU | Khong (keyword) | Van hoat dong — sach da index qua Scout |
+| Mo ta co keyword ro | Khong (keyword) | Van hoat dong |
+| Cau hoi ngu nghia ("sach ve ky nang giao tiep") | Co (vector/hybrid) | Chi tot trong pham vi sach da co `_vectors` |
 
-- Cau "Dac Nhan Tam" tim dung sach bang keyword/hybrid.
-- Cau "sach ve ky nang giao tiep" tim duoc sach lien quan bang semantic.
-- Cau ngoai domain tra `matched = false`.
+Quy tac nghiep vu:
+
+- `matched = false` **khong** duoc hieu la "Bookify chac chan khong ban sach do". Chi co nghia la retrieval khong dat nguong voi du lieu hien co.
+- Lat 7 khi `matched = false` dung `AI_CHAT_NO_CONTEXT_MESSAGE` / prompt flag `no_relevant_context` voi wording **"du lieu hien co"**, khong noi chac chan la khong ban.
+- Unit test Lat 6 dung mock Meilisearch/Gemini — **khong phu thuoc** vao coverage that.
+- Manual demo semantic chi co gia tri sau khi ghi nhan coverage va uu tien sync vector cho nhom sach test.
+
+**Song song voi code Lat 6**, tiep tuc lap day vector (khong chay lai `--all` khi dang bi 429):
+
+```bash
+# Cau hinh an toan free tier (xem muc 20)
+php artisan ai:sync-book-rag-documents --missing-vectors --limit=100
+# Neu 429: tang AI_RAG_SYNC_BATCH_SLEEP_MS, giam --limit, doi reset quota roi resume
+php artisan ai:sync-book-rag-documents --missing-vectors --from-id=<last_id> --limit=100
+php artisan ai:sync-book-rag-documents --pending
+```
+
+Truoc manual demo, ghi nhan coverage (tinker hoac helper Lat 6):
+
+- `active_books`: so sach `is_active = true` trong MySQL.
+- `vectorized_books`: so active book co `_vectors.{embedder_name}` tren Meilisearch.
+- `coverage_pct = vectorized_books / active_books * 100`.
+
+#### 6.2. Phu thuoc (da co tu Lat 1–5)
+
+| Thanh phan | Vai tro |
+| --- | --- |
+| `GeminiClient::embedText()` | Embed cau hoi, 768 chieu |
+| `MeilisearchRagDocumentWriter` | Pattern `Meilisearch\Client`, index `books` |
+| `BookRagDocumentFactory` | Document shape da sync |
+| `config('ai.rag.*')` | `top_k`, `min_score`, `rrf_min_score`, `hybrid_semantic_ratio` |
+
+Chua lam o Lat 6: wire vao `ChatbotService`, fetch MySQL gia/ton kho (Lat 7), populate API `sources`.
+
+#### 6.3. Thanh phan moi
+
+| File | Vai tro |
+| --- | --- |
+| `App\Services\Ai\BookRagRetriever` | Orchestrate embed + search + threshold |
+| `App\Services\Ai\Dto\BookRagRetrievalResult` | `matched`, `topScore`, `documents`, `strategy`, latency |
+| `App\Services\Ai\Dto\BookRagRetrievedDocument` | `bookId`, `score`, `name`, `slug`, `raw` |
+| `App\Services\Ai\Support\ReciprocalRankFusionMerger` | Merge rank lists khi RRF fallback |
+| `App\Services\Ai\RagVectorCoverageReporter` (optional) | Doc/count active vs vectorized books cho demo ops |
+
+`BookRagRetrievalResult` contract:
+
+```php
+final readonly class BookRagRetrievalResult
+{
+    /** @param list<BookRagRetrievedDocument> $documents */
+    public function __construct(
+        public bool $matched,
+        public ?float $topScore,
+        public array $documents,
+        public string $strategy, // hybrid | rrf | none
+        public ?int $embeddingLatencyMs = null,
+        public ?int $searchLatencyMs = null,
+    ) {}
+}
+```
+
+Public API:
+
+```php
+public function retrieve(string $question): BookRagRetrievalResult;
+```
+
+#### 6.4. Luong xu ly
+
+```mermaid
+flowchart TD
+    A["retrieve(question)"] --> B["embedText(question)"]
+    B --> C{"Hybrid API kha dung?"}
+    C -- "Co" --> D["hybridSearch + filter is_active"]
+    C -- "Unsupported" --> E["keywordSearch + vectorSearch"]
+    E --> F["RRF merge"]
+    D --> G["mapHits"]
+    F --> G
+    G --> H{"Co hit?"}
+    H -- "Khong" --> I["matched=false, strategy thuc te hoac none"]
+    H -- "Co" --> J{"Dat nguong?"}
+    J -- "RRF + keyword top1 cao" --> K["matched=true (boost rule)"]
+    J -- "Score >= threshold" --> K
+    J -- "Score < threshold" --> L["matched=false, giu documents + strategy"]
+    K --> M["BookRagRetrievalResult"]
+    L --> M
+    I --> M
+```
+
+**Buoc 1 — Embed cau hoi**
+
+- Goi `GeminiClient::embedText($question)`.
+- Embedding loi: rethrow `GeminiClientException` — Lat 7 xu ly `embedding_failed`, fail fast (muc 12.1).
+
+**Buoc 2 — Hybrid search (uu tien)**
+
+```php
+$index->search($question, [
+    'hybrid' => [
+        'semanticRatio' => config('ai.rag.hybrid_semantic_ratio'),
+        'embedder' => config('ai.rag.embedder_name'),
+    ],
+    'vector' => $embeddingVector,
+    'filter' => 'is_active = true',
+    'limit' => config('ai.rag.top_k'),
+    'showRankingScore' => true,
+]);
+```
+
+- `strategy = 'hybrid'`.
+- Score lay tu `_rankingScore`.
+- Khi coverage thap, hybrid van tra hit keyword — exact title khong phu thuoc vector.
+
+**Buoc 3 — RRF fallback (chi khi hybrid unsupported)**
+
+- Chi kich hoat khi loi la hybrid unsupported (unknown field `hybrid`, invalid hybrid param).
+- **Khong** fallback RRF cho 401/403, index khong ton tai, filter/embedder invalid — log `error` va degrade `strategy = none`.
+- Keyword search + vector search rieng, merge:
+
+```text
+rrf_score(book_id) = sum(1 / (rank + 60))
+```
+
+- Rank bat dau tu 1. Sach co trong ca hai list duoc cong hai lan.
+- `strategy = 'rrf'`.
+- Vector list co the rong khi chua sync du — RRF van chay voi keyword list; ket qua phu thuoc keyword.
+
+**Buoc 4 — Nguong `matched`**
+
+| Strategy | Dieu kien `matched = true` |
+| --- | --- |
+| `hybrid` | Co hit **va** `topScore >= AI_RAG_MIN_SCORE` (0.80) |
+| `rrf` | Co hit **va** (`topScore >= AI_RAG_RRF_MIN_SCORE` (0.016) **hoac** keyword top-1 boost — xem duoi) |
+
+**Keyword top-1 boost (quan trong khi coverage thap / RRF fallback):**
+
+- Neu keyword search tra top 1 voi `_rankingScore >= 0.70` (config optional `ai.rag.keyword_top1_min_score`), dat `matched = true` du RRF score thap.
+- Muc dich: exact title "Dac Nhan Tam" van match khi vector chua co hoac RRF top-1 chi dat `0.0164`.
+
+**Khi co hit nhung duoi nguong:**
+
+- Van tra `documents`, `top_score`, `strategy` thuc te (`hybrid`/`rrf`).
+- Chi dat `matched = false`.
+- **Khong** doi thanh `strategy = none`.
+
+**Khi Meilisearch loi (connection, auth, index):**
+
+- Log `warning` voi question truncated, latency, exception class.
+- Tra `matched=false`, `documents=[]`, `strategy=none` — degrade, khong throw (muc 12.2).
+
+#### 6.5. Pham vi implement
+
+- Tao cac file muc 6.3.
+- Inject `?Meilisearch\Client` de test (giong `MeilisearchRagDocumentWriter`).
+- `ReciprocalRankFusionMerger` tach rieng, co unit test doc lap.
+- `RagVectorCoverageReporter` (optional): method `report(): array{active_books, vectorized_books, coverage_pct}` — doc MySQL count + sample Meilisearch hoac dry-run `--missing-vectors` count.
+- Khong sua `ChatbotService` o lat nay.
+
+#### 6.6. Cau hinh lien quan
+
+| Key | Mac dinh | Ghi chu |
+| --- | --- | --- |
+| `AI_RAG_TOP_K` | 5 | `limit` search |
+| `AI_RAG_MIN_SCORE` | 0.80 | hybrid threshold; tune theo smoke test full-vector |
+| `AI_RAG_RRF_MIN_SCORE` | **0.016** | top-1 mot list = `1/61 ≈ 0.0164` |
+| `AI_RAG_HYBRID_SEMANTIC_RATIO` | 0.6 | tang neu semantic quan trong hon |
+| `AI_RAG_EMBEDDER_NAME` | `gemini_embedding_2_768` | hybrid + vector leg |
+| `AI_CHAT_NO_CONTEXT_MESSAGE` | "... du lieu hien co." | Lat 7 dung khi `matched=false` |
+
+Optional them khi implement (khong bat buoc MVP):
+
+```php
+'keyword_top1_min_score' => (float) env('AI_RAG_KEYWORD_TOP1_MIN_SCORE', 0.70),
+'rrf_k' => (int) env('AI_RAG_RRF_K', 60),
+```
+
+**Luu y:** `config/ai.php` hien tai co the van mac dinh `rrf_min_score = 0.02`; can doi ve `0.016` khi implement Lat 6 de khop doc.
+
+#### 6.7. Kiem thu
+
+**Unit test (mock — khong can vector that):**
+
+| Case | Ky vong |
+| --- | --- |
+| Hybrid hit score 0.82 | `matched=true`, `strategy=hybrid` |
+| Hybrid hit score 0.40 | `matched=false`, van co `documents` |
+| Exact title (mock keyword-heavy) | `matched=true` |
+| Out of domain / empty hits | `matched=false` |
+| Filter `is_active = true` | assert request params |
+| Hybrid unsupported → RRF | `strategy=rrf`, merge dung rank |
+| RRF score 0.015 | `matched=false` |
+| RRF score 0.017 hoac keyword top-1 boost | `matched=true` |
+| Vector leg rong (mock) | keyword-only RRF van tra hit |
+| Meilisearch exception | `strategy=none`, khong throw |
+| Embedding fail | `GeminiClientException` bubble |
+
+File: `tests/Unit/Ai/BookRagRetrieverTest.php`, `tests/Unit/Ai/ReciprocalRankFusionMergerTest.php`.
+
+**Manual demo — tach 2 tier theo coverage:**
+
+| Tier | Dieu kien | Cau hoi mau | Ky vong |
+| --- | --- | --- | --- |
+| A — keyword | Luon chay duoc | `"Dac Nhan Tam"`, `"Sach cua tac gia X"` | `matched=true` neu sach active da index |
+| B — semantic | Can vector cho sach lien quan | `"sach ve ky nang giao tiep"` | `matched=true` chi khi nhom sach test da sync vector |
+
+Moi lan demo ghi ro: `active_books`, `vectorized_books`, `coverage_pct`.
+
+#### 6.8. Tieu chi nghiem thu Lat 6
+
+- [ ] `BookRagRetriever::retrieve()` tra `BookRagRetrievalResult` dung contract.
+- [ ] Hybrid: dung `semanticRatio`, `embedder`, `filter is_active = true`, `limit = top_k`.
+- [ ] RRF chi khi hybrid unsupported; loi auth/index → `strategy=none`.
+- [ ] Hit duoi nguong: giu `documents` + `strategy`, chi `matched=false`.
+- [ ] Keyword top-1 boost hoac `rrf_min_score=0.016` — exact title khong bi fail khi coverage thap.
+- [ ] Meilisearch loi degrade, embedding loi fail fast.
+- [ ] `php artisan test --filter=BookRagRetriever` pass.
+
+#### 6.9. Ket qua demo
+
+- Tier A: `"Dac Nhan Tam"` tim dung sach bang keyword/hybrid (khong can 100% vector).
+- Tier B: `"sach ve ky nang giao tiep"` chi pass semantic khi sach lien quan da co vector.
+- `"Bookify co ban dien thoai khong?"` → `matched=false`.
+- Bao cao coverage tai thoi diem test.
+
+#### 6.10. Ghi chu tich hop Lat 7
+
+`ChatbotService` se goi `BookRagRetriever`, chi inject context khi `matched=true`, fetch MySQL top K, log `retrieval_strategy` / `retrieval_matched` / `retrieved_books`. Lat 6 khong populate API `sources`.
 
 ### Lat 7: PromptBuilder va luong chat that
 
@@ -964,7 +1190,7 @@ Pham vi:
 - Tao `PromptBuilder`.
 - Build prompt theo system rules.
 - Dua retrieved context vao prompt khi `matched = true`.
-- Dua `no_relevant_context=true` khi `matched = false`.
+- Dua `no_relevant_context=true` khi `matched = false`; system prompt / fallback dung wording "du lieu hien co", khong khang dinh kho sach khong ban sach do.
 - Sau retrieval, fetch lai MySQL cho top K `book_id` de lay gia, rating va ton kho hien tai truoc khi build context.
 - Chi dua sliding window history.
 - `ChatbotService` orchestrate:
@@ -1075,6 +1301,8 @@ Ket qua demo:
 - High similarity inject context.
 - Top K retrieval fetch lai MySQL truoc khi build context gia/ton kho.
 - RRF fallback merge hoat dong neu hybrid API khong kha dung.
+- Khi vector coverage chua day du, low semantic match khong duoc dien giai thanh "khong co sach"; response dung wording an toan ve du lieu hien co.
+- Hybrid unsupported moi fallback RRF; loi auth/index/filter/embedder degrade va log, khong che loi cau hinh bang RRF.
 - Redis history sliding window.
 - DB luu `model_version`.
 - Feedback luu/update dung theo rule `session_id` khop hoac `account_id` khop.
@@ -1086,6 +1314,11 @@ Ket qua demo:
 - `ChatEvaluationService` flag risk dung.
 - `BookRagRetriever` check threshold dung.
 - `BookRagRetriever` merge RRF dung rank khi fallback.
+- `BookRagRetriever` keyword top-1 boost hoac `rrf_min_score=0.016` cho exact title khi coverage thap.
+- `BookRagRetriever` giu `documents` + `strategy` khi hit duoi nguong, chi `matched=false`.
+- `BookRagRetriever` RRF threshold xu ly dung case top 1 chi nam trong mot list (`1 / 61 = 0.0164`).
+- `BookRagRetriever` giu `strategy`, `top_score`, `documents` khi co hit nhung duoi nguong.
+- `BookRagRetriever` phan biet hybrid unsupported voi loi cau hinh/quyen truy cap.
 - `GeminiClient` parse response, token usage, va `output_dimensionality` embedding dung.
 - `GeminiClient` batch embedding goi `batchEmbedContents`, validate count/dimension, va giu dung thu tu vector theo input.
 - `QueueBookRagSyncService` deduplicate pending book ids va batch theo config.
@@ -1139,7 +1372,7 @@ Ket qua demo:
 | 3 | `GeminiClient`, exception/fallback classes neu can |
 | 4 | `BookRagDocumentFactory`, command configure Meilisearch |
 | 5 | command/job sync RAG documents, pending sync set, batch worker, queue `ai-rag-sync` |
-| 6 | `BookRagRetriever` |
+| 6 | `BookRagRetriever`, DTO retrieval, `ReciprocalRankFusionMerger`, optional `RagVectorCoverageReporter` |
 | 7 | `PromptBuilder`, `ChatbotService`, `ChatMessageResource` |
 | 8 | migration/model `AiChatEvaluation`, `ChatEvaluationService` |
 | 9 | migration/model `AiChatFeedback`, `ChatFeedbackController`, `ChatFeedbackService` |
@@ -1156,6 +1389,7 @@ Ket qua demo:
 | Chi phi Gemini tang | Ton chi phi API | Rate limit, max question length, max history turns |
 | Chat quality flash-lite khong dat | Tra loi so san/khong tu nhien | Doi `GEMINI_CHAT_MODEL=gemini-2.5-flash`; danh gia lai latency/chi phi |
 | Vector dimension sai | Search loi hoac ket qua sai | Config `output_dimensionality` 768, test vector length, re-index khi doi model/embedder |
+| Vector coverage chua day du | Semantic query miss sach phu hop, `matched = false` co the bi hieu sai | Cho phep trien khai Lat 6 nhung log/bao cao coverage, uu tien `--missing-vectors`, va Lat 7 dung wording "du lieu hien co" khi khong matched |
 | Embedding text chua tot | Retrieval kem | Template ro rang, co manual test query, iterate sau MVP |
 | Pure vector kem exact match | Tim sai ten sach | Dung hybrid search tu dau |
 | Evaluation rule-based co false positive | Canh bao sai | Regex chi tim candidate claim; doi chieu structured facts tu MySQL truoc khi flag risk |
@@ -1163,7 +1397,8 @@ Ket qua demo:
 | Du lieu gia/ton kho cu trong Meilisearch | Tra loi sai | Bat buoc fetch lai MySQL cho top K truoc khi build context |
 | Fallback Gemini bi luu vao history | Lam nhieu context cac luot sau | Chi luu Redis khi co cau tra loi that tu Gemini |
 | Feedback bi chan sai khi doi thiet bi/dang nhap sau | User khong danh gia duoc cau tra loi hop le | Authorization feedback dung rule OR: `session_id` khop hoac `account_id` khop |
-| Meilisearch khong ho tro hybrid API | Retrieval khong chay duoc | Test version truoc khi code; neu can fallback RRF theo rank |
+| Meilisearch khong ho tro hybrid API | Retrieval khong chay duoc | Chi fallback RRF khi loi la hybrid unsupported; loi auth/index/filter/embedder degrade va log de khong che loi cau hinh |
+| RRF threshold qua cao | Exact title hoac vector-only top 1 bi `matched = false` khi fallback | Ha `AI_RAG_RRF_MIN_SCORE` ve khoang `0.016` hoac them rule keyword top 1 exact/high score |
 | Full sync tao 1 request embedding cho moi sach | Dataset 1.800 sach vuot free tier RPD 1K va fail 429 hang loat | Dung `batchEmbedContents` voi `AI_RAG_EMBED_BATCH_SIZE`, them `--limit`/`--from-id`/`--missing-vectors`, va dung som khi 429 |
 | Batch embedding qua lon | Giam RPD nhung van vuot TPM/RPM, bi 429 | Bat dau `AI_RAG_EMBED_BATCH_SIZE=25`, tang sleep theo Rate Limit page, theo doi token/request |
 | Pending worker mat id khi sync fail | Sach fail khong duoc retry, index thieu vector | Re-add failed ids vao pending hoac dead-letter; khong pop vinh vien khi loi tam thoi |
@@ -1198,7 +1433,10 @@ AI_RAG_EMBED_BATCH_SIZE=25
 AI_RAG_SYNC_BATCH_SIZE=25
 AI_RAG_SYNC_BATCH_SLEEP_MS=30000
 AI_RAG_SYNC_STOP_ON_429=true
+AI_RAG_RRF_MIN_SCORE=0.016
 ```
 
 - Neu Rate Limit page cho thay TPM con du, co the tang `AI_RAG_EMBED_BATCH_SIZE` len 50. Neu con gap 429, giam batch hoac tang sleep.
 - Khong chay lai `--all` tu dau khi dang bi 429. Dung `--from-id`, `--limit`, `--missing-vectors` hoac `--pending` de resume/retry.
+- **Truoc manual demo Lat 6/Lat 7:** uu tien `--missing-vectors --limit=...` cho nhom sach test semantic; ghi nhan `active_books`, `vectorized_books`, `coverage_pct`. Tier A (exact title) demo duoc ngay ca khi coverage thap; Tier B (semantic) chi danh gia sau khi sach lien quan da co vector.
+- Lat 6 implement khong bi chan boi coverage; dat `AI_RAG_RRF_MIN_SCORE=0.016` de exact title khong fail khi RRF fallback.

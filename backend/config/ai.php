@@ -16,8 +16,10 @@ return [
         'embedder_name' => env('AI_RAG_EMBEDDER_NAME', 'gemini_embedding_2_768'),
         'embedding_dimensions' => (int) env('AI_RAG_EMBEDDING_DIMENSIONS', 768),
         'top_k' => (int) env('AI_RAG_TOP_K', 5),
-        'min_score' => (float) env('AI_RAG_MIN_SCORE', 0.65),
-        'rrf_min_score' => (float) env('AI_RAG_RRF_MIN_SCORE', 0.02),
+        'min_score' => (float) env('AI_RAG_MIN_SCORE', 0.80),
+        'rrf_min_score' => (float) env('AI_RAG_RRF_MIN_SCORE', 0.016),
+        'rrf_k' => (int) env('AI_RAG_RRF_K', 60),
+        'keyword_top1_min_score' => (float) env('AI_RAG_KEYWORD_TOP1_MIN_SCORE', 0.70),
         'hybrid_semantic_ratio' => (float) env('AI_RAG_HYBRID_SEMANTIC_RATIO', 0.6),
         'sync_batch_size' => (int) env('AI_RAG_SYNC_BATCH_SIZE', 20),
         'sync_batch_sleep_ms' => (int) env('AI_RAG_SYNC_BATCH_SLEEP_MS', 500),
@@ -43,7 +45,7 @@ return [
         'max_question_length' => (int) env('AI_CHAT_MAX_QUESTION_LENGTH', 1000),
         'stub_message' => env('AI_CHAT_STUB_MESSAGE', 'Chatbot dang duoc trien khai. Vui long quay lai sau.'),
         'fallback_message' => env('AI_CHAT_FALLBACK_MESSAGE', 'Chatbot dang ban, vui long thu lai sau.'),
-        'no_context_message' => env('AI_CHAT_NO_CONTEXT_MESSAGE', 'Minh chua tim thay thong tin phu hop trong du lieu Bookify.'),
+        'no_context_message' => env('AI_CHAT_NO_CONTEXT_MESSAGE', 'Minh chua tim thay thong tin phu hop trong du lieu hien co.'),
     ],
 
     'rate_limits' => [

@@ -158,6 +158,7 @@ test('missing vectors limit applies after filtering missing books', function ():
 
     $writer = Mockery::mock(\App\Services\Ai\MeilisearchRagDocumentWriter::class);
     $writer->shouldReceive('getDocumentVectors')
+        ->times(2)
         ->andReturnUsing(function (int $bookId) use ($bookWithVectorId): ?array {
             return $bookId === $bookWithVectorId ? [0.1, 0.2, 0.3] : null;
         });
