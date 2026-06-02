@@ -100,7 +100,7 @@ test('high match chat injects mysql context logs retrieval metadata and returns 
 
     $response = test()->postJson('/api/v1/ai/chat', [
         'session_id' => $sessionId,
-        'question' => 'Dac Nhan Tam gia bao nhieu?',
+        'question' => 'Toi muon sach ve ky nang giao tiep',
     ]);
 
     $response
@@ -147,6 +147,91 @@ test('high match chat injects mysql context logs retrieval metadata and returns 
     expect(app(ChatHistoryStore::class)->getAll($sessionId))->toHaveCount(2);
 });
 
+test('low score rag documents without match keep no context path and empty sources', function (): void {
+    $book = Book::factory()->create([
+        'name' => 'Sach khac',
+        'slug' => 'sach-khac',
+        'selling_price' => 50000,
+    ]);
+
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'quantity' => 5,
+        'reserved_quantity' => 0,
+    ]);
+
+    bindBookRagRetriever(new BookRagRetrievalResult(
+        matched: false,
+        topScore: 0.40,
+        documents: [
+            new BookRagRetrievedDocument((int) $book->id, 0.40, (string) $book->name, (string) $book->slug, []),
+        ],
+        strategy: 'hybrid',
+    ));
+
+    ragFakeGeminiChatSuccess('Minh chua tim thay thong tin phu hop trong du lieu hien co.');
+
+    $sessionId = '550e8400-e29b-41d4-a716-446655440040';
+
+    $response = test()->postJson('/api/v1/ai/chat', [
+        'session_id' => $sessionId,
+        'question' => 'Toi muon sach ve chu de xyzkhongco',
+    ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('data.sources', [])
+        ->assertJsonPath('meta.retrieval.matched', false)
+        ->assertJsonPath('meta.retrieval.strategy', 'hybrid');
+
+    Http::assertSent(function ($request) use ($book): bool {
+        $body = (string) ($request->data()['contents'][0]['parts'][0]['text'] ?? '');
+
+        return str_contains($body, 'no_relevant_context=true')
+            && ! str_contains($body, 'Gia ban:')
+            && ! str_contains($body, (string) $book->name);
+    });
+
+    $this->assertDatabaseHas('ai_chat_messages', [
+        'session_id' => $sessionId,
+        'retrieval_matched' => false,
+        'retrieval_strategy' => 'hybrid',
+    ]);
+});
+
+test('matched retrieval does not log unrelated book id when answer cites no retrieved source', function (): void {
+    $book = Book::factory()->create([
+        'name' => 'Dac Nhan Tam',
+        'slug' => 'dac-nhan-tam',
+        'selling_price' => 86000,
+    ]);
+
+    Inventory::factory()->create([
+        'book_id' => $book->id,
+        'quantity' => 5,
+        'reserved_quantity' => 0,
+    ]);
+
+    bindBookRagRetriever(matchedHybridRetrieval((int) $book->id));
+    ragFakeGeminiChatSuccess('Giao Tiep Thong Minh con hang.');
+
+    $sessionId = '550e8400-e29b-41d4-a716-446655440041';
+
+    $response = test()->postJson('/api/v1/ai/chat', [
+        'session_id' => $sessionId,
+        'question' => 'Toi muon sach ve thanh cong',
+    ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('data.sources', []);
+
+    $message = AiChatMessage::query()->where('session_id', $sessionId)->firstOrFail();
+
+    expect($message->retrieval_matched)->toBeTrue()
+        ->and($message->retrieved_books)->toBeNull();
+});
+
 test('low match chat uses no context wording and returns empty sources', function (): void {
     bindBookRagRetriever(new BookRagRetrievalResult(
         matched: false,
@@ -161,7 +246,7 @@ test('low match chat uses no context wording and returns empty sources', functio
 
     $response = test()->postJson('/api/v1/ai/chat', [
         'session_id' => $sessionId,
-        'question' => 'Bookify co ban dien thoai khong?',
+        'question' => 'Toi muon sach ve chu de xyzkhongco',
     ]);
 
     $response
@@ -193,7 +278,7 @@ test('matched retrieval without mysql context returns empty sources and effectiv
 
     $response = test()->postJson('/api/v1/ai/chat', [
         'session_id' => $sessionId,
-        'question' => 'Dac Nhan Tam gia bao nhieu?',
+        'question' => 'Toi muon sach ve ky nang giao tiep',
     ]);
 
     $response
@@ -243,7 +328,7 @@ test('gemini failure preserves retrieval metadata and does not append redis hist
         ->assertJsonPath('data.answer', config('ai.chat.fallback_message'))
         ->assertJsonPath('meta.error_code', 'gemini_chat_failed')
         ->assertJsonPath('meta.retrieval.strategy', 'hybrid')
-        ->assertJsonPath('meta.retrieval.matched', true)
+        ->assertJsonPath('meta.retrieval.matched', false)
         ->assertJsonPath('meta.evaluation', null);
 
     expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
@@ -251,7 +336,8 @@ test('gemini failure preserves retrieval metadata and does not append redis hist
     $this->assertDatabaseHas('ai_chat_messages', [
         'session_id' => $sessionId,
         'retrieval_strategy' => 'hybrid',
-        'retrieval_matched' => true,
+        'retrieval_matched' => false,
+        'retrieved_books' => null,
         'error_code' => 'gemini_chat_failed',
     ]);
 });

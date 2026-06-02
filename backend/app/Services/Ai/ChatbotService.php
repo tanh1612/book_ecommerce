@@ -6,8 +6,10 @@ use App\Exceptions\Ai\GeminiClientException;
 use App\Models\AiChatEvaluation;
 use App\Models\AiChatMessage;
 use App\Services\Ai\Dto\BookRagRetrievalResult;
+use App\Services\Ai\Dto\BookRagRetrievedDocument;
 use App\Services\Ai\Dto\ChatEvaluationResult;
 use App\Services\Ai\Dto\GeminiGenerateContentRequest;
+use App\Services\Ai\Dto\OutOfScopeIntentGuardResult;
 use App\Services\Ai\Dto\RetrievedBookPromptContext;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -16,8 +18,13 @@ class ChatbotService
 {
     public function __construct(
         private readonly ChatHistoryStore $chatHistoryStore,
+        private readonly ChatContextStore $chatContextStore,
+        private readonly FollowUpQueryResolver $followUpQueryResolver,
+        private readonly ExactBookQueryResolver $exactBookQueryResolver,
+        private readonly OutOfScopeIntentGuard $outOfScopeIntentGuard,
         private readonly BookRagRetriever $bookRagRetriever,
         private readonly RetrievedBookContextLoader $retrievedBookContextLoader,
+        private readonly AnswerSourceSelector $answerSourceSelector,
         private readonly PromptBuilder $promptBuilder,
         private readonly GeminiClient $geminiClient,
         private readonly ChatEvaluationService $chatEvaluationService,
@@ -34,33 +41,83 @@ class ChatbotService
     public function handle(string $sessionId, string $question, ?int $accountId = null): array
     {
         $startedAt = hrtime(true);
-        $history = $this->chatHistoryStore->getRecentTurns($sessionId);
 
-        try {
-            $retrieval = $this->bookRagRetriever->retrieve($question);
-        } catch (GeminiClientException $e) {
-            Log::warning('Gemini embedding failed during retrieval, returning fallback', [
-                'session_id' => $sessionId,
-                'account_id' => $accountId,
-                'error_code' => $e->errorCode,
-                'http_status' => $e->httpStatus,
-                'latency_ms' => $e->latencyMs,
-            ]);
-
-            return $this->buildFallbackResponse(
+        $intentGuardResult = $this->outOfScopeIntentGuard->evaluate($question);
+        if ($intentGuardResult->matched) {
+            return $this->buildScopeLimitedResponse(
                 sessionId: $sessionId,
                 accountId: $accountId,
                 question: $question,
                 startedAt: $startedAt,
-                retrieval: null,
-                bookContexts: [],
-                effectiveMatched: false,
-                errorCode: 'embedding_failed',
+                intentGuardResult: $intentGuardResult,
             );
         }
 
-        $bookContexts = $retrieval->matched
-            ? $this->retrievedBookContextLoader->load($retrieval->documents)
+        $history = $this->chatHistoryStore->getRecentTurns($sessionId);
+        $lastSources = $this->chatContextStore->getLastSources($sessionId);
+        $currentSource = $this->chatContextStore->getCurrentSource($sessionId);
+        $followUpSource = $this->followUpQueryResolver->resolveSource($question, $lastSources, $currentSource);
+        $followUpQuery = $this->followUpQueryResolver->resolve($question, $lastSources, $currentSource);
+
+        if ($followUpQuery === null && $this->followUpQueryResolver->isFollowUpQuestion($question)) {
+            return $this->buildUnresolvedFollowUpResponse(
+                sessionId: $sessionId,
+                accountId: $accountId,
+                question: $question,
+                startedAt: $startedAt,
+            );
+        }
+
+        $retrievalQuery = $followUpQuery ?? $question;
+
+        $exactDocuments = $followUpSource !== null
+            ? [$this->documentFromFollowUpSource($followUpSource)]
+            : $this->exactBookQueryResolver->resolveToDocuments($retrievalQuery);
+
+        $requiresExactMatch = $followUpSource === null
+            && $exactDocuments === []
+            && $this->exactBookQueryResolver->requiresExactMatch($retrievalQuery);
+
+        if ($followUpSource !== null) {
+            $retrieval = $this->followUpRetrievalResult();
+        } elseif ($requiresExactMatch) {
+            $retrieval = $this->emptyRetrievalResult();
+        } else {
+            try {
+                $retrieval = $this->bookRagRetriever->retrieve($retrievalQuery);
+            } catch (GeminiClientException $e) {
+                Log::warning('Gemini embedding failed during retrieval', [
+                    'session_id' => $sessionId,
+                    'account_id' => $accountId,
+                    'error_code' => $e->errorCode,
+                    'http_status' => $e->httpStatus,
+                    'latency_ms' => $e->latencyMs,
+                ]);
+
+                if ($exactDocuments === []) {
+                    return $this->buildFallbackResponse(
+                        sessionId: $sessionId,
+                        accountId: $accountId,
+                        question: $question,
+                        startedAt: $startedAt,
+                        retrieval: null,
+                        bookContexts: [],
+                        effectiveMatched: false,
+                        errorCode: 'embedding_failed',
+                    );
+                }
+
+                $retrieval = $this->emptyRetrievalResult();
+            }
+        }
+
+        $hasExactDocuments = $exactDocuments !== [];
+        $ragDocuments = $retrieval->matched ? $retrieval->documents : [];
+        $documents = $this->selectDocumentsForPrompt($exactDocuments, $ragDocuments);
+        $retrieval = $this->withMergedDocuments($retrieval, $documents, $hasExactDocuments);
+
+        $bookContexts = $documents !== []
+            ? $this->retrievedBookContextLoader->load($documents)
             : [];
 
         $effectiveMatched = $retrieval->matched && $bookContexts !== [];
@@ -80,6 +137,16 @@ class ChatbotService
 
             $this->chatHistoryStore->appendExchange($sessionId, $question, $chatResult->text);
 
+            $citedContexts = $this->answerSourceSelector->select(
+                answer: $chatResult->text,
+                bookContexts: $bookContexts,
+                effectiveMatched: $effectiveMatched,
+            );
+
+            $conversationReferents = $citedContexts !== []
+                ? $citedContexts
+                : $this->resolveConversationReferents($bookContexts, $exactDocuments);
+
             $message = $this->logMessage(
                 sessionId: $sessionId,
                 accountId: $accountId,
@@ -89,7 +156,7 @@ class ChatbotService
                 latencyMs: $this->elapsedMilliseconds($startedAt),
                 tokenUsage: $chatResult->tokenUsage,
                 retrieval: $retrieval,
-                bookContexts: $bookContexts,
+                bookContexts: $conversationReferents,
                 effectiveMatched: $effectiveMatched,
                 errorCode: null,
             );
@@ -102,12 +169,19 @@ class ChatbotService
                 bookContexts: $bookContexts,
             );
 
+            $this->rememberConversationReferents(
+                sessionId: $sessionId,
+                lastSources: $lastSources,
+                conversationReferents: $conversationReferents,
+                keepLastSources: $followUpSource !== null,
+            );
+
             return $this->buildSuccessResponse(
                 sessionId: $sessionId,
                 answer: $chatResult->text,
                 model: $chatResult->model,
                 retrieval: $retrieval,
-                bookContexts: $bookContexts,
+                citedContexts: $citedContexts,
                 effectiveMatched: $effectiveMatched,
                 messageId: $message?->id,
                 evaluation: $evaluationMeta,
@@ -147,7 +221,7 @@ class ChatbotService
         string $answer,
         string $model,
         BookRagRetrievalResult $retrieval,
-        array $bookContexts,
+        array $citedContexts,
         bool $effectiveMatched,
         ?int $messageId,
         ?array $evaluation = null,
@@ -155,7 +229,7 @@ class ChatbotService
         return [
             'message_id' => $messageId,
             'answer' => $answer,
-            'sources' => $this->mapSources($bookContexts, $effectiveMatched),
+            'sources' => $this->mapSources($citedContexts, $effectiveMatched),
             'meta' => [
                 'session_id' => $sessionId,
                 'model' => $model,
@@ -195,8 +269,8 @@ class ChatbotService
             latencyMs: $this->elapsedMilliseconds($startedAt),
             tokenUsage: null,
             retrieval: $retrieval,
-            bookContexts: $bookContexts,
-            effectiveMatched: $effectiveMatched,
+            bookContexts: [],
+            effectiveMatched: false,
             errorCode: $errorCode,
         );
 
@@ -207,11 +281,200 @@ class ChatbotService
             'meta' => [
                 'session_id' => $sessionId,
                 'model' => null,
-                'retrieval' => $this->mapRetrievalMeta($retrieval, $effectiveMatched),
+                'retrieval' => $this->mapRetrievalMeta($retrieval, false),
                 'evaluation' => null,
                 'error_code' => $errorCode,
             ],
         ];
+    }
+
+    /**
+     * @return array{
+     *     message_id: int|null,
+     *     answer: string,
+     *     sources: array<int, mixed>,
+     *     meta: array<string, mixed>
+     * }
+     */
+    private function buildUnresolvedFollowUpResponse(
+        string $sessionId,
+        ?int $accountId,
+        string $question,
+        int $startedAt,
+    ): array {
+        $answer = 'Minh chua xac dinh duoc cuon sach ban dang nhac toi. Ban vui long gui lai ten sach hoac hoi lai sau khi chatbot vua goi y danh sach sach.';
+        $retrieval = $this->emptyRetrievalResult();
+
+        $this->chatContextStore->putLastSources($sessionId, []);
+        $this->chatContextStore->putCurrentSource($sessionId, null);
+
+        $message = $this->logMessage(
+            sessionId: $sessionId,
+            accountId: $accountId,
+            question: $question,
+            answer: $answer,
+            modelVersion: (string) config('ai.gemini.chat_model'),
+            latencyMs: $this->elapsedMilliseconds($startedAt),
+            tokenUsage: null,
+            retrieval: $retrieval,
+            bookContexts: [],
+            effectiveMatched: false,
+            errorCode: null,
+        );
+
+        return [
+            'message_id' => $message?->id,
+            'answer' => $answer,
+            'sources' => [],
+            'meta' => [
+                'session_id' => $sessionId,
+                'model' => null,
+                'retrieval' => $this->mapRetrievalMeta($retrieval, false),
+                'evaluation' => null,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{
+     *     message_id: int|null,
+     *     answer: string,
+     *     sources: array<int, mixed>,
+     *     meta: array<string, mixed>
+     * }
+     */
+    private function buildScopeLimitedResponse(
+        string $sessionId,
+        ?int $accountId,
+        string $question,
+        int $startedAt,
+        OutOfScopeIntentGuardResult $intentGuardResult,
+    ): array {
+        $answer = $intentGuardResult->response
+            ?? 'Minh chi ho tro tu van thong tin va goi y sach tren Bookify; minh khong xu ly don hang, thanh toan, hoan tien hoac thong tin tai khoan.';
+        $retrieval = $this->emptyRetrievalResult();
+
+        $message = $this->logMessage(
+            sessionId: $sessionId,
+            accountId: $accountId,
+            question: $question,
+            answer: $answer,
+            modelVersion: (string) config('ai.gemini.chat_model'),
+            latencyMs: $this->elapsedMilliseconds($startedAt),
+            tokenUsage: null,
+            retrieval: $retrieval,
+            bookContexts: [],
+            effectiveMatched: false,
+            errorCode: null,
+        );
+
+        return [
+            'message_id' => $message?->id,
+            'answer' => $answer,
+            'sources' => [],
+            'meta' => [
+                'session_id' => $sessionId,
+                'model' => null,
+                'retrieval' => $this->mapRetrievalMeta($retrieval, false),
+                'evaluation' => null,
+            ],
+        ];
+    }
+
+    /**
+     * @param  list<BookRagRetrievedDocument>  $exactDocuments
+     * @param  list<BookRagRetrievedDocument>  $ragDocuments
+     * @return list<BookRagRetrievedDocument>
+     */
+    private function selectDocumentsForPrompt(array $exactDocuments, array $ragDocuments): array
+    {
+        if ($exactDocuments !== []) {
+            return $exactDocuments;
+        }
+
+        $merged = [];
+        $seenBookIds = [];
+
+        foreach ($ragDocuments as $document) {
+            if (isset($seenBookIds[$document->bookId])) {
+                continue;
+            }
+
+            $seenBookIds[$document->bookId] = true;
+            $merged[] = $document;
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param  array{book_id: int, name: string, slug: string}  $source
+     */
+    private function documentFromFollowUpSource(array $source): BookRagRetrievedDocument
+    {
+        return new BookRagRetrievedDocument(
+            bookId: $source['book_id'],
+            score: 1.0,
+            name: $source['name'],
+            slug: $source['slug'],
+            raw: ['source' => 'follow_up_context'],
+        );
+    }
+
+    private function followUpRetrievalResult(): BookRagRetrievalResult
+    {
+        return new BookRagRetrievalResult(
+            matched: false,
+            topScore: null,
+            documents: [],
+            strategy: 'follow_up_context',
+        );
+    }
+
+    /**
+     * @param  list<BookRagRetrievedDocument>  $documents
+     */
+    private function withMergedDocuments(
+        BookRagRetrievalResult $retrieval,
+        array $documents,
+        bool $hasExactDocuments,
+    ): BookRagRetrievalResult {
+        $topScore = $documents[0]->score ?? $retrieval->topScore;
+
+        return new BookRagRetrievalResult(
+            matched: $retrieval->matched || $hasExactDocuments,
+            topScore: $topScore,
+            documents: $documents,
+            strategy: $retrieval->strategy,
+            embeddingLatencyMs: $retrieval->embeddingLatencyMs,
+            searchLatencyMs: $retrieval->searchLatencyMs,
+        );
+    }
+
+    /**
+     * API sources only include books named in the answer; follow-up referents may keep a single resolved book.
+     *
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     * @param  list<BookRagRetrievedDocument>  $exactDocuments
+     * @return list<RetrievedBookPromptContext>
+     */
+    private function resolveConversationReferents(array $bookContexts, array $exactDocuments): array
+    {
+        if ($bookContexts === []) {
+            return [];
+        }
+
+        if (count($exactDocuments) === 1) {
+            $exactBookId = $exactDocuments[0]->bookId;
+
+            foreach ($bookContexts as $context) {
+                if ($context->bookId === $exactBookId) {
+                    return [$context];
+                }
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -278,12 +541,55 @@ class ChatbotService
     }
 
     /**
-     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     * @param  list<RetrievedBookPromptContext>  $citedContexts
+     * @return list<array{book_id: int, name: string, slug: string}>
+     */
+    private function mapLastSources(array $citedContexts): array
+    {
+        return array_map(
+            static fn (RetrievedBookPromptContext $context): array => [
+                'book_id' => $context->bookId,
+                'name' => $context->name,
+                'slug' => $context->slug,
+            ],
+            $citedContexts,
+        );
+    }
+
+    /**
+     * @param  list<array{book_id: int, name: string, slug: string}>  $lastSources
+     * @param  list<RetrievedBookPromptContext>  $conversationReferents
+     */
+    private function rememberConversationReferents(
+        string $sessionId,
+        array $lastSources,
+        array $conversationReferents,
+        bool $keepLastSources,
+    ): void {
+        if ($conversationReferents === []) {
+            return;
+        }
+
+        $sources = $this->mapLastSources($conversationReferents);
+
+        $this->chatContextStore->putLastSources(
+            $sessionId,
+            $keepLastSources && $lastSources !== [] ? $lastSources : $sources,
+        );
+
+        $this->chatContextStore->putCurrentSource(
+            $sessionId,
+            count($sources) === 1 ? $sources[0] : null,
+        );
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $citedContexts
      * @return list<array{book_id: int, name: string, slug: string, score: float}>
      */
-    private function mapSources(array $bookContexts, bool $effectiveMatched): array
+    private function mapSources(array $citedContexts, bool $effectiveMatched): array
     {
-        if (! $effectiveMatched || $bookContexts === []) {
+        if (! $effectiveMatched || $citedContexts === []) {
             return [];
         }
 
@@ -294,7 +600,7 @@ class ChatbotService
                 'slug' => $context->slug,
                 'score' => $context->similarityScore,
             ],
-            $bookContexts,
+            $citedContexts,
         );
     }
 

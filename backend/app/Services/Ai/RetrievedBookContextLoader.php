@@ -28,7 +28,6 @@ class RetrievedBookContextLoader
 
         try {
             $books = Book::query()
-                ->active()
                 ->whereIn('id', $bookIds)
                 ->with([
                     'authors:id,name',

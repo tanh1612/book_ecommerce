@@ -126,3 +126,17 @@ test('build shows out of stock label in retrieved context', function (): void {
 
     expect($result->userText)->toContain('Con hang: khong');
 });
+
+test('build instructs quality questions to use rating and description instead of price', function (): void {
+    $result = app(PromptBuilder::class)->build(
+        question: 'Cuon thu 3 co hay khong?',
+        history: [],
+        retrieval: matchedRetrieval(),
+        bookContexts: [sampleBookContext()],
+    );
+
+    expect($result->userText)
+        ->toContain('sach co hay/dang doc/hay hay do')
+        ->toContain('Rating')
+        ->toContain('khong tra loi ve gia neu nguoi dung khong hoi gia');
+});

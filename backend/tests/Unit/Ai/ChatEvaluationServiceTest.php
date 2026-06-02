@@ -143,6 +143,177 @@ test('publication year and plain vnd price do not trigger isbn hallucination fla
         ->and($result->hasHallucinationRisk)->toBeFalse();
 });
 
+test('stock answer mentioning only book name keeps high groundedness without author', function (): void {
+    $contexts = [makeEvalBookContext([
+        'name' => 'Dac Nhan Tam',
+        'authorNames' => ['Dale Carnegie'],
+        'availableStock' => 3,
+    ])];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Cuon nay con hang khong?',
+        answer: 'Dac Nhan Tam hien van con hang.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->hasHallucinationRisk)->toBeFalse()
+        ->and($result->groundednessScore)->toBeGreaterThanOrEqual(0.7)
+        ->and($result->verdict)->toBe('pass');
+});
+
+test('correct price for cited book in context does not lower groundedness when author omitted', function (): void {
+    $contexts = [makeEvalBookContext([
+        'name' => 'Giao Tiep Thong Minh',
+        'authorNames' => ['John Doe'],
+        'sellingPrice' => 86000.0,
+    ])];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Gia bao nhieu?',
+        answer: 'Giao Tiep Thong Minh co gia 86.000 VND.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->hasHallucinationRisk)->toBeFalse()
+        ->and($result->riskFlags)->not->toContain('ungrounded_price')
+        ->and($result->groundednessScore)->toBeGreaterThanOrEqual(0.7)
+        ->and($result->verdict)->toBe('pass');
+});
+
+test('year appearing in book title is not flagged as ungrounded', function (): void {
+    $contexts = [makeEvalBookContext([
+        'name' => 'Cuoc Tham Hiem Vao Long Dat (Tai Ban 2025)',
+        'publicationYear' => null,
+    ])];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Thong tin sach?',
+        answer: 'Cuoc Tham Hiem Vao Long Dat (Tai Ban 2025) dang co san.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->riskFlags)->not->toContain('ungrounded_year')
+        ->and($result->hasHallucinationRisk)->toBeFalse();
+});
+
+test('quality intent question with price only answer fails for intent mismatch', function (): void {
+    $contexts = [makeEvalBookContext([
+        'name' => 'Cuoc Tham Hiem Vao Long Dat',
+        'sellingPrice' => 150000.0,
+    ])];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Cuon nay co hay khong?',
+        answer: 'Cuoc Tham Hiem Vao Long Dat co gia 150.000 VND.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->verdict)->toBe('fail')
+        ->and($result->relevanceScore)->toBeLessThanOrEqual(0.25)
+        ->and($result->riskFlags)->not->toContain('ungrounded_year');
+});
+
+test('book price before aggregate total is still validated when total mentions tong cong', function (): void {
+    $contexts = [
+        makeEvalBookContext([
+            'bookId' => 1,
+            'name' => 'Alpha Communication Book',
+            'sellingPrice' => 120000.0,
+        ]),
+    ];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Gia sach?',
+        answer: 'Alpha Communication Book co gia 98.000 VND. Tong cong 218.000 VND.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->riskFlags)->toContain('ungrounded_price')
+        ->and($result->hasHallucinationRisk)->toBeTrue();
+});
+
+test('aggregate total after book prices is ignored when tong cong precedes the amount', function (): void {
+    $contexts = [
+        makeEvalBookContext([
+            'bookId' => 1,
+            'name' => 'Alpha Communication Book',
+            'sellingPrice' => 120000.0,
+        ]),
+        makeEvalBookContext([
+            'bookId' => 2,
+            'name' => 'Beta Communication Book',
+            'sellingPrice' => 98000.0,
+        ]),
+    ];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Gia sach?',
+        answer: 'Alpha Communication Book co gia 120.000 VND. Beta Communication Book co gia 98.000 VND. Tong cong 218.000 VND.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->hasHallucinationRisk)->toBeFalse()
+        ->and($result->riskFlags)->not->toContain('ungrounded_price');
+});
+
+test('swapped prices between two cited books flag ungrounded price', function (): void {
+    $contexts = [
+        makeEvalBookContext([
+            'bookId' => 1,
+            'name' => 'Alpha Communication Book',
+            'sellingPrice' => 120000.0,
+        ]),
+        makeEvalBookContext([
+            'bookId' => 2,
+            'name' => 'Beta Communication Book',
+            'sellingPrice' => 98000.0,
+        ]),
+    ];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Gia tung cuon?',
+        answer: 'Alpha Communication Book co gia 98.000 VND. Beta Communication Book co gia 120.000 VND.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->riskFlags)->toContain('ungrounded_price')
+        ->and($result->hasHallucinationRisk)->toBeTrue()
+        ->and($result->verdict)->toBeIn(['warning', 'fail']);
+});
+
+test('correct prices for two cited books pass when context order differs from answer', function (): void {
+    $contexts = [
+        makeEvalBookContext([
+            'bookId' => 2,
+            'name' => 'Beta Communication Book',
+            'sellingPrice' => 98000.0,
+        ]),
+        makeEvalBookContext([
+            'bookId' => 1,
+            'name' => 'Alpha Communication Book',
+            'sellingPrice' => 120000.0,
+        ]),
+    ];
+
+    $result = app(ChatEvaluationService::class)->evaluate(
+        question: 'Gia tung cuon?',
+        answer: 'Alpha Communication Book co gia 120.000 VND. Beta Communication Book co gia 98.000 VND.',
+        retrievalMatched: true,
+        bookContexts: $contexts,
+    );
+
+    expect($result->hasHallucinationRisk)->toBeFalse()
+        ->and($result->riskFlags)->not->toContain('ungrounded_price')
+        ->and($result->verdict)->toBe('pass');
+});
+
 test('vietnamese dong and nghin price formats match structured facts', function (string $answer): void {
     $contexts = [makeEvalBookContext(['sellingPrice' => 120000.0])];
 

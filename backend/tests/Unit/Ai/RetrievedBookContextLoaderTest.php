@@ -64,7 +64,7 @@ test('load preserves retrieval order across multiple books', function (): void {
         ->and($contexts[1]->bookId)->toBe($firstBook->id);
 });
 
-test('load skips inactive books', function (): void {
+test('load includes inactive books when they are explicit retrieval targets', function (): void {
     $inactiveBook = Book::factory()->inactive()->create([
         'name' => 'Sach inactive',
         'slug' => 'sach-inactive',
@@ -74,7 +74,11 @@ test('load skips inactive books', function (): void {
         new BookRagRetrievedDocument((int) $inactiveBook->id, 0.90, 'Sach inactive', 'sach-inactive', []),
     ];
 
-    expect(app(RetrievedBookContextLoader::class)->load($documents))->toBe([]);
+    $contexts = app(RetrievedBookContextLoader::class)->load($documents);
+
+    expect($contexts)->toHaveCount(1)
+        ->and($contexts[0]->bookId)->toBe($inactiveBook->id)
+        ->and($contexts[0]->inStock)->toBeFalse();
 });
 
 test('load truncates long descriptions with ascii ellipsis', function (): void {

@@ -1257,18 +1257,22 @@ Ket qua demo:
 
 - Frontend co the gui thumbs up/down cho mot `message_id`.
 
-### Lat 10: Frontend integration co ban
+### Lat 10: API contract (backend) + Frontend integration
 
-Muc tieu: noi UI chatbot hien co voi API that.
+**Backend (xong truoc):** [ai-chatbot-api.md](./ai-chatbot-api.md), `tests/Feature/Ai/ChatApiContractTest.php`.
 
-Pham vi:
+- Chat: `POST /api/v1/ai/chat` — envelope `data` + `meta`.
+- Feedback: `POST /api/v1/ai/messages/{message}/feedback` — `rating`: `up` | `down`.
+- Contract test: guest envelope, guest feedback + session, member feedback khong session, gemini fallback, DB log fail, sources shape.
+
+**Frontend (tiep theo):**
 
 - Frontend tao/lay `bookify_chat_session_id` trong `localStorage`.
 - Gui `session_id` va `question` den API.
 - Hien thi loading, answer va error fallback.
 - Hien thi sources neu backend tra ve.
-- Hien thi nut thumbs up/down khi co `message_id`.
-- Khong hien debug metric cho user cuoi.
+- Hien thi nut thumbs up/down khi co `message_id` va khong co `meta.error_code`.
+- Khong hien debug metric (`meta.evaluation`) cho user cuoi.
 
 Ket qua demo:
 
@@ -1277,19 +1281,19 @@ Ket qua demo:
 
 ### Lat 11: Van hanh va cleanup
 
-Muc tieu: chuan bi chay on dinh.
+Muc tieu: backend co cong cu theo doi, prune du lieu, va tai lieu van hanh.
 
 Pham vi:
 
-- Them command/schedule neu can sync vector dinh ky.
-- Ghi log latency, token usage, retrieval miss rate.
-- Them command prune chat logs neu can retention.
-- Cap nhat `backend/docs/database_schema.md` sau migration.
-- Cap nhat `.cursor/rules/ai-chatbot-rag.mdc` neu quyet dinh ky thuat thay doi.
+- `php artisan ai:chatbot:report` — message 24h/7d, retrieval matched rate & strategy breakdown (7d), Gemini `error_code` (7d), evaluation verdict & hallucination risk (7d), feedback up/down (7d), avg latency/token (7d).
+- `php artisan ai:chatbot:prune [--days=]` — xoa `ai_chat_messages` cu hon retention; `ai_chat_evaluations` / `ai_chat_feedback` cascade FK.
+- Config: `AI_CHAT_LOG_RETENTION_DAYS`, `AI_CHAT_PRUNE_CHUNK_SIZE` trong `config/ai.php` (`operations.*`).
+- Schedule prune (comment trong `routes/console.php`) — bat khi da chot retention production.
+- Test: `ChatbotReportCommandTest`, `ChatbotPruneCommandTest`.
 
 Ket qua demo:
 
-- Co huong dan config, sync index va theo doi loi.
+- Report chay duoc voi DB trong; prune xoa message cu, giu message moi.
 
 ## 16. Kiem thu tong hop
 
@@ -1381,7 +1385,7 @@ Ket qua demo:
 | 7 | `PromptBuilder`, `ChatbotService`, `ChatMessageResource` |
 | 8 | migration/model `AiChatEvaluation`, `ChatEvaluationService` |
 | 9 | migration/model `AiChatFeedback`, `ChatFeedbackController`, `ChatFeedbackService` |
-| 10 | `frontend/src/components/UI/Chatbot.jsx`, service API frontend |
+| 10 | [ai-chatbot-api.md](./ai-chatbot-api.md), `ChatApiContractTest.php`, `frontend/.../Chatbot.jsx` |
 | 11 | `backend/docs/database_schema.md`, schedule/retention docs |
 
 ## 19. Rui ro va cach xu ly

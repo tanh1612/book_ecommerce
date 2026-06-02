@@ -41,6 +41,8 @@ expect()->extend('toBeOne', function () {
 |
 */
 
+require_once __DIR__.'/Feature/Ai/Support/AiChatTestHelpers.php';
+
 function checkoutBookWithStock(int $available = 10): \App\Models\Book
 {
     $book = \App\Models\Book::factory()->create();

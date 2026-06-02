@@ -24,3 +24,7 @@ Schedule::command('recommendations:prune-interactions')
 Schedule::command('ai:sync-book-rag-documents --pending')
     ->dailyAt('02:30')
     ->withoutOverlapping(60);
+
+// Schedule::command('ai:chatbot:prune')
+//     ->daily()
+//     ->withoutOverlapping(30);

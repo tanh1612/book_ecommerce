@@ -47,6 +47,7 @@ return [
         'stub_message' => env('AI_CHAT_STUB_MESSAGE', 'Chatbot dang duoc trien khai. Vui long quay lai sau.'),
         'fallback_message' => env('AI_CHAT_FALLBACK_MESSAGE', 'Chatbot dang ban, vui long thu lai sau.'),
         'no_context_message' => env('AI_CHAT_NO_CONTEXT_MESSAGE', 'Minh chua tim thay thong tin phu hop trong du lieu hien co.'),
+        'exact_book_max_candidates' => (int) env('AI_CHAT_EXACT_BOOK_MAX_CANDIDATES', 3),
     ],
 
     'rate_limits' => [
@@ -54,5 +55,10 @@ return [
         'member_per_minute' => (int) env('AI_CHAT_RATE_LIMIT_MEMBER', 60),
         'feedback_guest_per_minute' => (int) env('AI_CHAT_FEEDBACK_RATE_LIMIT_GUEST', 30),
         'feedback_member_per_minute' => (int) env('AI_CHAT_FEEDBACK_RATE_LIMIT_MEMBER', 60),
+    ],
+
+    'operations' => [
+        'log_retention_days' => (int) env('AI_CHAT_LOG_RETENTION_DAYS', 90),
+        'prune_chunk_size' => (int) env('AI_CHAT_PRUNE_CHUNK_SIZE', 500),
     ],
 ];

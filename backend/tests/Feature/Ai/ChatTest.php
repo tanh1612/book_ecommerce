@@ -2,9 +2,7 @@
 
 use App\Models\Account;
 use App\Models\AiChatMessage;
-use App\Services\Ai\BookRagRetriever;
 use App\Services\Ai\ChatHistoryStore;
-use App\Services\Ai\Dto\BookRagRetrievalResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -18,53 +16,6 @@ beforeEach(function (): void {
     Http::preventStrayRequests();
     bindDefaultBookRagRetriever();
 });
-
-function bindDefaultBookRagRetriever(): void
-{
-    $mock = Mockery::mock(BookRagRetriever::class);
-    $mock->shouldReceive('retrieve')->andReturn(new BookRagRetrievalResult(
-        matched: false,
-        topScore: null,
-        documents: [],
-        strategy: 'none',
-    ));
-    app()->instance(BookRagRetriever::class, $mock);
-}
-
-function validChatPayload(array $overrides = []): array
-{
-    return array_merge([
-        'session_id' => '550e8400-e29b-41d4-a716-446655440000',
-        'question' => 'Toi muon tim sach ve ky nang giao tiep',
-    ], $overrides);
-}
-
-function postChat(array $payload = []): \Illuminate\Testing\TestResponse
-{
-    return test()->postJson('/api/v1/ai/chat', validChatPayload($payload));
-}
-
-function fakeGeminiChatSuccess(string $answer = 'Ban co the tham khao sach ve ky nang giao tiep.'): void
-{
-    Http::fake([
-        '*:generateContent*' => Http::response([
-            'candidates' => [
-                [
-                    'content' => [
-                        'parts' => [
-                            ['text' => $answer],
-                        ],
-                    ],
-                ],
-            ],
-            'usageMetadata' => [
-                'promptTokenCount' => 12,
-                'candidatesTokenCount' => 18,
-                'totalTokenCount' => 30,
-            ],
-        ], 200),
-    ]);
-}
 
 test('guest chat returns gemini answer with expected contract and logs message', function (): void {
     $sessionId = '550e8400-e29b-41d4-a716-446655440000';
@@ -180,6 +131,7 @@ test('redis history is appended when gemini succeeds even if db log fails', func
     $sessionId = '550e8400-e29b-41d4-a716-446655440000';
     $answer = 'Tra loi khi db loi nhung gemini ok.';
 
+    Schema::dropIfExists('ai_chat_feedback');
     Schema::dropIfExists('ai_chat_evaluations');
     Schema::dropIfExists('ai_chat_messages');
     fakeGeminiChatSuccess($answer);
@@ -218,6 +170,42 @@ test('multiple chats with same session_id append redis history', function (): vo
     expect(app(ChatHistoryStore::class)->getAll($sessionId))->toHaveCount(4);
     expect(AiChatMessage::query()->where('session_id', $sessionId)->count())->toBe(2);
 });
+
+test('out of scope intents short-circuit without rag or gemini calls', function (string $question): void {
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => $question,
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.sources', [])
+        ->assertJsonPath('meta.model', null)
+        ->assertJsonPath('meta.retrieval.strategy', 'none')
+        ->assertJsonPath('meta.retrieval.matched', false)
+        ->assertJsonPath('meta.evaluation', null);
+
+    Http::assertNothingSent();
+
+    expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
+
+    $this->assertDatabaseHas('ai_chat_messages', [
+        'session_id' => $sessionId,
+        'question' => $question,
+        'retrieval_strategy' => 'none',
+        'retrieval_matched' => false,
+        'retrieved_books' => null,
+        'error_code' => null,
+    ]);
+})->with([
+    'order status' => 'Don hang cua toi dau roi?',
+    'cancel order' => 'Toi muon huy don hang',
+    'payment issue' => 'Thanh toan VNPAY bi loi',
+    'refund request' => 'Toi muon refund/hoan tien',
+    'change password' => 'Doi mat khau tai khoan the nao?',
+    'private address' => 'Dia chi cua toi la gi?',
+    'non book product' => 'Bookify co ban dien thoai khong?',
+]);
 
 test('chat requires session_id', function (): void {
     $this->postJson('/api/v1/ai/chat', [

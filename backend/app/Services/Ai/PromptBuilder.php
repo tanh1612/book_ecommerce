@@ -9,7 +9,8 @@ use App\Services\Ai\Dto\RetrievedBookPromptContext;
 class PromptBuilder
 {
     private const SYSTEM_INSTRUCTION = <<<'TEXT'
-Ban la tro ly ao cua Bookify. Chi ho tro ve sach va mua sach tren Bookify.
+Ban la tro ly ao cua Bookify. 
+Chi tu van thong tin va goi y sach; khong xy ly don hang, thanh toan, hoan tien hoac thong tin tai khoan.
 Chi dung thong tin trong retrieved_context va conversation_history.
 Khong bia gia, ton kho, nam xuat ban, so trang, ISBN, tac gia hoac ten sach.
 Khi goi y sach, neu co the hay neu ten sach, tac gia, gia, rating va ly do ngan.
@@ -109,6 +110,7 @@ TEXT;
 no_relevant_context=false
 Chi tra loi dua tren retrieved context va conversation history.
 Neu thong tin khong co trong context, noi ro la chua co trong du lieu hien co.
+Neu cau hoi hoi sach co hay/dang doc/hay hay do, hay danh gia dua tren Rating, So danh gia, Mo ta ngan va The loai; khong tra loi ve gia neu nguoi dung khong hoi gia.
 TEXT;
     }
 

@@ -3,8 +3,6 @@
 use App\Models\Account;
 use App\Models\AiChatFeedback;
 use App\Models\AiChatMessage;
-use App\Services\Ai\BookRagRetriever;
-use App\Services\Ai\Dto\BookRagRetrievalResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -13,53 +11,19 @@ uses(RefreshDatabase::class);
 beforeEach(function (): void {
     config(['ai.gemini.api_key' => 'test-api-key']);
     Http::preventStrayRequests();
-    bindFeedbackBookRagRetriever();
+    bindDefaultBookRagRetriever();
 });
-
-function bindFeedbackBookRagRetriever(): void
-{
-    $mock = Mockery::mock(BookRagRetriever::class);
-    $mock->shouldReceive('retrieve')->andReturn(new BookRagRetrievalResult(
-        matched: false,
-        topScore: null,
-        documents: [],
-        strategy: 'none',
-    ));
-    app()->instance(BookRagRetriever::class, $mock);
-}
-
-function fakeGeminiForFeedbackChat(string $answer = 'Tra loi mau.'): void
-{
-    Http::fake([
-        '*:generateContent*' => Http::response([
-            'candidates' => [
-                [
-                    'content' => [
-                        'parts' => [
-                            ['text' => $answer],
-                        ],
-                    ],
-                ],
-            ],
-        ], 200),
-    ]);
-}
 
 function createGuestChatMessage(string $sessionId): AiChatMessage
 {
-    fakeGeminiForFeedbackChat();
+    fakeGeminiChatSuccess();
 
-    test()->postJson('/api/v1/ai/chat', [
+    postChat([
         'session_id' => $sessionId,
         'question' => 'Tim sach hay',
     ])->assertOk();
 
     return AiChatMessage::query()->where('session_id', $sessionId)->firstOrFail();
-}
-
-function postFeedback(int $messageId, array $payload = []): \Illuminate\Testing\TestResponse
-{
-    return test()->postJson("/api/v1/ai/messages/{$messageId}/feedback", $payload);
 }
 
 test('guest can submit thumbs up with matching session_id', function (): void {
@@ -129,7 +93,7 @@ test('member can submit feedback by account_id without session_id', function ():
     $account = Account::factory()->create();
     $sessionId = '550e8400-e29b-41d4-a716-446655440004';
 
-    fakeGeminiForFeedbackChat();
+    fakeGeminiChatSuccess();
 
     test()->actingAs($account, 'web')
         ->postJson('/api/v1/ai/chat', [
@@ -159,7 +123,7 @@ test('member cannot submit feedback for another members message', function (): v
     $other = Account::factory()->create();
     $sessionId = '550e8400-e29b-41d4-a716-446655440005';
 
-    fakeGeminiForFeedbackChat();
+    fakeGeminiChatSuccess();
 
     test()->actingAs($owner, 'web')
         ->postJson('/api/v1/ai/chat', [

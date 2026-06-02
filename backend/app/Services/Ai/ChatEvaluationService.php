@@ -4,10 +4,17 @@ namespace App\Services\Ai;
 
 use App\Services\Ai\Dto\ChatEvaluationResult;
 use App\Services\Ai\Dto\RetrievedBookPromptContext;
+use App\Services\Ai\Support\AnswerBookSegmenter;
+use App\Services\Ai\Support\BookMentionMatcher;
 use App\Services\Ai\Support\VietnameseAccentFolder;
 
 class ChatEvaluationService
 {
+    public function __construct(
+        private readonly BookMentionMatcher $bookMentionMatcher,
+        private readonly AnswerBookSegmenter $answerBookSegmenter,
+    ) {}
+
     private const GROUNDEDNESS_PASS = 0.7;
 
     private const GROUNDEDNESS_WARNING = 0.4;
@@ -20,6 +27,8 @@ class ChatEvaluationService
 
     private const RELEVANCE_LOW_MATCH = 0.35;
 
+    private const RELEVANCE_INTENT_MISMATCH = 0.25;
+
     /**
      * @param  list<RetrievedBookPromptContext>  $bookContexts
      */
@@ -29,6 +38,7 @@ class ChatEvaluationService
         bool $retrievalMatched,
         array $bookContexts,
     ): ChatEvaluationResult {
+        $normalizedQuestion = $this->normalizeText($question);
         $normalizedAnswer = $this->normalizeText($answer);
         $riskFlags = [];
 
@@ -44,6 +54,7 @@ class ChatEvaluationService
         );
 
         $relevanceScore = $this->calculateRelevance(
+            $normalizedQuestion,
             $normalizedAnswer,
             $retrievalMatched,
             $bookContexts,
@@ -51,7 +62,9 @@ class ChatEvaluationService
         );
 
         $verdict = $this->determineVerdict(
+            $normalizedQuestion,
             $groundednessScore,
+            $relevanceScore,
             $hasHallucinationRisk,
             $retrievalMatched,
             $bookContexts,
@@ -76,22 +89,43 @@ class ChatEvaluationService
         array $bookContexts,
         array &$riskFlags,
     ): void {
-        foreach ($this->extractPriceCandidates($normalizedAnswer) as $candidate) {
-            if (! $this->priceMatchesAnyFact($candidate, $bookContexts)) {
-                $riskFlags[] = 'ungrounded_price';
+        $citedCount = count($this->answerBookSegmenter->buildCitationSpans($normalizedAnswer, $bookContexts));
+
+        foreach ($this->extractPriceOccurrences($normalizedAnswer) as $occurrence) {
+            if ($this->shouldIgnoreAggregatePriceAtOffset($normalizedAnswer, $occurrence['offset'])) {
+                continue;
             }
+
+            $this->validateAttributedPrice(
+                $occurrence['amount'],
+                $occurrence['offset'],
+                $normalizedAnswer,
+                $bookContexts,
+                $citedCount,
+                $riskFlags,
+            );
         }
 
-        foreach ($this->extractYearCandidates($normalizedAnswer) as $year) {
-            if (! $this->yearMatchesAnyFact($year, $bookContexts)) {
-                $riskFlags[] = 'ungrounded_year';
-            }
+        foreach ($this->extractYearOccurrences($normalizedAnswer) as $occurrence) {
+            $this->validateAttributedYear(
+                $occurrence['year'],
+                $occurrence['offset'],
+                $normalizedAnswer,
+                $bookContexts,
+                $citedCount,
+                $riskFlags,
+            );
         }
 
-        foreach ($this->extractPageCountCandidates($normalizedAnswer) as $pages) {
-            if (! $this->pageCountMatchesAnyFact($pages, $bookContexts)) {
-                $riskFlags[] = 'ungrounded_page_count';
-            }
+        foreach ($this->extractPageOccurrences($normalizedAnswer) as $occurrence) {
+            $this->validateAttributedPageCount(
+                $occurrence['pages'],
+                $occurrence['offset'],
+                $normalizedAnswer,
+                $bookContexts,
+                $citedCount,
+                $riskFlags,
+            );
         }
 
         if ($this->containsPercentageCandidate($normalizedAnswer) && ! $this->percentageMatchesAnyFact($normalizedAnswer, $bookContexts)) {
@@ -130,43 +164,53 @@ class ChatEvaluationService
 
         foreach ($bookContexts as $context) {
             $normalizedName = $this->normalizeText($context->name);
-            if ($normalizedName !== '') {
+            if ($normalizedName !== '' && str_contains($normalizedAnswer, $normalizedName)) {
                 $checks++;
-                if (str_contains($normalizedAnswer, $normalizedName)) {
-                    $hits++;
-                }
-            }
-
-            foreach ($context->authorNames as $authorName) {
-                $normalizedAuthor = $this->normalizeText($authorName);
-                if ($normalizedAuthor === '') {
-                    continue;
-                }
-
-                $checks++;
-                if (str_contains($normalizedAnswer, $normalizedAuthor)) {
-                    $hits++;
-                }
-            }
-        }
-
-        foreach ($this->extractPriceCandidates($normalizedAnswer) as $candidate) {
-            $checks++;
-            if ($this->priceMatchesAnyFact($candidate, $bookContexts)) {
                 $hits++;
             }
         }
 
-        foreach ($this->extractYearCandidates($normalizedAnswer) as $year) {
+        $citedCount = count($this->answerBookSegmenter->buildCitationSpans($normalizedAnswer, $bookContexts));
+
+        foreach ($this->extractPriceOccurrences($normalizedAnswer) as $occurrence) {
+            if ($this->shouldIgnoreAggregatePriceAtOffset($normalizedAnswer, $occurrence['offset'])) {
+                continue;
+            }
+
             $checks++;
-            if ($this->yearMatchesAnyFact($year, $bookContexts)) {
+            if ($this->priceClaimIsGrounded(
+                $occurrence['amount'],
+                $occurrence['offset'],
+                $normalizedAnswer,
+                $bookContexts,
+                $citedCount,
+            )) {
                 $hits++;
             }
         }
 
-        foreach ($this->extractPageCountCandidates($normalizedAnswer) as $pages) {
+        foreach ($this->extractYearOccurrences($normalizedAnswer) as $occurrence) {
             $checks++;
-            if ($this->pageCountMatchesAnyFact($pages, $bookContexts)) {
+            if ($this->yearClaimIsGrounded(
+                $occurrence['year'],
+                $occurrence['offset'],
+                $normalizedAnswer,
+                $bookContexts,
+                $citedCount,
+            )) {
+                $hits++;
+            }
+        }
+
+        foreach ($this->extractPageOccurrences($normalizedAnswer) as $occurrence) {
+            $checks++;
+            if ($this->pageClaimIsGrounded(
+                $occurrence['pages'],
+                $occurrence['offset'],
+                $normalizedAnswer,
+                $bookContexts,
+                $citedCount,
+            )) {
                 $hits++;
             }
         }
@@ -182,11 +226,17 @@ class ChatEvaluationService
      * @param  list<RetrievedBookPromptContext>  $bookContexts
      */
     private function calculateRelevance(
+        string $normalizedQuestion,
         string $normalizedAnswer,
         bool $retrievalMatched,
         array $bookContexts,
         bool $hasHallucinationRisk,
     ): float {
+        if ($this->isBookQualityIntentQuestion($normalizedQuestion)
+            && $this->answerOnlyPriceOrStock($normalizedAnswer, $bookContexts)) {
+            return self::RELEVANCE_INTENT_MISMATCH;
+        }
+
         if ($retrievalMatched && $normalizedAnswer !== '') {
             $score = self::RELEVANCE_MATCHED_BASE;
             if ($this->containsContextEntity($normalizedAnswer, $bookContexts)) {
@@ -211,13 +261,20 @@ class ChatEvaluationService
      * @param  list<RetrievedBookPromptContext>  $bookContexts
      */
     private function determineVerdict(
+        string $normalizedQuestion,
         float $groundednessScore,
+        float $relevanceScore,
         bool $hasHallucinationRisk,
         bool $retrievalMatched,
         array $bookContexts,
         string $normalizedAnswer,
     ): string {
         if (! $retrievalMatched && $this->suggestsSpecificBooksWhenUnmatched($normalizedAnswer, $bookContexts)) {
+            return 'fail';
+        }
+
+        if ($this->isBookQualityIntentQuestion($normalizedQuestion)
+            && $relevanceScore <= self::RELEVANCE_INTENT_MISMATCH) {
             return 'fail';
         }
 
@@ -425,8 +482,91 @@ class ChatEvaluationService
      */
     private function yearMatchesAnyFact(int $year, array $bookContexts): bool
     {
+        $yearString = (string) $year;
+
         foreach ($bookContexts as $context) {
             if ($context->publicationYear === $year) {
+                return true;
+            }
+
+            $normalizedName = $this->normalizeText($context->name);
+            if ($normalizedName !== '' && str_contains($normalizedName, $yearString)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isBookQualityIntentQuestion(string $normalizedQuestion): bool
+    {
+        $patterns = [
+            '/\bco\s+hay\s+khong\b/u',
+            '/\bhay\s+hay\s+do\b/u',
+            '/\bdang\s+doc\s+khong\b/u',
+            '/\bnen\s+doc\s+khong\b/u',
+            '/\bco\s+nen\s+doc\b/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalizedQuestion)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     */
+    private function answerOnlyPriceOrStock(string $normalizedAnswer, array $bookContexts): bool
+    {
+        $hasPrice = $this->extractPriceCandidates($normalizedAnswer) !== [];
+        $hasStock = (bool) preg_match('/\b(?:con hang|het hang|ton kho|co hang|khong con hang)\b/u', $normalizedAnswer);
+
+        if (! $hasPrice && ! $hasStock) {
+            return false;
+        }
+
+        return ! $this->answerAddressesBookQuality($normalizedAnswer, $bookContexts);
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     */
+    private function answerAddressesBookQuality(string $normalizedAnswer, array $bookContexts): bool
+    {
+        if (preg_match('/\b(?:danh gia|rating|diem trung binh|trung binh|sao)\b/u', $normalizedAnswer)) {
+            return true;
+        }
+
+        if (preg_match('/\b(?:rat hay|kha hay|xuat sac|dang doc|nen doc|khuyen doc|doc thu vi|noi dung hay)\b/u', $normalizedAnswer)) {
+            return true;
+        }
+
+        if (preg_match('/\b(?:ly do|vi sao|cam nhan|noi dung|mo ta)\b/u', $normalizedAnswer)) {
+            return true;
+        }
+
+        foreach ($bookContexts as $context) {
+            if ($context->averageRating <= 0) {
+                continue;
+            }
+
+            $ratingVariants = [
+                number_format($context->averageRating, 1, '.', ''),
+                number_format($context->averageRating, 1, ',', ''),
+            ];
+
+            foreach (array_unique($ratingVariants) as $rating) {
+                if ($rating !== '' && preg_match('/\b'.preg_quote($rating, '/').'\b/u', $normalizedAnswer)) {
+                    return true;
+                }
+            }
+
+            $wholeRating = (string) (int) round($context->averageRating);
+            if ($wholeRating !== '' && preg_match('/\b'.$wholeRating.'\s*(?:sao|star)\b/u', $normalizedAnswer)) {
                 return true;
             }
         }
@@ -481,10 +621,302 @@ class ChatEvaluationService
 
     private function normalizeText(string $text): string
     {
-        $normalized = mb_strtolower(trim($text));
-        // Accent-insensitive matching for Gemini answers that retain Vietnamese diacritics.
-        $normalized = VietnameseAccentFolder::fold($normalized);
+        return $this->bookMentionMatcher->normalizeForMatching($text);
+    }
 
-        return preg_replace('/\s+/u', ' ', $normalized) ?? '';
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     * @param  list<string>  $riskFlags
+     */
+    private function validateAttributedPrice(
+        int $amount,
+        int $offset,
+        string $normalizedAnswer,
+        array $bookContexts,
+        int $citedCount,
+        array &$riskFlags,
+    ): void {
+        if ($this->priceClaimIsGrounded($amount, $offset, $normalizedAnswer, $bookContexts, $citedCount)) {
+            return;
+        }
+
+        if ($citedCount >= 2 && $this->answerBookSegmenter->attributeClaimOffset($offset, $normalizedAnswer, $bookContexts) === null) {
+            $riskFlags[] = 'unattributed_claim';
+        }
+
+        $riskFlags[] = 'ungrounded_price';
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     * @param  list<string>  $riskFlags
+     */
+    private function validateAttributedYear(
+        int $year,
+        int $offset,
+        string $normalizedAnswer,
+        array $bookContexts,
+        int $citedCount,
+        array &$riskFlags,
+    ): void {
+        if ($this->yearClaimIsGrounded($year, $offset, $normalizedAnswer, $bookContexts, $citedCount)) {
+            return;
+        }
+
+        if ($citedCount >= 2 && $this->answerBookSegmenter->attributeClaimOffset($offset, $normalizedAnswer, $bookContexts) === null) {
+            $riskFlags[] = 'unattributed_claim';
+        }
+
+        $riskFlags[] = 'ungrounded_year';
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     * @param  list<string>  $riskFlags
+     */
+    private function validateAttributedPageCount(
+        int $pages,
+        int $offset,
+        string $normalizedAnswer,
+        array $bookContexts,
+        int $citedCount,
+        array &$riskFlags,
+    ): void {
+        if ($this->pageClaimIsGrounded($pages, $offset, $normalizedAnswer, $bookContexts, $citedCount)) {
+            return;
+        }
+
+        if ($citedCount >= 2 && $this->answerBookSegmenter->attributeClaimOffset($offset, $normalizedAnswer, $bookContexts) === null) {
+            $riskFlags[] = 'unattributed_claim';
+        }
+
+        $riskFlags[] = 'ungrounded_page_count';
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     */
+    private function priceClaimIsGrounded(
+        int $amount,
+        int $offset,
+        string $normalizedAnswer,
+        array $bookContexts,
+        int $citedCount,
+    ): bool {
+        if ($citedCount === 0) {
+            return $this->priceMatchesAnyFact($amount, $bookContexts);
+        }
+
+        $context = $this->answerBookSegmenter->attributeClaimOffset($offset, $normalizedAnswer, $bookContexts);
+
+        if ($context === null) {
+            return false;
+        }
+
+        return $this->priceMatchesContext($amount, $context);
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     */
+    private function yearClaimIsGrounded(
+        int $year,
+        int $offset,
+        string $normalizedAnswer,
+        array $bookContexts,
+        int $citedCount,
+    ): bool {
+        if ($citedCount === 0) {
+            return $this->yearMatchesAnyFact($year, $bookContexts);
+        }
+
+        $context = $this->answerBookSegmenter->attributeClaimOffset($offset, $normalizedAnswer, $bookContexts);
+
+        if ($context === null) {
+            return false;
+        }
+
+        return $this->yearMatchesContext($year, $context);
+    }
+
+    /**
+     * @param  list<RetrievedBookPromptContext>  $bookContexts
+     */
+    private function pageClaimIsGrounded(
+        int $pages,
+        int $offset,
+        string $normalizedAnswer,
+        array $bookContexts,
+        int $citedCount,
+    ): bool {
+        if ($citedCount === 0) {
+            return $this->pageCountMatchesAnyFact($pages, $bookContexts);
+        }
+
+        $context = $this->answerBookSegmenter->attributeClaimOffset($offset, $normalizedAnswer, $bookContexts);
+
+        if ($context === null) {
+            return false;
+        }
+
+        return $context->numPages === $pages;
+    }
+
+    private function priceMatchesContext(int $candidateAmount, RetrievedBookPromptContext $context): bool
+    {
+        $factAmount = (int) round($context->sellingPrice);
+
+        if ($factAmount === $candidateAmount) {
+            return true;
+        }
+
+        return abs($factAmount - $candidateAmount) <= max(1000, (int) round($factAmount * 0.01));
+    }
+
+    private function yearMatchesContext(int $year, RetrievedBookPromptContext $context): bool
+    {
+        if ($context->publicationYear === $year) {
+            return true;
+        }
+
+        $normalizedName = $this->normalizeText($context->name);
+
+        return $normalizedName !== '' && str_contains($normalizedName, (string) $year);
+    }
+
+    private function shouldIgnoreAggregatePriceAtOffset(string $normalizedAnswer, int $offset): bool
+    {
+        $windowStart = max(0, $offset - 48);
+        $windowLength = $offset - $windowStart;
+
+        if ($windowLength <= 0) {
+            return false;
+        }
+
+        $window = mb_substr($normalizedAnswer, $windowStart, $windowLength);
+
+        return (bool) preg_match('/\b(?:tong|tong cong|ca hai|combo)\b/u', $window);
+    }
+
+    /**
+     * @return list<array{amount: int, offset: int}>
+     */
+    private function extractPriceOccurrences(string $normalizedAnswer): array
+    {
+        $moneyText = $this->prepareTextForMoneyParsing($normalizedAnswer);
+        $occurrences = [];
+
+        if (preg_match_all('/\b(\d{1,3}(?:[.,]\d{3})*|\d+)\s*(k|nghin|ngan)\b/u', $moneyText, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+            foreach ($matches as $match) {
+                $amount = $this->normalizeMoneyCandidate($match[1][0].' '.$match[2][0]);
+                if ($amount !== null) {
+                    $occurrences[] = ['amount' => $amount, 'offset' => $this->mapMoneyTextOffsetToNormalized($normalizedAnswer, $moneyText, $match[0][1])];
+                }
+            }
+        }
+
+        if (preg_match_all('/\b(\d{1,3}(?:[.,]\d{3})*|\d+)\s*(?:vnd|dong)\b/u', $moneyText, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+            foreach ($matches as $match) {
+                $amount = $this->normalizeMoneyCandidate($match[1][0]);
+                if ($amount !== null) {
+                    $occurrences[] = ['amount' => $amount, 'offset' => $this->mapMoneyTextOffsetToNormalized($normalizedAnswer, $moneyText, $match[0][1])];
+                }
+            }
+        }
+
+        if (preg_match_all('/\b(\d{4,9})\s+dong\b/u', $moneyText, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+            foreach ($matches as $match) {
+                $amount = $this->normalizeMoneyCandidate($match[1][0]);
+                if ($amount !== null) {
+                    $occurrences[] = ['amount' => $amount, 'offset' => $this->mapMoneyTextOffsetToNormalized($normalizedAnswer, $moneyText, $match[0][1])];
+                }
+            }
+        }
+
+        if (preg_match_all('/\b(\d{1,3}(?:[.,]\d{3})+)\b/u', $moneyText, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+            foreach ($matches as $match) {
+                $amount = $this->normalizeMoneyCandidate($match[1][0]);
+                if ($amount !== null && $amount >= 1000) {
+                    $occurrences[] = ['amount' => $amount, 'offset' => $this->mapMoneyTextOffsetToNormalized($normalizedAnswer, $moneyText, $match[0][1])];
+                }
+            }
+        }
+
+        return $this->uniqueOccurrences($occurrences);
+    }
+
+    private function mapMoneyTextOffsetToNormalized(string $normalizedAnswer, string $moneyText, int $moneyOffset): int
+    {
+        if ($moneyText === $normalizedAnswer) {
+            return $moneyOffset;
+        }
+
+        $needle = trim(mb_substr($moneyText, $moneyOffset, 24));
+        if ($needle === '') {
+            return $moneyOffset;
+        }
+
+        $mapped = mb_strpos($normalizedAnswer, $needle);
+
+        return $mapped !== false ? $mapped : $moneyOffset;
+    }
+
+    /**
+     * @return list<array{year: int, offset: int}>
+     */
+    private function extractYearOccurrences(string $normalizedAnswer): array
+    {
+        if (! preg_match_all('/\b(19\d{2}|20\d{2})\b/u', $normalizedAnswer, $matches, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $occurrences = [];
+
+        foreach ($matches[1] as $match) {
+            $occurrences[] = [
+                'year' => (int) $match[0],
+                'offset' => $match[1],
+            ];
+        }
+
+        return $this->uniqueOccurrences($occurrences);
+    }
+
+    /**
+     * @return list<array{pages: int, offset: int}>
+     */
+    private function extractPageOccurrences(string $normalizedAnswer): array
+    {
+        if (! preg_match_all('/\b(\d{1,4})\s*(?:trang|pages?)\b/u', $normalizedAnswer, $matches, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $occurrences = [];
+
+        foreach ($matches[0] as $index => $match) {
+            $occurrences[] = [
+                'pages' => (int) $matches[1][$index][0],
+                'offset' => $match[1],
+            ];
+        }
+
+        return $this->uniqueOccurrences($occurrences);
+    }
+
+    /**
+     * @template T of array<string, int>
+     * @param  list<T>  $occurrences
+     * @return list<T>
+     */
+    private function uniqueOccurrences(array $occurrences): array
+    {
+        $unique = [];
+
+        foreach ($occurrences as $occurrence) {
+            $key = implode(':', $occurrence);
+            $unique[$key] = $occurrence;
+        }
+
+        return array_values($unique);
     }
 }
