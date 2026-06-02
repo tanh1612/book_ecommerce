@@ -1,14 +1,14 @@
 // src/pages/Checkout/CheckoutPage.jsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiChevronRight, FiMapPin, FiTruck, FiCreditCard } from 'react-icons/fi';
+import { FiChevronRight, FiMapPin, FiTruck, FiCreditCard, FiAlertCircle } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { v4 as uuidv4 } from 'uuid';
 import { formatCurrency } from '../../utils/formatters';
 import { useCart } from '../../context/CartContext';
 import addressApi from '../../services/addressApi';
 import checkoutApi from '../../services/checkoutApi';
-import bookApi from '../../services/bookApi'; // Thêm API đối chiếu Flash Sale
+import cartApi from '../../services/cartApi'; // Import API giỏ hàng
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -16,66 +16,81 @@ const CheckoutPage = () => {
   
   const [provinces, setProvinces] = useState([]);
   const [wards, setWards] = useState([]);
-  const [shippingFee, setShippingFee] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Kho chứa % giảm giá để cross-check
-  const [flashSales, setFlashSales] = useState({});
+  const [shippingFee, setShippingFee] = useState(null);
+  const [shippingError, setShippingError] = useState(null); 
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingWards, setIsFetchingWards] = useState(false);
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+  
+  // Lưu trữ dữ liệu giỏ hàng để lấy "pricing_expectations"
+  const [cartInfo, setCartInfo] = useState(null);
 
   const [formData, setFormData] = useState({
     recipient_name: '', recipient_phone: '', province_code: '', ward_code: '',
     detail_address: '', note: '', shipping_method_id: 1, payment_method: 'cod'
   });
 
-  const selectedItems = useMemo(() => cartItems.filter(item => item.selected), [cartItems]);
+  const selectedItems = cartItems.filter(item => item.selected);
+  
+  // TÍNH TỔNG TIỀN DỰA TRÊN DỮ LIỆU CỦA TUẤN ANH
+  const subTotal = cartInfo?.selected_subtotal_after_discount || 0;
+  const totalAmount = subTotal + (shippingFee || 0);
 
-  // 🌟 ĐỒNG BỘ THUẬT TOÁN TÍNH TỔNG TIỀN THANH TOÁN
-  const orderSummary = useMemo(() => {
-    const subTotal = selectedItems.reduce((sum, item) => {
-      const bookData = item.book || item;
-      
-      let original = Number(bookData.original_price || bookData.price || 0);
-      let price = Number(bookData.selling_price || original);
-      
-      // Ép giá giảm từ bảng flashSales đối chiếu
-      let discount = Number(flashSales[bookData.id] || bookData.discount_percent || 0);
-      if (discount > 0) price = original - (original * (discount / 100));
+  const loadWards = async (code) => {
+    setIsFetchingWards(true);
+    try {
+      const res = await addressApi.getWards(code);
+      setWards(res.data?.data || res.data || []);
+    } finally {
+      setIsFetchingWards(false);
+    }
+  };
 
-      return sum + (price * (item.quantity || 1));
-    }, 0);
-    return { subTotal, total: subTotal + shippingFee };
-  }, [selectedItems, shippingFee, flashSales]);
+  const calculateShipping = async (provinceCode, methodId) => {
+    if (!provinceCode) return;
+    setIsCalculatingFee(true);
+    setShippingError(null); 
+    
+    try {
+      const res = await checkoutApi.getShippingQuote({ province_code: provinceCode, shipping_method_id: Number(methodId) });
+      setShippingFee(res.data?.data?.shipping_fee ?? res.data?.shipping_fee ?? 0);
+    } catch (error) {
+      setShippingFee(null);
+      if (error.response?.status === 422) {
+        setShippingError("Nhà vận chuyển chưa thiết lập cước phí cho khu vực này.");
+      } else {
+        setShippingError("Không thể tính phí vận chuyển lúc này.");
+      }
+    } finally {
+      setIsCalculatingFee(false);
+    }
+  };
 
   useEffect(() => {
+    let isMounted = true; 
+
     if (selectedItems.length === 0) {
       toast.warning("Vui lòng chọn sản phẩm để thanh toán!");
       navigate('/cart');
       return;
     }
 
-    const loadInitialCheckoutData = async () => {
+    const initData = async () => {
       try {
-        // Tải song song: Tỉnh thành, Sổ địa chỉ, và Bảng Flash Sale
-        const [provinceRes, addressRes, fsRes] = await Promise.all([
+        const [provinceRes, addressRes, cartRes] = await Promise.all([
           addressApi.getProvinces(),
           addressApi.getAddresses(),
-          bookApi.getActiveFlashSale().catch(() => null)
+          cartApi.getCart() // 🔥 Kéo dữ liệu cart xịn từ BE
         ]);
+        
+        if (!isMounted) return;
 
-        // Cập nhật kho Flash Sale
-        if (fsRes) {
-          const fsData = fsRes.data?.data || fsRes.data;
-          if (fsData && Array.isArray(fsData.items)) {
-            const fsMap = {};
-            fsData.items.forEach(item => fsMap[item.book.id] = Number(item.discount_percent || item.discount_value || 0));
-            setFlashSales(fsMap);
-          }
-        }
+        setProvinces(provinceRes.data?.data || provinceRes.data || []);
+        setCartInfo(cartRes.data?.data || cartRes.data);
 
-        const provinceList = provinceRes.data?.data || provinceRes.data || [];
         const addressList = addressRes.data?.data || addressRes.data || [];
-
-        setProvinces(provinceList);
         const defaultAddress = addressList.find(addr => addr.is_default === 1 || addr.is_default === true);
 
         if (defaultAddress) {
@@ -87,25 +102,22 @@ const CheckoutPage = () => {
             ward_code: defaultAddress.ward_code || '',
             detail_address: defaultAddress.detail_address || '',
           }));
+          toast.info("Đã tự động áp dụng địa chỉ mặc định!");
 
           if (defaultAddress.province_code) {
-            const wardRes = await addressApi.getWards(defaultAddress.province_code);
-            setWards(wardRes.data?.data || wardRes.data || []);
-
-            const feeRes = await checkoutApi.getShippingQuote({
-              province_code: defaultAddress.province_code, shipping_method_id: formData.shipping_method_id
-            });
-            setShippingFee(feeRes.data?.data?.shipping_fee || feeRes.data?.shipping_fee || 0);
+            loadWards(defaultAddress.province_code);
+            calculateShipping(defaultAddress.province_code, 1);
           }
-          toast.info("Đã áp dụng địa chỉ mặc định của bạn.");
         }
-      } catch (error) {
-        console.error("Lỗi khởi tạo:", error);
+      } catch (err) {
+        console.error(err);
       }
     };
 
-    loadInitialCheckoutData();
-  }, [selectedItems, navigate]);
+    initData();
+
+    return () => { isMounted = false; };
+  }, []); // Cờ [] khóa chặt vòng lặp
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -114,42 +126,43 @@ const CheckoutPage = () => {
     if (name === 'province_code') {
       setFormData(prev => ({ ...prev, ward_code: '' }));
       if (value) {
-        addressApi.getWards(value).then(res => setWards(res.data?.data || res.data || [])).catch(console.error);
+        loadWards(value);
         calculateShipping(value, formData.shipping_method_id);
       } else {
         setWards([]);
-        setShippingFee(0);
+        setShippingFee(null);
+        setShippingError(null);
       }
     }
-    if (name === 'shipping_method_id') calculateShipping(formData.province_code, value);
-  };
-
-  const calculateShipping = async (provinceCode, methodId) => {
-    if (!provinceCode) return;
-    try {
-      const res = await checkoutApi.getShippingQuote({ province_code: provinceCode, shipping_method_id: Number(methodId) });
-      setShippingFee(res.data?.data?.shipping_fee || res.data?.shipping_fee || 0);
-    } catch (error) {
-      setShippingFee(30000); 
+    if (name === 'shipping_method_id') {
+      calculateShipping(formData.province_code, value);
     }
   };
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    if (!formData.recipient_name || !formData.recipient_phone || !formData.province_code || !formData.detail_address) {
-      return toast.error("Vui lòng nhập đầy đủ thông tin nhận hàng!");
+    
+    if (!formData.recipient_name || !formData.recipient_phone || !formData.province_code || !formData.ward_code || !formData.detail_address) {
+      return toast.error("Vui lòng điền và chọn đầy đủ thông tin giao hàng!");
     }
+    
     setIsSubmitting(true);
     try {
       const payload = {
-        idempotency_key: uuidv4(), payment_method: formData.payment_method, shipping_method_id: Number(formData.shipping_method_id),
+        idempotency_key: uuidv4(), 
+        payment_method: formData.payment_method, 
+        shipping_method_id: Number(formData.shipping_method_id),
         note: formData.note ? formData.note.trim() : "test vnpay",
         shipping: {
           recipient_name: formData.recipient_name.trim(), recipient_phone: formData.recipient_phone.trim(),
-          province_code: String(formData.province_code).padStart(2, '0'), ward_code: formData.ward_code ? String(formData.ward_code).padStart(5, '0') : "00001",
+          province_code: String(formData.province_code).padStart(2, '0'), 
+          ward_code: String(formData.ward_code).padStart(5, '0'),
           detail_address: formData.detail_address.trim()
-        }
+        },
+        // 🔥 BÍ KÍP Ở ĐÂY: Gửi lại chìa khóa bảo mật giá cho Tuấn Anh
+        pricing_expectations: cartInfo?.pricing_expectations 
       };
+      
       const res = await checkoutApi.submitOrder(payload);
       const responseData = res.data?.data || res.data; 
       
@@ -190,6 +203,8 @@ const CheckoutPage = () => {
       <div className="container mx-auto px-4">
         <form onSubmit={handleCheckout} className="flex flex-col lg:flex-row gap-8">
           <div className="lg:w-2/3 flex flex-col gap-6">
+            
+            {/* THÔNG TIN NHẬN HÀNG */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiMapPin className="text-[#157a2c]" /> Thông tin nhận hàng</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -205,8 +220,9 @@ const CheckoutPage = () => {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Quận/Huyện/Xã</label>
-                  <select name="ward_code" value={formData.ward_code} onChange={handleInputChange} disabled={!formData.province_code} className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none bg-white">
-                    <option value="">Chọn Phường/Xã</option>{wards.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
+                  <select name="ward_code" value={formData.ward_code} onChange={handleInputChange} disabled={!formData.province_code || isFetchingWards} className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none bg-white">
+                    <option value="">{isFetchingWards ? 'Đang tải dữ liệu...' : 'Chọn Phường/Xã'}</option>
+                    {wards.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -215,14 +231,25 @@ const CheckoutPage = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* VẬN CHUYỂN */}
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiTruck className="text-[#157a2c]" /> Vận chuyển</h2>
+                
+                {shippingError && formData.province_code !== '' && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-start gap-2 text-red-600 text-sm">
+                    <FiAlertCircle className="mt-0.5 flex-shrink-0" />
+                    <span>{shippingError}</span>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-3">
                   <label className={`border p-3 rounded flex gap-3 cursor-pointer transition ${formData.shipping_method_id == 1 ? 'border-[#157a2c] bg-green-50' : 'border-gray-200'}`}><input type="radio" name="shipping_method_id" value="1" checked={formData.shipping_method_id == 1} onChange={handleInputChange} className="mt-1 w-4 h-4 text-[#157a2c]" /><div><div className="font-medium text-gray-800 text-sm">Giao hàng tiêu chuẩn</div></div></label>
                   <label className={`border p-3 rounded flex gap-3 cursor-pointer transition ${formData.shipping_method_id == 2 ? 'border-[#157a2c] bg-green-50' : 'border-gray-200'}`}><input type="radio" name="shipping_method_id" value="2" checked={formData.shipping_method_id == 2} onChange={handleInputChange} className="mt-1 w-4 h-4 text-[#157a2c]" /><div><div className="font-medium text-gray-800 text-sm">Giao hàng hỏa tốc</div></div></label>
                 </div>
               </div>
 
+              {/* THANH TOÁN */}
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiCreditCard className="text-[#157a2c]" /> Thanh toán</h2>
                 <div className="flex flex-col gap-3">
@@ -240,11 +267,8 @@ const CheckoutPage = () => {
                 {selectedItems.map(item => {
                   const bookData = item.book || item;
                   
-                  // 🌟 ĐỒNG BỘ THUẬT TOÁN Ở KHUNG BÊN PHẢI
-                  let original = Number(bookData.original_price || bookData.price || 0);
-                  let price = Number(bookData.selling_price || original);
-                  let discount = Number(flashSales[bookData.id] || bookData.discount_percent || 0);
-                  if (discount > 0) price = original - (original * (discount / 100));
+                  // 🔥 Dùng đúng trường BE trả về, bỏ logic tự tính Flash Sale cũ
+                  const itemPrice = Number(item.effective_unit_price ?? bookData.selling_price ?? bookData.price ?? 0);
 
                   return (
                     <div key={item.id} className="flex gap-3 text-sm">
@@ -254,7 +278,7 @@ const CheckoutPage = () => {
                       </div>
                       <div className="flex flex-col justify-between flex-grow">
                         <span className="font-medium text-gray-800 line-clamp-2">{bookData.name || bookData.title}</span>
-                        <span className="font-bold text-[#157a2c]">{formatCurrency(price * item.quantity)}</span>
+                        <span className="font-bold text-[#157a2c]">{formatCurrency(itemPrice * item.quantity)}</span>
                       </div>
                     </div>
                   )
@@ -262,15 +286,26 @@ const CheckoutPage = () => {
               </div>
 
               <div className="flex flex-col gap-2 mb-4 text-sm text-gray-600 border-b border-gray-100 pb-4 mt-4">
-                <div className="flex justify-between"><span>Tạm tính:</span><span className="font-medium text-gray-800">{formatCurrency(orderSummary.subTotal)}</span></div>
-                <div className="flex justify-between"><span>Phí vận chuyển:</span><span className="font-medium text-gray-800">{shippingFee === 0 ? '--' : formatCurrency(shippingFee)}</span></div>
+                <div className="flex justify-between"><span>Tạm tính:</span><span className="font-medium text-gray-800">{formatCurrency(subTotal)}</span></div>
+                <div className="flex justify-between">
+                  <span>Phí vận chuyển:</span>
+                  <span className="font-medium text-gray-800">
+                    {isCalculatingFee 
+                      ? <span className="animate-pulse text-gray-400">Đang tính...</span> 
+                      : (shippingFee !== null ? formatCurrency(shippingFee) : '--')}
+                  </span>
+                </div>
               </div>
               
               <div className="flex justify-between items-center mb-6">
-                <span className="text-gray-800 font-bold">Tổng cộng:</span><span className="text-2xl font-bold text-[#ff424e]">{formatCurrency(orderSummary.total)}</span>
+                <span className="text-gray-800 font-bold">Tổng cộng:</span><span className="text-2xl font-bold text-[#ff424e]">{formatCurrency(totalAmount)}</span>
               </div>
 
-              <button type="submit" disabled={isSubmitting || selectedItems.length === 0} className="w-full bg-[#157a2c] text-white py-3 rounded-md font-bold text-lg hover:bg-green-800 transition shadow-sm flex justify-center items-center gap-2 disabled:opacity-50">
+              <button 
+                type="submit" 
+                disabled={isSubmitting || selectedItems.length === 0 || isFetchingWards || isCalculatingFee || shippingError !== null} 
+                className="w-full bg-[#157a2c] text-white py-3 rounded-md font-bold text-lg transition shadow-sm flex justify-center items-center gap-2 disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
                 {isSubmitting ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Xử lý...</> : (formData.payment_method === 'vnpay' ? 'ĐẶT HÀNG QUA VNPAY' : 'HOÀN TẤT ĐẶT HÀNG')}
               </button>
             </div>
