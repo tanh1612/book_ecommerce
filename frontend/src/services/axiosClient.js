@@ -1,7 +1,8 @@
+// src/services/axiosClient.js
 import axios from 'axios';
 
 const axiosClient = axios.create({
-  baseURL: '/api', // CHỈ ĐỂ '/api'
+  baseURL: '/api', 
   withCredentials: true, 
   headers: {
     'Content-Type': 'application/json',
@@ -10,7 +11,6 @@ const axiosClient = axios.create({
 });
 
 export const getCsrfToken = () => {
-  // CHỈ ĐỂ '/sanctum/csrf-cookie'
   return axios.get('/sanctum/csrf-cookie', { withCredentials: true }); 
 };
 
