@@ -76,6 +76,7 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\Author::observe(\App\Observers\AuthorObserver::class);
         \App\Models\Inventory::observe(\App\Observers\InventoryObserver::class);
         \App\Models\BookDetail::observe(\App\Observers\BookDetailObserver::class);
+        \App\Models\Banner::observe(\App\Observers\BannerObserver::class);
 
         \Illuminate\Support\Facades\Storage::extend('cloudinary_fast', function ($app, $config) {
             $cloudinary = new \Cloudinary\Cloudinary($config['url'] ?? env('CLOUDINARY_URL'));

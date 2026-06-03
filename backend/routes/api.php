@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V1\Cart\CartController;
 use App\Http\Controllers\Api\V1\Catalog\BookController;
+use App\Http\Controllers\Api\V1\Content\BannerController;
 use App\Http\Controllers\Api\V1\Promotion\FlashSaleController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewEligibilityController;
@@ -73,6 +74,11 @@ Route::prefix('v1/payments/vnpay')->middleware('throttle:120,1')->group(function
 // Public Flash Sale
 Route::prefix('v1/flash-sales')->middleware('throttle:120,1')->group(function (): void {
     Route::get('active', [FlashSaleController::class, 'active']);
+});
+
+// Public home banners
+Route::prefix('v1/banners')->middleware('throttle:120,1')->group(function (): void {
+    Route::get('', [BannerController::class, 'index']);
 });
 
 // Public catalog
