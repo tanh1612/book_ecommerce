@@ -38,15 +38,25 @@ return [
         'sync_processing_claim_ttl_seconds' => (int) env('AI_RAG_SYNC_PROCESSING_CLAIM_TTL_SECONDS', 900),
     ],
 
+    'intent' => [
+        'classifier_enabled' => (bool) env('AI_CHAT_INTENT_CLASSIFIER_ENABLED', false),
+        'classifier_provider' => env('AI_CHAT_INTENT_CLASSIFIER_PROVIDER', 'gemini'),
+        'classifier_timeout_seconds' => (int) env('AI_CHAT_INTENT_CLASSIFIER_TIMEOUT_SECONDS', 3),
+        'classifier_retry_times' => (int) env('AI_CHAT_INTENT_CLASSIFIER_RETRY_TIMES', 0),
+        'classifier_confidence_threshold' => (float) env('AI_CHAT_INTENT_CLASSIFIER_CONFIDENCE_THRESHOLD', 0.80),
+        'classifier_max_question_length' => (int) env('AI_CHAT_INTENT_CLASSIFIER_MAX_QUESTION_LENGTH', 240),
+        'classifier_cache_ttl_seconds' => (int) env('AI_CHAT_INTENT_CLASSIFIER_CACHE_TTL_SECONDS', 3600),
+    ],
+
     'chat' => [
         'history_store' => env('AI_CHAT_HISTORY_STORE', 'redis'),
         'history_ttl_seconds' => (int) env('AI_CHAT_HISTORY_TTL_SECONDS', 86400),
         'history_max_turns' => (int) env('AI_CHAT_HISTORY_MAX_TURNS', 10),
         'min_question_length' => (int) env('AI_CHAT_MIN_QUESTION_LENGTH', 2),
         'max_question_length' => (int) env('AI_CHAT_MAX_QUESTION_LENGTH', 1000),
-        'stub_message' => env('AI_CHAT_STUB_MESSAGE', 'Chatbot dang duoc trien khai. Vui long quay lai sau.'),
-        'fallback_message' => env('AI_CHAT_FALLBACK_MESSAGE', 'Chatbot dang ban, vui long thu lai sau.'),
-        'no_context_message' => env('AI_CHAT_NO_CONTEXT_MESSAGE', 'Minh chua tim thay thong tin phu hop trong du lieu hien co.'),
+        'stub_message' => env('AI_CHAT_STUB_MESSAGE', 'Chatbot đang được triển khai. Vui lòng quay lại sau.'),
+        'fallback_message' => env('AI_CHAT_FALLBACK_MESSAGE', 'Chatbot đang bận, vui lòng thử lại sau.'),
+        'no_context_message' => env('AI_CHAT_NO_CONTEXT_MESSAGE', 'Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.'),
         'exact_book_max_candidates' => (int) env('AI_CHAT_EXACT_BOOK_MAX_CANDIDATES', 3),
     ],
 

@@ -75,7 +75,7 @@ test('exact title stock question injects mysql book even when rag returns anothe
 
         return is_string($payload)
             && str_contains($payload, '[Book #'.$target->id.']')
-            && str_contains($payload, 'Con hang: khong');
+            && str_contains($payload, 'Còn hàng: không');
     });
 });
 
@@ -155,7 +155,7 @@ test('exact title miss does not fallback to semantically related book', function
     app()->instance(BookRagRetriever::class, $retriever);
     app()->forgetInstance(\App\Services\Ai\ChatbotService::class);
 
-    fakeGeminiChatSuccess('Minh chua tim thay thong tin phu hop trong du lieu hien co.');
+    fakeGeminiChatSuccess('Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.');
 
     $sessionId = '550e8400-e29b-41d4-a716-446655440022';
 
