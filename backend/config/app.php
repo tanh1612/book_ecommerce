@@ -52,7 +52,9 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+    'url' => env('APP_URL', 'http://book_ecommerce.test'),
+
+    'frontend_url' => env('FRONTEND_URL', 'http://book_ecommerce.test'),
 
     /*
     |--------------------------------------------------------------------------

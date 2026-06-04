@@ -133,6 +133,122 @@ test('vnpay return marks order paid on success', function (): void {
     expect($txn->status)->toBe(PaymentTransactionStatus::PAID);
 });
 
+test('vnpay ipn marks order paid and returns confirm success', function (): void {
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+    $service->createPaymentUrl($order, '127.0.0.1');
+
+    $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
+    $query = signedVnPaySuccessQuery($service, $txn, $order);
+
+    $this->getJson('/api/v1/payments/vnpay/ipn?'.http_build_query($query))
+        ->assertOk()
+        ->assertJson([
+            'RspCode' => '00',
+            'Message' => 'Confirm Success',
+        ]);
+
+    $order->refresh();
+    $txn->refresh();
+
+    expect($order->payment_status)->toBe(PaymentStatus::PAID)
+        ->and($order->current_status)->toBe(OrderStatus::CONFIRMED)
+        ->and($txn->status)->toBe(PaymentTransactionStatus::PAID);
+});
+
+test('vnpay ipn duplicate confirmation returns already confirmed', function (): void {
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+    $service->createPaymentUrl($order, '127.0.0.1');
+
+    $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
+    $query = signedVnPaySuccessQuery($service, $txn, $order);
+
+    $this->getJson('/api/v1/payments/vnpay/ipn?'.http_build_query($query))
+        ->assertOk()
+        ->assertJsonPath('RspCode', '00');
+
+    $this->getJson('/api/v1/payments/vnpay/ipn?'.http_build_query($query))
+        ->assertOk()
+        ->assertJson([
+            'RspCode' => '02',
+            'Message' => 'Order already confirmed',
+        ]);
+});
+
+test('vnpay ipn rejects invalid signature with vnpay response code', function (): void {
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+    $service->createPaymentUrl($order, '127.0.0.1');
+
+    $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
+
+    $this->getJson('/api/v1/payments/vnpay/ipn?'.http_build_query([
+        'vnp_TxnRef' => $txn->gateway_txn_id,
+        'vnp_Amount' => '10000000',
+        'vnp_ResponseCode' => '00',
+        'vnp_TransactionStatus' => '00',
+        'vnp_SecureHash' => 'deadbeef',
+    ]))
+        ->assertOk()
+        ->assertJson([
+            'RspCode' => '97',
+            'Message' => 'Invalid signature',
+        ]);
+});
+
+test('vnpay ipn rejects amount mismatch with vnpay response code', function (): void {
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+    $service->createPaymentUrl($order, '127.0.0.1');
+
+    $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
+    $query = signedVnPaySuccessQuery($service, $txn, $order, amountMinor: '999999');
+
+    $this->getJson('/api/v1/payments/vnpay/ipn?'.http_build_query($query))
+        ->assertOk()
+        ->assertJson([
+            'RspCode' => '04',
+            'Message' => 'Invalid amount',
+        ]);
+});
+
+test('vnpay ipn confirms failed payment notification after updating payment status', function (): void {
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+    $service->createPaymentUrl($order, '127.0.0.1');
+
+    $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
+    $query = signedVnPaySuccessQuery($service, $txn, $order, responseCode: '24', transactionStatus: '02');
+
+    $this->getJson('/api/v1/payments/vnpay/ipn?'.http_build_query($query))
+        ->assertOk()
+        ->assertJson([
+            'RspCode' => '00',
+            'Message' => 'Confirm Success',
+        ]);
+
+    $order->refresh();
+    $txn->refresh();
+
+    expect($order->payment_status)->toBe(PaymentStatus::FAILED)
+        ->and($txn->status)->toBe(PaymentTransactionStatus::FAILED);
+});
+
+test('vnpay return redirects browser to frontend payment result', function (): void {
+    config(['app.frontend_url' => 'https://bookify.test']);
+
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+    $service->createPaymentUrl($order, '127.0.0.1');
+
+    $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
+    $query = signedVnPaySuccessQuery($service, $txn, $order);
+
+    $this->get('/api/v1/payments/vnpay/return?'.http_build_query($query))
+        ->assertRedirect('https://bookify.test/payment-result?status=paid&order_id='.$order->id);
+});
+
 test('expire command cancels unpaid vnpay orders past expiry', function (): void {
     $order = createVnPayOrder();
     $service = app(VnPayService::class);
@@ -150,6 +266,33 @@ test('expire command cancels unpaid vnpay orders past expiry', function (): void
     $txn = PaymentTransaction::query()->where('order_id', $order->id)->firstOrFail();
     expect($txn->status)->toBe(PaymentTransactionStatus::EXPIRED);
 });
+
+function signedVnPaySuccessQuery(
+    VnPayService $service,
+    PaymentTransaction $txn,
+    Order $order,
+    ?string $amountMinor = null,
+    string $responseCode = '00',
+    string $transactionStatus = '00',
+): array {
+    $parts = parse_url((string) $txn->payload['payment_url']);
+    parse_str((string) ($parts['query'] ?? ''), $baseQuery);
+
+    $query = array_merge($baseQuery, [
+        'vnp_TxnRef' => $txn->gateway_txn_id,
+        'vnp_Amount' => $amountMinor ?? (string) (int) round((float) $order->final_amount * 100),
+        'vnp_ResponseCode' => $responseCode,
+        'vnp_TransactionStatus' => $transactionStatus,
+        'vnp_TransactionNo' => '999888',
+        'vnp_PayDate' => '20260518101530',
+    ]);
+
+    $ref = new ReflectionMethod(VnPayService::class, 'secureHash');
+    $ref->setAccessible(true);
+    $query['vnp_SecureHash'] = $ref->invoke($service, $query);
+
+    return $query;
+}
 
 test('expire command releases reserved inventory for order items', function (): void {
     $book = Book::factory()->create();

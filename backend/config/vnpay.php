@@ -10,6 +10,8 @@ return [
 
     'return_url' => env('VNP_RETURN_URL'),
 
+    'ipn_url' => env('VNP_IPN_URL'),
+
     'payment_ttl_hours' => (int) env('VNP_PAYMENT_TTL_HOURS', 12),
 
     'version' => '2.1.0',

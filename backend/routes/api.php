@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\Recommendation\InteractionController;
 use App\Http\Controllers\Api\V1\Recommendation\RecommendationController;
 use App\Http\Controllers\Api\V1\Checkout\CheckoutController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
+use App\Http\Controllers\Api\V1\Payment\VnPayIpnController;
 use App\Http\Controllers\Api\V1\Payment\VnPayReturnController;
 use App\Http\Controllers\Api\V1\Shipping\ShippingQuoteController;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +68,9 @@ Route::prefix('v1/locations')->middleware('throttle:120,1')->group(function (): 
 
 // VNPay payment
 Route::prefix('v1/payments/vnpay')->middleware('throttle:120,1')->group(function (): void {
+    // VNPay IPN (server-to-server confirmation)
+    Route::get('ipn', VnPayIpnController::class);
+
     // VNPay return
     Route::get('return', VnPayReturnController::class);
 });
