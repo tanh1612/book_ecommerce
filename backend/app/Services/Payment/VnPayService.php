@@ -358,6 +358,40 @@ class VnPayService
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $query
+     * @return array{RspCode: string, Message: string}
+     */
+    public function handleIpn(array $query): array
+    {
+        try {
+            $result = $this->handleReturn($query);
+
+            if (($result['success'] ?? false) === true) {
+                if (($result['idempotent'] ?? false) === true) {
+                    return $this->ipnResponse('02', 'Order already confirmed');
+                }
+
+                return $this->ipnResponse('00', 'Confirm Success');
+            }
+
+            return match ($result['message'] ?? '') {
+                'Missing vnp_SecureHash.', 'Invalid signature.' => $this->ipnResponse('97', 'Invalid signature'),
+                'Unknown transaction reference.', 'Order not found.' => $this->ipnResponse('01', 'Order not found'),
+                'Amount mismatch.', 'Missing vnp_Amount.' => $this->ipnResponse('04', 'Invalid amount'),
+                'Payment not successful.' => $this->ipnResponse('00', 'Confirm Success'),
+                default => $this->ipnResponse('99', 'Unknown error'),
+            };
+        } catch (\Throwable $e) {
+            Log::error('VNPay IPN handling failed', [
+                'vnp_TxnRef' => $query['vnp_TxnRef'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->ipnResponse('99', 'Unknown error');
+        }
+    }
+
     private function assertCustomerRetryEligible(Order $order): void
     {
         if ($order->canPay()) {
@@ -410,6 +444,17 @@ class VnPayService
         if (! is_string($tmn) || $tmn === '' || ! is_string($secret) || $secret === '' || ! is_string($url) || $url === '' || ! is_string($returnUrl) || $returnUrl === '') {
             throw new RuntimeException('VNPay is not configured (VNP_TMN_CODE, VNP_HASH_SECRET, VNP_URL, VNP_RETURN_URL).');
         }
+    }
+
+    /**
+     * @return array{RspCode: string, Message: string}
+     */
+    private function ipnResponse(string $code, string $message): array
+    {
+        return [
+            'RspCode' => $code,
+            'Message' => $message,
+        ];
     }
 
     private function makeTxnRef(int $orderId): string

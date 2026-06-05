@@ -7,7 +7,7 @@ uses(Tests\TestCase::class);
 
 beforeEach(function (): void {
     config([
-        'ai.chat.no_context_message' => 'Minh chua tim thay thong tin phu hop trong du lieu hien co.',
+        'ai.chat.no_context_message' => 'Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.',
     ]);
 });
 
@@ -37,7 +37,7 @@ test('answer mentioning book name in context passes evaluation', function (): vo
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Tim sach hay',
-        answer: 'Ban co the tham khao Dac Nhan Tam cua Dale Carnegie.',
+        answer: 'Bạn có thể tham khảo Dac Nhan Tam của Dale Carnegie.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -52,7 +52,7 @@ test('answer price matching structured facts does not flag hallucination risk', 
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Gia bao nhieu?',
-        answer: 'Gia sach la 120.000 VND.',
+        answer: 'Giá sách là 120.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -66,7 +66,7 @@ test('answer price not in facts flags risk and warning or fail verdict', functio
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Gia bao nhieu?',
-        answer: 'Gia sach la 99.000 VND.',
+        answer: 'Giá sách là 99.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -79,7 +79,7 @@ test('answer price not in facts flags risk and warning or fail verdict', functio
 test('low context answer acknowledging missing data passes', function (): void {
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Co ban dien thoai khong?',
-        answer: 'Minh chua tim thay thong tin phu hop trong du lieu hien co.',
+        answer: 'Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.',
         retrievalMatched: false,
         bookContexts: [],
     );
@@ -105,7 +105,7 @@ test('low context answer with vietnamese diacritics acknowledges missing data', 
 test('low context answer inventing specific book recommendation fails', function (): void {
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Co sach nao hay?',
-        answer: 'Ban nen mua sach ABC voi gia 50.000 VND.',
+        answer: 'Bạn nên mua sách ABC với giá 50.000 VND.',
         retrievalMatched: false,
         bookContexts: [],
     );
@@ -120,7 +120,7 @@ test('matched context with wrong year flags ungrounded year', function (): void 
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Nam xuat ban?',
-        answer: 'Sach xuat ban nam 2020.',
+        answer: 'Sách xuất bản năm 2020.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -134,7 +134,7 @@ test('publication year and plain vnd price do not trigger isbn hallucination fla
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Thong tin sach?',
-        answer: 'Sach xuat ban nam 1936. Gia sach la 120000 VND.',
+        answer: 'Sách xuất bản năm 1936. Giá sách là 120000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -152,7 +152,7 @@ test('stock answer mentioning only book name keeps high groundedness without aut
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Cuon nay con hang khong?',
-        answer: 'Dac Nhan Tam hien van con hang.',
+        answer: 'Dac Nhan Tam hiện vẫn còn hàng.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -171,7 +171,7 @@ test('correct price for cited book in context does not lower groundedness when a
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Gia bao nhieu?',
-        answer: 'Giao Tiep Thong Minh co gia 86.000 VND.',
+        answer: 'Giao Tiep Thong Minh có giá 86.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -190,7 +190,7 @@ test('year appearing in book title is not flagged as ungrounded', function (): v
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Thong tin sach?',
-        answer: 'Cuoc Tham Hiem Vao Long Dat (Tai Ban 2025) dang co san.',
+        answer: 'Cuoc Tham Hiem Vao Long Dat (Tai Ban 2025) đang có sẵn.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -207,7 +207,7 @@ test('quality intent question with price only answer fails for intent mismatch',
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Cuon nay co hay khong?',
-        answer: 'Cuoc Tham Hiem Vao Long Dat co gia 150.000 VND.',
+        answer: 'Cuoc Tham Hiem Vao Long Dat có giá 150.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -228,7 +228,7 @@ test('book price before aggregate total is still validated when total mentions t
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Gia sach?',
-        answer: 'Alpha Communication Book co gia 98.000 VND. Tong cong 218.000 VND.',
+        answer: 'Alpha Communication Book có giá 98.000 VND. Tổng cộng 218.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -253,7 +253,7 @@ test('aggregate total after book prices is ignored when tong cong precedes the a
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Gia sach?',
-        answer: 'Alpha Communication Book co gia 120.000 VND. Beta Communication Book co gia 98.000 VND. Tong cong 218.000 VND.',
+        answer: 'Alpha Communication Book có giá 120.000 VND. Beta Communication Book có giá 98.000 VND. Tổng cộng 218.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -278,7 +278,7 @@ test('swapped prices between two cited books flag ungrounded price', function ()
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Gia tung cuon?',
-        answer: 'Alpha Communication Book co gia 98.000 VND. Beta Communication Book co gia 120.000 VND.',
+        answer: 'Alpha Communication Book có giá 98.000 VND. Beta Communication Book có giá 120.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -304,7 +304,7 @@ test('correct prices for two cited books pass when context order differs from an
 
     $result = app(ChatEvaluationService::class)->evaluate(
         question: 'Gia tung cuon?',
-        answer: 'Alpha Communication Book co gia 120.000 VND. Beta Communication Book co gia 98.000 VND.',
+        answer: 'Alpha Communication Book có giá 120.000 VND. Beta Communication Book có giá 98.000 VND.',
         retrievalMatched: true,
         bookContexts: $contexts,
     );
@@ -327,8 +327,8 @@ test('vietnamese dong and nghin price formats match structured facts', function 
     expect($result->hasHallucinationRisk)->toBeFalse()
         ->and($result->riskFlags)->not->toContain('ungrounded_price');
 })->with([
-    'dotted dong' => 'Gia sach la 120.000 đồng.',
-    'plain dong' => 'Gia sach la 120000 đồng.',
+    'dotted dong' => 'Giá sách là 120.000 đồng.',
+    'plain dong' => 'Giá sách là 120000 đồng.',
     'nghin' => 'Gia khoang 120 nghìn.',
-    'd sign' => 'Gia sach 120.000 đ.',
+    'd sign' => 'Giá sách 120.000 đ.',
 ]);

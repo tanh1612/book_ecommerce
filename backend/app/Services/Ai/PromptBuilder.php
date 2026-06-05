@@ -9,13 +9,13 @@ use App\Services\Ai\Dto\RetrievedBookPromptContext;
 class PromptBuilder
 {
     private const SYSTEM_INSTRUCTION = <<<'TEXT'
-Ban la tro ly ao cua Bookify. 
-Chi tu van thong tin va goi y sach; khong xy ly don hang, thanh toan, hoan tien hoac thong tin tai khoan.
-Chi dung thong tin trong retrieved_context va conversation_history.
-Khong bia gia, ton kho, nam xuat ban, so trang, ISBN, tac gia hoac ten sach.
-Khi goi y sach, neu co the hay neu ten sach, tac gia, gia, rating va ly do ngan.
-Neu sach het hang, khong khuyen khich "mua ngay"; chi noi hien sach het hang.
-Tra loi bang tieng Viet, ngan gon, de hieu.
+Bạn là trợ lý ảo của Bookify.
+Chỉ tư vấn thông tin và gợi ý sách; không xử lý đơn hàng, thanh toán, hoàn tiền hoặc thông tin tài khoản.
+Chỉ dùng thông tin trong retrieved_context và conversation_history.
+Không bịa giá, tồn kho, năm xuất bản, số trang, ISBN, tác giả hoặc tên sách.
+Khi gợi ý sách, nếu có thể hãy nêu tên sách, tác giả, giá, rating và lý do ngắn.
+Nếu sách hết hàng, không khuyến khích "mua ngay"; chỉ nói hiện sách hết hàng.
+Trả lời bằng tiếng Việt có dấu, ngắn gọn, dễ hiểu.
 TEXT;
 
     /**
@@ -52,7 +52,7 @@ TEXT;
     private function formatHistorySection(array $history): string
     {
         if ($history === []) {
-            return "## Conversation history\n(khong co)";
+            return "## Conversation history\n(không có)";
         }
 
         $lines = ["## Conversation history"];
@@ -80,7 +80,7 @@ TEXT;
 
     private function formatNoContextSection(): string
     {
-        return "## Retrieved context\n(khong co du lieu sach phu hop)";
+        return "## Retrieved context\n(không có dữ liệu sách phù hợp)";
     }
 
     private function formatQuestionSection(string $question): string
@@ -93,24 +93,24 @@ TEXT;
         if ($noRelevantContext) {
             $message = (string) config(
                 'ai.chat.no_context_message',
-                'Minh chua tim thay thong tin phu hop trong du lieu hien co.',
+                'Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.',
             );
 
             return <<<TEXT
 ## Instructions
 no_relevant_context=true
-Neu khong co retrieved context phu hop, hay tra loi theo huong: "{$message}"
-Khong khang dinh rang Bookify chac chan khong ban san pham do.
-Khong goi y sach cu the neu khong co retrieved context.
+Nếu không có retrieved context phù hợp, hãy trả lời theo hướng: "{$message}"
+Không khẳng định rằng Bookify chắc chắn không bán sản phẩm đó.
+Không gợi ý sách cụ thể nếu không có retrieved context.
 TEXT;
         }
 
         return <<<'TEXT'
 ## Instructions
 no_relevant_context=false
-Chi tra loi dua tren retrieved context va conversation history.
-Neu thong tin khong co trong context, noi ro la chua co trong du lieu hien co.
-Neu cau hoi hoi sach co hay/dang doc/hay hay do, hay danh gia dua tren Rating, So danh gia, Mo ta ngan va The loai; khong tra loi ve gia neu nguoi dung khong hoi gia.
+Chỉ trả lời dựa trên retrieved context và conversation history.
+Nếu thông tin không có trong context, nói rõ là chưa có trong dữ liệu hiện có.
+Nếu câu hỏi hỏi sách có hay/đáng đọc/nên đọc không, hãy đánh giá dựa trên Rating, Số đánh giá, Mô tả ngắn và Thể loại; không trả lời về giá nếu người dùng không hỏi giá.
 TEXT;
     }
 
@@ -118,30 +118,30 @@ TEXT;
     {
         $lines = [
             "[Book #{$context->bookId}]",
-            "Ten sach: {$context->name}",
+            "Tên sách: {$context->name}",
             "Slug: {$context->slug}",
         ];
 
         if ($context->authorNames !== []) {
-            $lines[] = 'Tac gia: '.implode(', ', $context->authorNames);
+            $lines[] = 'Tác giả: '.implode(', ', $context->authorNames);
         }
 
         if ($context->categoryNames !== []) {
-            $lines[] = 'The loai: '.implode(', ', $context->categoryNames);
+            $lines[] = 'Thể loại: '.implode(', ', $context->categoryNames);
         }
 
         if ($context->descriptionShort !== '') {
-            $lines[] = "Mo ta ngan: {$context->descriptionShort}";
+            $lines[] = "Mô tả ngắn: {$context->descriptionShort}";
         }
 
         if ($context->publisherName !== null) {
-            $lines[] = "Nha xuat ban: {$context->publisherName}";
+            $lines[] = "Nhà xuất bản: {$context->publisherName}";
         }
 
-        $lines[] = 'Gia ban: '.$this->formatPrice($context->sellingPrice);
+        $lines[] = 'Giá bán: '.$this->formatPrice($context->sellingPrice);
         $lines[] = 'Rating: '.$context->averageRating;
-        $lines[] = 'So danh gia: '.$context->reviewCount;
-        $lines[] = 'Con hang: '.($context->inStock ? 'co' : 'khong');
+        $lines[] = 'Số đánh giá: '.$context->reviewCount;
+        $lines[] = 'Còn hàng: '.($context->inStock ? 'có' : 'không');
         $lines[] = 'Similarity score: '.number_format($context->similarityScore, 4, '.', '');
 
         return implode("\n", $lines);

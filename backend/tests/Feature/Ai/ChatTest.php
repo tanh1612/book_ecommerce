@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Schema;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config(['ai.gemini.api_key' => 'test-api-key']);
+    config([
+        'ai.gemini.api_key' => 'test-api-key',
+        'ai.intent.classifier_enabled' => false,
+    ]);
     Cache::store((string) config('ai.chat.history_store'))->flush();
     Http::preventStrayRequests();
     bindDefaultBookRagRetriever();
@@ -206,6 +209,144 @@ test('out of scope intents short-circuit without rag or gemini calls', function 
     'private address' => 'Dia chi cua toi la gi?',
     'non book product' => 'Bookify co ban dien thoai khong?',
 ]);
+
+test('small talk intents short-circuit without rag or gemini calls', function (string $question, string $expectedAnswerFragment): void {
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => $question,
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.answer', fn (string $answer): bool => str_contains($answer, $expectedAnswerFragment))
+        ->assertJsonPath('data.sources', [])
+        ->assertJsonPath('meta.model', null)
+        ->assertJsonPath('meta.retrieval.strategy', 'none')
+        ->assertJsonPath('meta.retrieval.matched', false)
+        ->assertJsonPath('meta.evaluation', null);
+
+    Http::assertNothingSent();
+
+    expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
+
+    $this->assertDatabaseHas('ai_chat_messages', [
+        'session_id' => $sessionId,
+        'question' => $question,
+        'retrieval_strategy' => 'none',
+        'retrieval_matched' => false,
+        'error_code' => null,
+    ]);
+})->with([
+    'status check' => ['alo, ban co nghe thay toi khong', 'Có, mình nghe thấy bạn'],
+    'still there' => ['ban con do khong', 'Có, mình nghe thấy bạn'],
+    'greeting' => ['chao ban', 'Chào bạn'],
+    'thanks' => ['cam on', 'Rất vui được hỗ trợ bạn'],
+    'capability' => ['ban lam duoc gi', 'Mình có thể hỗ trợ tìm sách'],
+    'capability with book mention' => ['ban co the giup gi ve sach', 'Mình có thể hỗ trợ tìm sách'],
+    'capability ho tro ve sach' => ['ban ho tro gi ve sach', 'Mình có thể hỗ trợ tìm sách'],
+]);
+
+test('broad book phrases do not bypass unsupported non book product guard', function (string $question): void {
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => $question,
+    ])
+        ->assertOk()
+        ->assertJsonPath('meta.model', null)
+        ->assertJsonPath('meta.evaluation', null);
+
+    Http::assertNothingSent();
+    expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
+})->with([
+    'tu van laptop' => 'tu van laptop',
+    'review dien thoai' => 'review dien thoai',
+    'goi y smartphone' => 'goi y smartphone',
+]);
+
+test('book-related questions are not short-circuited by small talk guard', function (string $question): void {
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+    $answer = 'Tra loi ve sach tu Gemini.';
+
+    fakeGeminiChatSuccess($answer);
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => $question,
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.answer', $answer)
+        ->assertJsonPath('meta.model', config('ai.gemini.chat_model'));
+
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), ':generateContent'));
+})->with([
+    'greeting with book search' => 'alo, tim sach ky nang giao tiep giup toi',
+    'thanks with book suggestion' => 'cam on, goi y them sach tuong tu di',
+    'general book question' => 'ban co sach nao hay khong',
+    'book intent overrides non book product' => 'Bookify co ban sach ve dien thoai khong',
+    'status check with book suggestion' => 'ban con do khong, goi y sach tai chinh cho toi',
+]);
+
+test('non book product with incidental gia token is not treated as book intent', function (): void {
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+    $question = 'Bookify co ban dien thoai gia re khong';
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => $question,
+    ])
+        ->assertOk()
+        ->assertJsonPath('meta.model', null)
+        ->assertJsonPath('meta.evaluation', null);
+
+    Http::assertNothingSent();
+    expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
+});
+
+test('unknown paraphrase can short-circuit when intent classifier is enabled', function (): void {
+    config(['ai.intent.classifier_enabled' => true]);
+
+    Http::fake([
+        '*:generateContent*' => function ($request) {
+            $system = $request->data()['systemInstruction']['parts'][0]['text'] ?? '';
+
+            if (str_contains($system, 'Classify the user')) {
+                return Http::response([
+                    'candidates' => [
+                        [
+                            'content' => [
+                                'parts' => [
+                                    ['text' => '{"intent":"small_talk.status_check","confidence":0.93}'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ], 200);
+            }
+
+            return Http::response([], 404);
+        },
+    ]);
+
+    $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+
+    postChat([
+        'session_id' => $sessionId,
+        'question' => 'alo ban oi nghe duoc khong',
+    ])
+        ->assertOk()
+        ->assertJsonPath('meta.model', null)
+        ->assertJsonPath('data.sources', [])
+        ->assertJsonPath('data.answer', fn (string $answer): bool => str_contains($answer, 'Có, mình nghe thấy bạn'));
+
+    Http::assertSent(fn ($request): bool => str_contains(
+        $request->data()['systemInstruction']['parts'][0]['text'] ?? '',
+        'Classify the user',
+    ));
+
+    expect(app(ChatHistoryStore::class)->getAll($sessionId))->toBe([]);
+});
 
 test('chat requires session_id', function (): void {
     $this->postJson('/api/v1/ai/chat', [

@@ -81,7 +81,7 @@ test('answer source selector ignores a single generic title token', function ():
     ];
 
     $selected = app(AnswerSourceSelector::class)->select(
-        answer: 'Toi chua tim thay thong tin ve cuon Vuon Doc Duoc trong du lieu hien co cua Bookify.',
+        answer: 'Tôi chưa tìm thấy thông tin về cuốn Vuon Doc Duoc trong dữ liệu hiện có của Bookify.',
         bookContexts: $contexts,
         effectiveMatched: true,
     );

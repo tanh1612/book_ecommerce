@@ -16,6 +16,34 @@ use Throwable;
 
 class GeminiClient
 {
+    private const INTENT_CLASSIFICATION_SYSTEM_INSTRUCTION = <<<'TEXT'
+Classify the user's Vietnamese ecommerce bookstore chatbot message.
+Return only JSON:
+{"intent":"...", "confidence":0.0}
+
+Allowed intents:
+book.search
+book.detail
+book.recommendation
+small_talk.greeting
+small_talk.status_check
+small_talk.thanks
+small_talk.goodbye
+small_talk.capability
+unsupported.order
+unsupported.payment
+unsupported.refund
+unsupported.account
+unsupported.non_book_product
+unknown
+
+Rules:
+- Use book.* if the user asks about books, authors, genres, prices, stock, reviews, or recommendations.
+- Use small_talk.* only for pure conversational messages.
+- Use unsupported.* for order/payment/refund/account/non-book product requests.
+- If unsure, use unknown.
+TEXT;
+
     public function embedText(string $text): GeminiEmbeddingResult
     {
         $this->ensureApiKey();
@@ -163,6 +191,51 @@ class GeminiClient
         return $result;
     }
 
+    public function generateIntentClassification(string $userText): GeminiChatResult
+    {
+        $this->ensureApiKey();
+
+        $model = (string) config('ai.gemini.chat_model');
+        $startedAt = hrtime(true);
+
+        $payload = [
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => $userText],
+                    ],
+                ],
+            ],
+            'systemInstruction' => [
+                'parts' => [
+                    ['text' => self::INTENT_CLASSIFICATION_SYSTEM_INSTRUCTION],
+                ],
+            ],
+            'generationConfig' => [
+                'temperature' => 0,
+                'maxOutputTokens' => 128,
+                'responseMimeType' => 'application/json',
+            ],
+        ];
+
+        $response = $this->requestWithIntentRetry(
+            operation: 'intent_classify',
+            model: $model,
+            method: 'post',
+            url: $this->modelPath($model, 'generateContent'),
+            payload: $payload,
+            startedAt: $startedAt,
+        );
+
+        $latencyMs = $this->elapsedMilliseconds($startedAt);
+        $result = $this->parseChatResponse($response->json(), $model, $latencyMs);
+
+        $this->logSuccess('intent_classify', $model, $startedAt);
+
+        return $result;
+    }
+
     private function ensureApiKey(): void
     {
         $apiKey = config('ai.gemini.api_key');
@@ -183,6 +256,87 @@ class GeminiClient
             ->withHeaders([
                 'x-goog-api-key' => (string) config('ai.gemini.api_key'),
             ]);
+    }
+
+    private function intentHttp(): PendingRequest
+    {
+        return Http::baseUrl(rtrim((string) config('ai.gemini.base_url'), '/'))
+            ->timeout(max((int) config('ai.intent.classifier_timeout_seconds', 3), 1))
+            ->acceptJson()
+            ->withHeaders([
+                'x-goog-api-key' => (string) config('ai.gemini.api_key'),
+            ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function requestWithIntentRetry(
+        string $operation,
+        string $model,
+        string $method,
+        string $url,
+        array $payload,
+        int $startedAt,
+    ): Response {
+        $maxAttempts = max((int) config('ai.intent.classifier_retry_times', 0), 0) + 1;
+        $sleepMs = max((int) config('ai.gemini.retry_sleep_ms', 200), 0);
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $response = $this->intentHttp()->{$method}($url, $payload);
+
+                if ($response->successful()) {
+                    return $response;
+                }
+
+                if (! $this->shouldRetryStatus($response->status()) || $attempt >= $maxAttempts) {
+                    $this->throwForResponse($operation, $model, $response, $startedAt);
+                }
+
+                $this->logRetry($operation, $model, $response->status(), $attempt, $startedAt);
+            } catch (ConnectionException $e) {
+                $lastException = $e;
+
+                if ($attempt >= $maxAttempts) {
+                    $this->logFailure($operation, $model, GeminiClientException::TIMEOUT, null, $startedAt, $e);
+
+                    throw new GeminiClientException(
+                        'Gemini API connection failed',
+                        GeminiClientException::TIMEOUT,
+                        latencyMs: $this->elapsedMilliseconds($startedAt),
+                        previous: $e,
+                    );
+                }
+
+                $this->logRetry($operation, $model, null, $attempt, $startedAt, $e);
+            } catch (GeminiClientException $e) {
+                throw $e;
+            } catch (Throwable $e) {
+                $this->logFailure($operation, $model, GeminiClientException::API_ERROR, null, $startedAt, $e);
+
+                throw new GeminiClientException(
+                    'Gemini API request failed',
+                    GeminiClientException::API_ERROR,
+                    latencyMs: $this->elapsedMilliseconds($startedAt),
+                    previous: $e,
+                );
+            }
+
+            if ($sleepMs > 0) {
+                usleep($sleepMs * 1000);
+            }
+        }
+
+        $this->logFailure($operation, $model, GeminiClientException::TIMEOUT, null, $startedAt, $lastException);
+
+        throw new GeminiClientException(
+            'Gemini API connection failed',
+            GeminiClientException::TIMEOUT,
+            latencyMs: $this->elapsedMilliseconds($startedAt),
+            previous: $lastException,
+        );
     }
 
     private function modelPath(string $model, string $action): string

@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Services\Ai\BookRagSyncDispatcher;
+use App\Services\Ai\Contracts\ChatIntentClassifier;
+use App\Services\Ai\GeminiChatIntentClassifier;
 use App\Services\Ai\QueueBookRagSyncService;
 use App\Services\Media\BookImageStorageService;
 use App\Services\Promotion\FlashSaleScheduleMutex;
@@ -36,6 +38,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(QueueBookRagSyncService::class);
 
         $this->app->singleton(FlashSaleScheduleMutex::class);
+
+        $this->app->bind(ChatIntentClassifier::class, function (): ChatIntentClassifier {
+            $provider = (string) config('ai.intent.classifier_provider', 'gemini');
+
+            return match ($provider) {
+                'gemini' => $this->app->make(GeminiChatIntentClassifier::class),
+                default => $this->app->make(GeminiChatIntentClassifier::class),
+            };
+        });
     }
 
     /**

@@ -8,7 +8,7 @@ uses(Tests\TestCase::class);
 
 beforeEach(function (): void {
     config([
-        'ai.chat.no_context_message' => 'Minh chua tim thay thong tin phu hop trong du lieu hien co.',
+        'ai.chat.no_context_message' => 'Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.',
     ]);
 });
 
@@ -64,8 +64,8 @@ test('build includes retrieved context when matched with book contexts', functio
     expect($result->noRelevantContext)->toBeFalse()
         ->and($result->userText)->toContain('## Retrieved context')
         ->and($result->userText)->toContain('[Book #10]')
-        ->and($result->userText)->toContain('Gia ban: 86.000 VND')
-        ->and($result->userText)->toContain('Con hang: co')
+        ->and($result->userText)->toContain('Giá bán: 86.000 VND')
+        ->and($result->userText)->toContain('Còn hàng: có')
         ->and($result->userText)->toContain('no_relevant_context=false');
 });
 
@@ -79,8 +79,8 @@ test('build marks no relevant context when retrieval is unmatched', function ():
 
     expect($result->noRelevantContext)->toBeTrue()
         ->and($result->userText)->toContain('no_relevant_context=true')
-        ->and($result->userText)->toContain('du lieu hien co')
-        ->and($result->userText)->toContain('Khong khang dinh rang Bookify chac chan khong ban san pham do')
+        ->and($result->userText)->toContain('dữ liệu hiện có')
+        ->and($result->userText)->toContain('Không khẳng định rằng Bookify chắc chắn không bán sản phẩm đó')
         ->and($result->userText)->not->toContain('[Book #');
 });
 
@@ -124,7 +124,7 @@ test('build shows out of stock label in retrieved context', function (): void {
         bookContexts: [sampleBookContext(inStock: false)],
     );
 
-    expect($result->userText)->toContain('Con hang: khong');
+    expect($result->userText)->toContain('Còn hàng: không');
 });
 
 test('build instructs quality questions to use rating and description instead of price', function (): void {
@@ -136,7 +136,7 @@ test('build instructs quality questions to use rating and description instead of
     );
 
     expect($result->userText)
-        ->toContain('sach co hay/dang doc/hay hay do')
+        ->toContain('sách có hay/đáng đọc/nên đọc không')
         ->toContain('Rating')
-        ->toContain('khong tra loi ve gia neu nguoi dung khong hoi gia');
+        ->toContain('không trả lời về giá nếu người dùng không hỏi giá');
 });

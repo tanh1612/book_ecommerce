@@ -140,7 +140,7 @@ test('high match chat injects mysql context logs retrieval metadata and returns 
         $body = $request->data();
 
         return str_contains($request->url(), ':generateContent')
-            && str_contains((string) ($body['contents'][0]['parts'][0]['text'] ?? ''), 'Gia ban: 86.000 VND')
+            && str_contains((string) ($body['contents'][0]['parts'][0]['text'] ?? ''), 'Giá bán: 86.000 VND')
             && str_contains((string) ($body['contents'][0]['parts'][0]['text'] ?? ''), 'no_relevant_context=false');
     });
 
@@ -169,7 +169,7 @@ test('low score rag documents without match keep no context path and empty sourc
         strategy: 'hybrid',
     ));
 
-    ragFakeGeminiChatSuccess('Minh chua tim thay thong tin phu hop trong du lieu hien co.');
+    ragFakeGeminiChatSuccess('Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.');
 
     $sessionId = '550e8400-e29b-41d4-a716-446655440040';
 
@@ -188,7 +188,7 @@ test('low score rag documents without match keep no context path and empty sourc
         $body = (string) ($request->data()['contents'][0]['parts'][0]['text'] ?? '');
 
         return str_contains($body, 'no_relevant_context=true')
-            && ! str_contains($body, 'Gia ban:')
+            && ! str_contains($body, 'Giá bán:')
             && ! str_contains($body, (string) $book->name);
     });
 
@@ -213,7 +213,7 @@ test('matched retrieval does not log unrelated book id when answer cites no retr
     ]);
 
     bindBookRagRetriever(matchedHybridRetrieval((int) $book->id));
-    ragFakeGeminiChatSuccess('Giao Tiep Thong Minh con hang.');
+    ragFakeGeminiChatSuccess('Giao Tiep Thong Minh còn hàng.');
 
     $sessionId = '550e8400-e29b-41d4-a716-446655440041';
 
@@ -240,7 +240,7 @@ test('low match chat uses no context wording and returns empty sources', functio
         strategy: 'hybrid',
     ));
 
-    ragFakeGeminiChatSuccess('Minh chua tim thay thong tin phu hop trong du lieu hien co.');
+    ragFakeGeminiChatSuccess('Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.');
 
     $sessionId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -257,10 +257,11 @@ test('low match chat uses no context wording and returns empty sources', functio
         ->assertJsonPath('meta.evaluation.verdict', 'pass');
 
     Http::assertSent(function ($request): bool {
-        $body = $request->data();
+        $body = json_encode($request->data(), JSON_UNESCAPED_UNICODE);
 
-        return str_contains((string) ($body['contents'][0]['parts'][0]['text'] ?? ''), 'no_relevant_context=true')
-            && str_contains((string) ($body['contents'][0]['parts'][0]['text'] ?? ''), 'du lieu hien co');
+        return is_string($body)
+            && str_contains($body, 'no_relevant_context=true')
+            && str_contains($body, 'dữ liệu hiện có');
     });
 
     $this->assertDatabaseHas('ai_chat_messages', [
@@ -272,7 +273,7 @@ test('low match chat uses no context wording and returns empty sources', functio
 
 test('matched retrieval without mysql context returns empty sources and effective matched false', function (): void {
     bindBookRagRetriever(matchedHybridRetrieval(99999));
-    ragFakeGeminiChatSuccess('Minh chua tim thay thong tin phu hop trong du lieu hien co.');
+    ragFakeGeminiChatSuccess('Tôi chưa tìm thấy thông tin phù hợp trong dữ liệu hiện có của Bookify.');
 
     $sessionId = '550e8400-e29b-41d4-a716-446655440000';
 

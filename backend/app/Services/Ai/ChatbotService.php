@@ -9,7 +9,7 @@ use App\Services\Ai\Dto\BookRagRetrievalResult;
 use App\Services\Ai\Dto\BookRagRetrievedDocument;
 use App\Services\Ai\Dto\ChatEvaluationResult;
 use App\Services\Ai\Dto\GeminiGenerateContentRequest;
-use App\Services\Ai\Dto\OutOfScopeIntentGuardResult;
+use App\Services\Ai\Dto\ChatIntentRouteResult;
 use App\Services\Ai\Dto\RetrievedBookPromptContext;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -21,7 +21,7 @@ class ChatbotService
         private readonly ChatContextStore $chatContextStore,
         private readonly FollowUpQueryResolver $followUpQueryResolver,
         private readonly ExactBookQueryResolver $exactBookQueryResolver,
-        private readonly OutOfScopeIntentGuard $outOfScopeIntentGuard,
+        private readonly ChatIntentRouter $chatIntentRouter,
         private readonly BookRagRetriever $bookRagRetriever,
         private readonly RetrievedBookContextLoader $retrievedBookContextLoader,
         private readonly AnswerSourceSelector $answerSourceSelector,
@@ -42,14 +42,14 @@ class ChatbotService
     {
         $startedAt = hrtime(true);
 
-        $intentGuardResult = $this->outOfScopeIntentGuard->evaluate($question);
-        if ($intentGuardResult->matched) {
-            return $this->buildScopeLimitedResponse(
+        $intentRoute = $this->chatIntentRouter->route($question);
+        if ($intentRoute->shouldShortCircuit) {
+            return $this->buildIntentRouteResponse(
                 sessionId: $sessionId,
                 accountId: $accountId,
                 question: $question,
                 startedAt: $startedAt,
-                intentGuardResult: $intentGuardResult,
+                intentRoute: $intentRoute,
             );
         }
 
@@ -302,7 +302,7 @@ class ChatbotService
         string $question,
         int $startedAt,
     ): array {
-        $answer = 'Minh chua xac dinh duoc cuon sach ban dang nhac toi. Ban vui long gui lai ten sach hoac hoi lai sau khi chatbot vua goi y danh sach sach.';
+        $answer = 'Mình chưa xác định được cuốn sách bạn đang nhắc tới. Bạn vui lòng gửi lại tên sách hoặc hỏi lại sau khi chatbot vừa gợi ý danh sách sách.';
         $retrieval = $this->emptyRetrievalResult();
 
         $this->chatContextStore->putLastSources($sessionId, []);
@@ -343,15 +343,15 @@ class ChatbotService
      *     meta: array<string, mixed>
      * }
      */
-    private function buildScopeLimitedResponse(
+    private function buildIntentRouteResponse(
         string $sessionId,
         ?int $accountId,
         string $question,
         int $startedAt,
-        OutOfScopeIntentGuardResult $intentGuardResult,
+        ChatIntentRouteResult $intentRoute,
     ): array {
-        $answer = $intentGuardResult->response
-            ?? 'Minh chi ho tro tu van thong tin va goi y sach tren Bookify; minh khong xu ly don hang, thanh toan, hoan tien hoac thong tin tai khoan.';
+        $answer = $intentRoute->response
+            ?? 'Mình chỉ hỗ trợ tư vấn thông tin và gợi ý sách trên Bookify; mình không xử lý đơn hàng, thanh toán, hoàn tiền hoặc thông tin tài khoản.';
         $retrieval = $this->emptyRetrievalResult();
 
         $message = $this->logMessage(

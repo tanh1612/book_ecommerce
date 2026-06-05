@@ -18,7 +18,7 @@ class ChatFeedbackService
         ?int $authenticatedAccountId,
     ): AiChatFeedback {
         if (! $this->canFeedback($message, $sessionId, $authenticatedAccountId)) {
-            throw new AuthorizationException('Ban khong co quyen danh gia tin nhan nay.');
+            throw new AuthorizationException('Bạn không có quyền đánh giá tin nhắn này.');
         }
 
         $storedSessionId = $sessionId ?? $message->session_id;

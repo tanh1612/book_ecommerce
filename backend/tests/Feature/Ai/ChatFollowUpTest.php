@@ -336,7 +336,7 @@ test('unresolved ordinal follow up does not fall back to rag random book', funct
         ->assertJsonPath('data.sources', [])
         ->assertJsonPath('meta.model', null)
         ->assertJsonPath('meta.retrieval.matched', false)
-        ->assertJsonPath('data.answer', fn (string $answer): bool => str_contains($answer, 'chua xac dinh'));
+        ->assertJsonPath('data.answer', fn (string $answer): bool => str_contains($answer, 'chưa xác định'));
 
     expect(app(ChatContextStore::class)->getLastSources('550e8400-e29b-41d4-a716-446655440034'))->toBe([]);
 });
