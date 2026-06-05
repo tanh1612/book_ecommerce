@@ -30,7 +30,7 @@ const ProductDetailPage = () => {
         const bookData = res.data?.data || res.data;
         setBook(bookData);
         setMainImage(bookData.thumbnail_url || ''); 
-      } catch (err) {
+      } catch {
         toast.error("Không tìm thấy thông tin sách!");
       } finally {
         setIsLoading(false);

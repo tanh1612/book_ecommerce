@@ -6,6 +6,26 @@ import { useSearchParams } from 'react-router-dom';
 import bookApi from '../../services/bookApi';
 import { toast } from 'react-toastify';
 
+const BACKEND_SORTS = ['relevance', 'newest', 'price_asc', 'price_desc', 'rating_desc'];
+const SORT_ALIASES = {
+  best_selling: 'rating_desc',
+  trending: 'rating_desc',
+};
+
+const normalizeSortForBackend = (sort, hasKeyword) => {
+  const normalized = SORT_ALIASES[sort] || sort;
+
+  if (normalized === 'relevance' && !hasKeyword) {
+    return 'newest';
+  }
+
+  if (BACKEND_SORTS.includes(normalized)) {
+    return normalized;
+  }
+
+  return hasKeyword ? 'relevance' : 'newest';
+};
+
 const CategoryPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const keyword = searchParams.get('keyword');
@@ -22,7 +42,8 @@ const CategoryPage = () => {
   const currentPublisher = searchParams.get('publisher') || '';
   const currentPriceMin = searchParams.get('price_min') || '';
   const currentPriceMax = searchParams.get('price_max') || '';
-  const currentSort = searchParams.get('sort') || 'newest';
+  const currentSupplier = searchParams.get('supplier') || '';
+  const currentSort = searchParams.get('sort') || (keyword ? 'relevance' : 'newest');
   
   useEffect(() => {
     bookApi.getFilters()
@@ -35,21 +56,25 @@ const CategoryPage = () => {
   const showCategoryFilter = currentCategory === '' || isRootCategory;
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchBooks = async () => {
       setIsLoading(true);
       try {
         const apiParams = Object.fromEntries([...searchParams]);
-        
-        // Mặc định gọi trang 1 nếu không có tham số page trên URL
-        if (!apiParams.page) apiParams.page = 1;
 
-        const validSorts = ['newest', 'price_asc', 'price_desc', 'rating_desc'];
-        if (apiParams.sort && !validSorts.includes(apiParams.sort)) {
-          apiParams.sort = 'newest'; 
+        if (!apiParams.page) apiParams.page = 1;
+        apiParams.per_page = apiParams.per_page || 40;
+
+        const backendSort = normalizeSortForBackend(apiParams.sort, Boolean(keyword));
+        if (backendSort) {
+          apiParams.sort = backendSort;
         }
 
         const res = await bookApi.getBooks(apiParams);
-        
+
+        if (abortController.signal.aborted) return;
+
         let booksArray = [];
         let metaData = null;
         
@@ -89,14 +114,18 @@ const CategoryPage = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
       } catch (err) {
-        toast.error("Lỗi tải danh sách sách!");
-        setBooks([]); 
+        if (err.name !== 'AbortError') {
+          toast.error("Lỗi tải danh sách sách!");
+          setBooks([]);
+        }
       } finally {
         setIsLoading(false);
       }
     };
     fetchBooks();
-  }, [searchParams]);
+
+    return () => { abortController.abort(); };
+  }, [searchParams, keyword]);
 
   // 🔥 ĐÃ CẬP NHẬT: Thêm cờ resetPage để phân biệt lúc Lọc và lúc Chuyển Trang
   const updateUrlParams = (newParams, resetPage = true) => {
@@ -185,6 +214,7 @@ const CategoryPage = () => {
   };
 
   const safeBooks = Array.isArray(books) ? books : [];
+  const displaySort = currentSort === 'relevance' && !keyword ? 'newest' : currentSort;
 
   return (
     <div className="bg-white min-h-screen pb-10">
@@ -258,6 +288,20 @@ const CategoryPage = () => {
               ))}
             </select>
           </div>
+
+          <div className="mb-8">
+            <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Nhà cung cấp</h3>
+            <select
+              className="w-full border border-gray-300 rounded p-2.5 text-sm outline-none focus:border-[#157a2c] bg-white"
+              value={currentSupplier}
+              onChange={(e) => updateUrlParams({ supplier: e.target.value })}
+            >
+              <option value="">Tất cả nhà cung cấp</option>
+              {Array.isArray(filtersData.suppliers) && filtersData.suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
         </aside>
 
         {/* DANH SÁCH SÁCH BÊN PHẢI */}
@@ -270,10 +314,13 @@ const CategoryPage = () => {
             <div className="relative">
               <select
                 className="appearance-none bg-[#157a2c] text-white text-sm font-medium pl-4 pr-10 py-2 rounded outline-none cursor-pointer"
-                value={currentSort}
+                value={displaySort}
                 onChange={(e) => updateUrlParams({ sort: e.target.value })}
               >
+                {keyword && <option value="relevance">Liên quan nhất</option>}
                 <option value="newest">Mới nhất</option>
+                <option value="best_selling">Bán chạy</option>
+                <option value="trending">Xu hướng</option>
                 <option value="price_asc">Giá từ thấp tới cao</option>
                 <option value="price_desc">Giá từ cao tới thấp</option>
                 <option value="rating_desc">Đánh giá cao / Nổi bật</option>

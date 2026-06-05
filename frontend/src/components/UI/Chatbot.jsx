@@ -36,6 +36,10 @@ const Chatbot = () => {
   const handleSend = async () => {
     const question = input.trim();
     if (!question) return;
+    if (question.length < 2) {
+      toast.error('Vui lòng nhập ít nhất 2 ký tự.');
+      return;
+    }
 
     // 1. Thêm tin nhắn của User vào UI
     const newUserMsg = { id: Date.now(), type: 'user', text: question };
@@ -58,10 +62,22 @@ const Chatbot = () => {
         feedback: null // Trạng thái đã vote: null | 'up' | 'down'
       }]);
     } catch (error) {
+      let errorText = 'Xin lỗi, hệ thống AI đang quá tải hoặc có lỗi xảy ra. Vui lòng thử lại sau giây lát!';
+
+      if (error.code === 'ECONNABORTED') {
+        errorText = 'AI phản hồi quá lâu. Vui lòng thử lại sau.';
+      } else if (error.response?.status === 419) {
+        errorText = 'Phiên bảo mật đã hết hạn. Vui lòng gửi lại tin nhắn.';
+      } else if (error.response?.status === 422) {
+        errorText = error.response?.data?.message || 'Tin nhắn chưa hợp lệ. Vui lòng kiểm tra lại.';
+      } else if (error.response?.status >= 500) {
+        errorText = error.response?.data?.message || 'Dịch vụ AI đang bận. Vui lòng thử lại sau.';
+      }
+
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         type: 'bot',
-        text: 'Xin lỗi, hệ thống AI đang quá tải hoặc có lỗi xảy ra. Vui lòng thử lại sau giây lát!',
+        text: errorText,
         message_id: null,
         isError: true
       }]);
@@ -88,7 +104,13 @@ const Chatbot = () => {
       await aiApi.sendFeedback(messageId, sessionId, rating);
       toast.success(rating === 'up' ? "Cảm ơn bạn đã đánh giá tốt!" : "Cảm ơn bạn đã góp ý!");
     } catch (error) {
-      toast.error("Lỗi khi gửi đánh giá.");
+      if (error.response?.status === 419) {
+        toast.error('Phiên bảo mật đã hết hạn. Vui lòng thử lại.');
+      } else if (error.code === 'ECONNABORTED') {
+        toast.error('Gửi đánh giá quá lâu. Vui lòng thử lại.');
+      } else {
+        toast.error("Lỗi khi gửi đánh giá.");
+      }
     }
   };
 

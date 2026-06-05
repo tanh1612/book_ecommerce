@@ -117,7 +117,7 @@ const ProfilePage = () => {
         logout();
         toast.success("Đăng xuất thành công");
         navigate('/login');
-      } catch(err) {
+      } catch {
         toast.error("Lỗi đăng xuất!");
       }
     }

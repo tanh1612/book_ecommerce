@@ -5,6 +5,7 @@ import { FiChevronRight, FiMapPin, FiTruck, FiCreditCard, FiAlertCircle } from '
 import { toast } from 'react-toastify';
 import { v4 as uuidv4 } from 'uuid';
 import { formatCurrency } from '../../utils/formatters';
+import { resolveMediaUrl } from '../../utils/media';
 import { useCart } from '../../context/CartContext';
 import addressApi from '../../services/addressApi';
 import checkoutApi from '../../services/checkoutApi';
@@ -23,6 +24,8 @@ const CheckoutPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingWards, setIsFetchingWards] = useState(false);
   const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [appliedAddress, setAppliedAddress] = useState(null);
   
   // Lưu trữ dữ liệu giỏ hàng để lấy "pricing_expectations"
   const [cartInfo, setCartInfo] = useState(null);
@@ -48,13 +51,17 @@ const CheckoutPage = () => {
     }
   };
 
-  const calculateShipping = async (provinceCode, methodId) => {
-    if (!provinceCode) return;
+  const calculateShipping = async ({ provinceCode, addressId }, methodId) => {
+    if (!provinceCode && !addressId) return;
     setIsCalculatingFee(true);
     setShippingError(null); 
     
     try {
-      const res = await checkoutApi.getShippingQuote({ province_code: provinceCode, shipping_method_id: Number(methodId) });
+      const payload = {
+        shipping_method_id: Number(methodId),
+        ...(addressId ? { address_id: Number(addressId) } : { province_code: provinceCode }),
+      };
+      const res = await checkoutApi.getShippingQuote(payload);
       setShippingFee(res.data?.data?.shipping_fee ?? res.data?.shipping_fee ?? 0);
     } catch (error) {
       setShippingFee(null);
@@ -69,7 +76,7 @@ const CheckoutPage = () => {
   };
 
   useEffect(() => {
-    let isMounted = true; 
+    const abortController = new AbortController();
 
     if (selectedItems.length === 0) {
       toast.warning("Vui lòng chọn sản phẩm để thanh toán!");
@@ -82,10 +89,10 @@ const CheckoutPage = () => {
         const [provinceRes, addressRes, cartRes] = await Promise.all([
           addressApi.getProvinces(),
           addressApi.getAddresses(),
-          cartApi.getCart() // 🔥 Kéo dữ liệu cart xịn từ BE
+          cartApi.getCart()
         ]);
-        
-        if (!isMounted) return;
+
+        if (abortController.signal.aborted) return;
 
         setProvinces(provinceRes.data?.data || provinceRes.data || []);
         setCartInfo(cartRes.data?.data || cartRes.data);
@@ -94,6 +101,8 @@ const CheckoutPage = () => {
         const defaultAddress = addressList.find(addr => addr.is_default === 1 || addr.is_default === true);
 
         if (defaultAddress) {
+          setSelectedAddressId(defaultAddress.id);
+          setAppliedAddress(defaultAddress);
           setFormData(prev => ({
             ...prev,
             recipient_name: defaultAddress.recipient_name || '',
@@ -105,29 +114,39 @@ const CheckoutPage = () => {
           toast.info("Đã tự động áp dụng địa chỉ mặc định!");
 
           if (defaultAddress.province_code) {
-            loadWards(defaultAddress.province_code);
-            calculateShipping(defaultAddress.province_code, 1);
+            void Promise.all([
+              loadWards(defaultAddress.province_code),
+              calculateShipping({ addressId: defaultAddress.id }, 1),
+            ]);
           }
         }
       } catch (err) {
-        console.error(err);
+        if (err.name !== 'CanceledError') {
+          toast.error("Lỗi tải dữ liệu thanh toán");
+        }
       }
     };
 
     initData();
 
-    return () => { isMounted = false; };
-  }, []); // Cờ [] khóa chặt vòng lặp
+    return () => { abortController.abort(); };
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+
+    if (name !== 'shipping_method_id') {
+      setSelectedAddressId(null);
+      setAppliedAddress(null);
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
 
     if (name === 'province_code') {
       setFormData(prev => ({ ...prev, ward_code: '' }));
       if (value) {
         loadWards(value);
-        calculateShipping(value, formData.shipping_method_id);
+        calculateShipping({ provinceCode: value }, formData.shipping_method_id);
       } else {
         setWards([]);
         setShippingFee(null);
@@ -135,33 +154,73 @@ const CheckoutPage = () => {
       }
     }
     if (name === 'shipping_method_id') {
-      calculateShipping(formData.province_code, value);
+      calculateShipping(
+        selectedAddressId ? { addressId: selectedAddressId } : { provinceCode: formData.province_code },
+        value
+      );
     }
+  };
+
+  const validateCheckoutForm = () => {
+    if (!formData.recipient_name || formData.recipient_name.trim().length < 2) {
+      toast.error("Họ tên ít nhất 2 ký tự");
+      return false;
+    }
+
+    const phoneRegex = /^0\d{9}$/;
+    if (!formData.recipient_phone || !phoneRegex.test(formData.recipient_phone.replace(/\s/g, ''))) {
+      toast.error("Số điện thoại phải là 10 chữ số (0xxxxxxxxx)");
+      return false;
+    }
+
+    if (!formData.province_code || !formData.ward_code || !formData.detail_address) {
+      toast.error("Vui lòng điền và chọn đầy đủ thông tin giao hàng!");
+      return false;
+    }
+
+    return true;
+  };
+
+  const isAppliedAddressUnchanged = () => {
+    if (!selectedAddressId || !appliedAddress) return false;
+
+    return (
+      String(formData.recipient_name || '') === String(appliedAddress.recipient_name || '') &&
+      String(formData.recipient_phone || '') === String(appliedAddress.recipient_phone || '') &&
+      String(formData.province_code || '') === String(appliedAddress.province_code || '') &&
+      String(formData.ward_code || '') === String(appliedAddress.ward_code || '') &&
+      String(formData.detail_address || '') === String(appliedAddress.detail_address || '')
+    );
   };
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    
-    if (!formData.recipient_name || !formData.recipient_phone || !formData.province_code || !formData.ward_code || !formData.detail_address) {
-      return toast.error("Vui lòng điền và chọn đầy đủ thông tin giao hàng!");
-    }
+
+    if (!validateCheckoutForm()) return;
     
     setIsSubmitting(true);
     try {
+      const useSavedAddress = isAppliedAddressUnchanged();
       const payload = {
         idempotency_key: uuidv4(), 
         payment_method: formData.payment_method, 
         shipping_method_id: Number(formData.shipping_method_id),
         note: formData.note ? formData.note.trim() : "test vnpay",
-        shipping: {
-          recipient_name: formData.recipient_name.trim(), recipient_phone: formData.recipient_phone.trim(),
-          province_code: String(formData.province_code).padStart(2, '0'), 
-          ward_code: String(formData.ward_code).padStart(5, '0'),
-          detail_address: formData.detail_address.trim()
-        },
         // 🔥 BÍ KÍP Ở ĐÂY: Gửi lại chìa khóa bảo mật giá cho Tuấn Anh
         pricing_expectations: cartInfo?.pricing_expectations 
       };
+
+      if (useSavedAddress) {
+        payload.address_id = Number(selectedAddressId);
+      } else {
+        payload.shipping = {
+          recipient_name: formData.recipient_name.trim(),
+          recipient_phone: formData.recipient_phone.trim(),
+          province_code: String(formData.province_code).padStart(2, '0'),
+          ward_code: String(formData.ward_code).padStart(5, '0'),
+          detail_address: formData.detail_address.trim()
+        };
+      }
       
       const res = await checkoutApi.submitOrder(payload);
       const responseData = res.data?.data || res.data; 
@@ -273,7 +332,11 @@ const CheckoutPage = () => {
                   return (
                     <div key={item.id} className="flex gap-3 text-sm">
                       <div className="relative flex-shrink-0">
-                        <img src={bookData.thumbnail_url || bookData.thumbnail} className="w-12 h-16 object-cover border rounded" />
+                        <img
+                          src={resolveMediaUrl(bookData.thumbnail_url || bookData.thumbnail, 'https://placehold.co/48x64?text=No+Image')}
+                          alt={bookData.name || bookData.title || 'Book'}
+                          className="w-12 h-16 object-cover border rounded"
+                        />
                         <span className="absolute -top-2 -right-2 bg-gray-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full">{item.quantity}</span>
                       </div>
                       <div className="flex flex-col justify-between flex-grow">

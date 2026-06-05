@@ -1,64 +1,107 @@
 // src/services/addressApi.js
 import axiosClient from "./axiosClient";
 
-const wardCache = {}; // KHO LƯU TRỮ TẠM BỘ NHỚ RAM
+let provinceCache = null;
+let provinceRequest = null;
+const wardCache = {};
+const wardRequests = {};
+
+const extractItems = (response) => response.data?.data || response.data || [];
+
+const resolveLastPage = (response, fallbackLimit = 100) => {
+  const metadata = response.data?.metadata || response.data?.meta || {};
+  const total = Number(metadata.total || 0);
+  const limit = Number(metadata.limit || fallbackLimit);
+
+  if (Number.isFinite(total) && total > 0 && Number.isFinite(limit) && limit > 0) {
+    return Math.max(1, Math.ceil(total / limit));
+  }
+
+  return Number(metadata.last_page || metadata.total_pages || 1);
+};
 
 const addressApi = {
   getAddresses() {
     return axiosClient.get('/v1/account/addresses');
   },
-  
+
   createAddress(data) {
     return axiosClient.post('/v1/account/addresses', data);
   },
-  
+
   updateAddress(id, data) {
     return axiosClient.patch(`/v1/account/addresses/${id}`, data);
   },
-  
+
   deleteAddress(id) {
     return axiosClient.delete(`/v1/account/addresses/${id}`);
   },
 
   getProvinces() {
-    return axiosClient.get('/v1/locations/provinces?limit=100');
+    if (provinceCache) {
+      return Promise.resolve({ data: { data: provinceCache } });
+    }
+
+    provinceRequest ??= axiosClient.get('/v1/locations/provinces?limit=100')
+      .then((res) => {
+        provinceCache = extractItems(res);
+        return { data: { data: provinceCache } };
+      })
+      .finally(() => {
+        provinceRequest = null;
+      });
+
+    return provinceRequest;
   },
-  
+
   async getWards(provinceCode) {
-    const code = String(provinceCode).padStart(2, '0');
-    
-    // NẾU ĐÃ CÓ TRONG KHO -> TRẢ VỀ NGAY LẬP TỨC 
+    const rawCode = String(provinceCode || '').trim();
+
+    if (!rawCode) {
+      return { data: { data: [] } };
+    }
+
+    const code = rawCode.padStart(2, '0');
+
     if (wardCache[code]) {
       return { data: { data: wardCache[code] } };
     }
 
-    try {
-      // 1. Gọi trang đầu tiên để lấy dữ liệu và lấy Tổng số trang (last_page)
-      const res1 = await axiosClient.get(`/v1/locations/provinces/${code}/wards?limit=100&page=1`);
-      let allWards = res1.data?.data || res1.data || [];
-      const lastPage = res1.data?.meta?.last_page || res1.meta?.last_page || 1;
-
-      // 2. Nếu có nhiều hơn 1 trang, GỌI SONG SONG tất cả các trang còn lại cùng 1 lúc!
-      if (lastPage > 1) {
-        const promises = [];
-        for (let p = 2; p <= lastPage; p++) {
-          promises.push(axiosClient.get(`/v1/locations/provinces/${code}/wards?limit=100&page=${p}`));
-        }
-        
-        const results = await Promise.all(promises);
-        results.forEach(res => {
-          const items = res.data?.data || res.data || [];
-          allWards = [...allWards, ...items];
-        });
-      }
-
-      wardCache[code] = allWards;
-      return { data: { data: allWards } };
-    } catch (error) {
-      console.error("Lỗi lấy Phường/Xã:", error);
-      return { data: { data: [] } };
+    if (wardRequests[code]) {
+      return wardRequests[code];
     }
-  }
+
+    try {
+      wardRequests[code] = (async () => {
+        const limit = 100;
+        const res1 = await axiosClient.get(`/v1/locations/provinces/${code}/wards?limit=${limit}&page=1`);
+        let allWards = extractItems(res1);
+        const lastPage = resolveLastPage(res1, limit);
+
+        if (lastPage > 1) {
+          const promises = [];
+          for (let page = 2; page <= lastPage; page += 1) {
+            promises.push(axiosClient.get(`/v1/locations/provinces/${code}/wards?limit=${limit}&page=${page}`));
+          }
+
+          const results = await Promise.all(promises);
+          results.forEach((res) => {
+            allWards = [...allWards, ...extractItems(res)];
+          });
+        }
+
+        wardCache[code] = allWards;
+        return { data: { data: allWards } };
+      })();
+
+      return await wardRequests[code];
+    } catch (error) {
+      console.error('Failed to load wards:', error);
+      return { data: { data: [] } };
+    } finally {
+      delete wardRequests[code];
+    }
+  },
 };
 
 export default addressApi;

@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FiTrash2, FiMinus, FiPlus, FiChevronRight } from 'react-icons/fi';
 import { formatCurrency } from '../../utils/formatters';
 import { useCart } from '../../context/CartContext';
-import cartApi from '../../services/cartApi'; // Import API giỏ hàng
+import CartItemSkeleton from '../../components/LoadingSkeletons/CartItemSkeleton';
+import cartApi from '../../services/cartApi';
 
 const CartPage = () => {
   const navigate = useNavigate();
@@ -43,7 +44,23 @@ const CartPage = () => {
   const totalPrice = cartInfo?.selected_subtotal_after_discount || 0;
 
   if (isLoadingCart && cartItems.length === 0) {
-    return <div className="py-20 flex justify-center"><div className="w-10 h-10 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>;
+    return (
+      <div className="bg-gray-50 min-h-screen pb-12">
+        <div className="bg-white py-3 border-b border-gray-200 mb-8">
+          <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
+            <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
+            <FiChevronRight size={14} className="text-gray-400" />
+            <span className="text-[#157a2c] font-medium">Giỏ hàng của bạn</span>
+          </div>
+        </div>
+        <div className="container mx-auto px-4">
+          <h1 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Giỏ hàng</h1>
+          <div className="bg-white rounded-lg shadow-sm">
+            {[1, 2, 3].map(i => <CartItemSkeleton key={i} />)}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

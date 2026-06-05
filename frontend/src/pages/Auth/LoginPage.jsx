@@ -5,30 +5,37 @@ import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import authApi from '../../services/authApi';
+import { validateEmail } from '../../utils/validation';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!email) newErrors.email = 'Email không được để trống';
+    else if (!validateEmail(email)) newErrors.email = 'Email không hợp lệ';
+    if (!password) newErrors.password = 'Mật khẩu không được để trống';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) return toast.warning("Vui lòng nhập đầy đủ email và mật khẩu!");
+    if (!validateForm()) return;
 
     try {
       setIsSubmitting(true);
-      // 1. Gọi API Login (Sanctum tự xử lý Cookie)
       await authApi.login({ email, password, remember: remember ? 1 : 0 });
-      
-      // 2. Lấy thông tin user
       const userRes = await authApi.getProfile();
       login(userRes.data);
-      
       toast.success("Đăng nhập thành công!");
       navigate('/');
     } catch (err) {
@@ -49,28 +56,41 @@ const LoginPage = () => {
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div>
             <label className="block text-sm text-gray-700 mb-1.5">Email</label>
-            <input 
-              type="email" placeholder="Nhập email"
-              className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c]"
-              value={email} onChange={(e) => setEmail(e.target.value)}
+            <input
+              type="email"
+              placeholder="Nhập email"
+              className={`w-full border rounded py-2.5 px-3 outline-none focus:border-[#157a2c] ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors({ ...errors, email: '' });
+              }}
             />
+            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
 
           <div>
             <label className="block text-sm text-gray-700 mb-1.5">Mật khẩu</label>
             <div className="relative">
-              <input 
-                type={showPassword ? "text" : "password"} placeholder="Nhập mật khẩu"
-                className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c]"
-                value={password} onChange={(e) => setPassword(e.target.value)}
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Nhập mật khẩu"
+                className={`w-full border rounded py-2.5 px-3 outline-none focus:border-[#157a2c] ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors({ ...errors, password: '' });
+                }}
               />
-              <button 
-                type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#157a2c]"
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#157a2c]"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
               </button>
             </div>
+            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           </div>
 
           <div className="flex justify-between items-center text-sm">
@@ -78,11 +98,12 @@ const LoginPage = () => {
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-[#157a2c]" />
               Ghi nhớ đăng nhập
             </label>
-            <Link to="/forgot-password" size="sm" className="text-[#157a2c] hover:underline">Quên mật khẩu?</Link>
+            <Link to="/forgot-password" className="text-[#157a2c] hover:underline">Quên mật khẩu?</Link>
           </div>
 
-          <button 
-            type="submit" disabled={isSubmitting}
+          <button
+            type="submit"
+            disabled={isSubmitting}
             className={`w-full py-3 rounded font-bold text-white transition-all ${isSubmitting ? 'bg-gray-400' : 'bg-[#157a2c] hover:bg-green-800'}`}
           >
             {isSubmitting ? "ĐANG XỬ LÝ..." : "ĐĂNG NHẬP"}

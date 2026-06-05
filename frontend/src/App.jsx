@@ -13,6 +13,21 @@ import WishlistPage from './Wishlist/WishlistPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
+import { useAuth } from './context/AuthContext';
+
+const RequireAuth = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="py-20 text-center text-gray-500">Đang tải...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
 
 function App() {
   return (
@@ -22,12 +37,12 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="cart" element={<CartPage />} />
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="profile" element={<ProfilePage />} />
+          <Route path="checkout" element={<RequireAuth><CheckoutPage /></RequireAuth>} />
+          <Route path="profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
           <Route path="forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="wishlist" element={<WishlistPage />} />
+          <Route path="wishlist" element={<RequireAuth><WishlistPage /></RequireAuth>} />
 
           {/* === ROUTE MỚI DÀNH CHO BỘ LỌC TỔNG HỢP === */}
           <Route path="catalog" element={<CategoryPage />} />

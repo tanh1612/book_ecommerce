@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { FiX, FiAlertCircle, FiClock, FiPackage } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { formatCurrency } from '../../utils/formatters';
+import { resolveMediaUrl } from '../../utils/media';
 import orderApi from '../../services/orderApi';
 
 // Danh sách các trạng thái dùng cho Tab Bộ lọc & Hiển thị (Khớp 100% với OrderStatus.php)
@@ -16,6 +17,27 @@ const ORDER_STATUSES = [
   { label: 'Đã hủy', value: 'cancelled', color: 'text-red-600 bg-red-100' },
   { label: 'Không hoàn tiền', value: 'refund_closed', color: 'text-gray-500 bg-gray-100' },
 ];
+
+const getOrderItemId = (item) => item.id || item.review_target_id;
+
+const mergeOrderSummaryAndDetail = (summary, detail) => {
+  if (!detail) return summary;
+
+  const detailItemsById = new Map(
+    (detail.items || []).map((item) => [getOrderItemId(item), item])
+  );
+
+  const mergedItems = (summary.items || detail.items || []).map((item) => {
+    const detailItem = detailItemsById.get(getOrderItemId(item));
+    return detailItem ? { ...detailItem, ...item, ...detailItem } : item;
+  });
+
+  return {
+    ...summary,
+    ...detail,
+    items: mergedItems,
+  };
+};
 
 const MyOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -37,8 +59,22 @@ const MyOrders = () => {
     setIsLoading(true);
     try {
       const res = await orderApi.getOrders(status ? { status } : {});
-      setOrders(res.data?.data || []);
-    } catch (error) {
+      const orderList = res.data?.data || [];
+      setOrders(orderList);
+
+      const enrichedOrders = await Promise.all(
+        orderList.map(async (order) => {
+          try {
+            const detailRes = await orderApi.getOrderDetail(order.id);
+            return mergeOrderSummaryAndDetail(order, detailRes.data?.data || detailRes.data);
+          } catch {
+            return order;
+          }
+        })
+      );
+
+      setOrders(enrichedOrders);
+    } catch {
       toast.error("Không thể tải danh sách đơn hàng!");
     } finally {
       setIsLoading(false);
@@ -85,9 +121,10 @@ const MyOrders = () => {
     try {
       toast.info("Đang tải dữ liệu...", { autoClose: 500 });
       const res = await orderApi.getOrderDetail(orderId);
-      setSelectedOrder(res.data?.data || res.data);
+      const summaryOrder = orders.find((order) => order.id === orderId);
+      setSelectedOrder(mergeOrderSummaryAndDetail(summaryOrder || {}, res.data?.data || res.data));
       setIsDetailModalOpen(true);
-    } catch (error) {
+    } catch {
       toast.error("Không thể lấy chi tiết đơn hàng");
     }
   };
@@ -99,7 +136,7 @@ const MyOrders = () => {
     try {
       const res = await orderApi.getRefundBanks();
       setRefundBanks(res.data?.data || res.data || []);
-    } catch (error) {
+    } catch {
       toast.error("Không thể tải danh sách ngân hàng");
     }
   };
@@ -120,17 +157,35 @@ const MyOrders = () => {
   const renderOrderItems = (items) => {
     return items.map((item) => {
       const bookData = item.book || {};
-      const bookName = bookData.name || bookData.title || "Sản phẩm";
-      const thumbnail = (bookData.images && bookData.images[0]?.url) || bookData.thumbnail_url || "https://placehold.co/80x120?text=No+Image";
+      const bookName = item.book_name || bookData.name || bookData.title || "Sản phẩm";
+      const thumbnail = resolveMediaUrl(
+        item.thumbnail_url ||
+        (bookData.images && (bookData.images[0]?.url || bookData.images[0]?.image_url)) ||
+        bookData.thumbnail_url ||
+        bookData.thumbnail
+      );
+      const quantity = Number(item.quantity || 0);
+      const lineTotal = Number(item.total_price ?? 0);
+      const unitPrice = Number(item.price ?? 0);
+      const displayPrice = lineTotal > 0 ? lineTotal : unitPrice;
 
       return (
-        <div key={item.id} className="flex gap-4 items-center mb-4 last:mb-0">
-          <img src={thumbnail} alt={bookName} className="w-16 h-24 object-cover border border-gray-200 rounded" />
+        <div key={getOrderItemId(item) || `${bookName}-${thumbnail}`} className="flex gap-4 items-center mb-4 last:mb-0">
+          <img
+            src={thumbnail}
+            alt={bookName}
+            className="w-16 h-24 object-cover border border-gray-200 rounded"
+            onError={(event) => {
+              event.currentTarget.src = 'https://placehold.co/80x120?text=No+Image';
+            }}
+          />
           <div className="flex-grow">
             <h3 className="font-medium text-gray-800 line-clamp-2">{bookName}</h3>
-            <div className="text-sm text-gray-500">Số lượng: x{item.quantity}</div>
+            {quantity > 0 && <div className="text-sm text-gray-500">Số lượng: x{quantity}</div>}
           </div>
-          <div className="font-bold text-[#157a2c]">{formatCurrency(item.price)}</div>
+          <div className="font-bold text-[#157a2c]">
+            {displayPrice > 0 ? formatCurrency(displayPrice) : 'Đang cập nhật'}
+          </div>
         </div>
       );
     });

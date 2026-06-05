@@ -9,7 +9,7 @@ const CartContext = createContext();
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [isLoadingCart, setIsLoadingCart] = useState(false);
-  const { user } = useAuth(); 
+  const { user } = useAuth();
 
   const fetchCart = async () => {
     setIsLoadingCart(true);
@@ -17,8 +17,8 @@ export const CartProvider = ({ children }) => {
       const res = await cartApi.getCart();
       const items = res.data?.data?.items || res.data?.items || res.data || [];
       setCartItems(Array.isArray(items) ? items : []);
-    } catch (error) {
-      console.error("Lỗi lấy giỏ hàng:", error);
+    } catch {
+      toast.error("Không thể tải giỏ hàng. Vui lòng tải lại trang.");
     } finally {
       setIsLoadingCart(false);
     }
@@ -28,84 +28,101 @@ export const CartProvider = ({ children }) => {
     fetchCart();
   }, [user]);
 
-  const totalQuantity = useMemo(() => 
+  const totalQuantity = useMemo(() =>
     cartItems.reduce((total, item) => total + (item.quantity || 1), 0)
   , [cartItems]);
 
   const addToCart = async (book, qty = 1) => {
     try {
-      await cartApi.addItem(book.id, qty);
-      await fetchCart(); 
+      const res = await cartApi.addItem(book.id, qty);
+      // Backend trả về cart data, set trực tiếp thay vì fetch lại
+      const items = res.data?.data?.items || res.data?.items || res.data || [];
+      setCartItems(Array.isArray(items) ? items : []);
       toast.success(`Đã thêm ${qty} cuốn vào giỏ hàng`);
-      return true; // Trả về true để biết là thành công
+      return true;
     } catch (error) {
       toast.error(error.response?.data?.message || "Lỗi khi thêm vào giỏ hàng");
       return false;
     }
   };
 
-  // 🔥 HÀM MỚI: Xử lý nút "Mua ngay"
   const buyNow = async (book, qty = 1, navigate) => {
     const isSuccess = await addToCart(book, qty);
     if (isSuccess) {
-      navigate('/cart'); // Chuyển thẳng tới giỏ hàng nếu thêm thành công
+      navigate('/cart');
     }
   };
 
   const updateQuantity = async (cartItemId, quantity) => {
+    const oldItems = cartItems;
     try {
       setCartItems(prev => prev.map(item => item.id === cartItemId ? { ...item, quantity } : item));
-      await cartApi.updateItem(cartItemId, { quantity });
-    } catch (error) {
+      const res = await cartApi.updateItem(cartItemId, { quantity });
+      // Update state từ response
+      const items = res.data?.data?.items || res.data?.items || res.data || [];
+      setCartItems(Array.isArray(items) ? items : []);
+    } catch {
       toast.error("Lỗi cập nhật số lượng");
-      fetchCart(); 
+      setCartItems(oldItems);
     }
   };
 
   const removeFromCart = async (cartItemId) => {
+    const oldItems = cartItems;
     try {
       setCartItems(prev => prev.filter(item => item.id !== cartItemId));
-      await cartApi.removeItem(cartItemId);
+      const res = await cartApi.removeItem(cartItemId);
+      // Update state từ response thay vì fetchCart
+      const items = res.data?.data?.items || res.data?.items || res.data || [];
+      setCartItems(Array.isArray(items) ? items : []);
       toast.success("Đã xóa sản phẩm");
-    } catch (error) {
+    } catch {
       toast.error("Lỗi khi xóa sản phẩm");
-      fetchCart();
+      setCartItems(oldItems);
     }
   };
 
   const toggleSelect = async (cartItemId, currentSelectedStatus) => {
+    const oldItems = cartItems;
     try {
       const newSelected = !currentSelectedStatus;
       setCartItems(prev => prev.map(item => item.id === cartItemId ? { ...item, selected: newSelected } : item));
-      await cartApi.updateItem(cartItemId, { selected: newSelected ? 1 : 0 });
-    } catch (error) {
+      const res = await cartApi.updateItem(cartItemId, { selected: newSelected ? 1 : 0 });
+      // Update state từ response
+      const items = res.data?.data?.items || res.data?.items || res.data || [];
+      setCartItems(Array.isArray(items) ? items : []);
+    } catch {
       toast.error("Lỗi thao tác");
-      fetchCart();
+      setCartItems(oldItems);
     }
   };
 
   const toggleAll = async (isSelected) => {
+    const oldItems = cartItems;
     try {
       setCartItems(prev => prev.map(item => ({ ...item, selected: isSelected })));
-      await cartApi.updateSelection(isSelected ? 1 : 0);
-    } catch (error) {
+      const res = await cartApi.updateSelection(isSelected ? 1 : 0);
+      // Update state từ response
+      const items = res.data?.data?.items || res.data?.items || res.data || [];
+      setCartItems(Array.isArray(items) ? items : []);
+    } catch {
       toast.error("Lỗi thao tác");
-      fetchCart();
+      setCartItems(oldItems);
     }
   };
 
   return (
-    <CartContext.Provider value={{ 
-      cartItems, 
-      totalQuantity, 
+    <CartContext.Provider value={{
+      cartItems,
+      totalQuantity,
       isLoadingCart,
       fetchCart,
-      addToCart, 
-      buyNow, // Export hàm buyNow
-      updateQuantity, 
-      removeFromCart, 
-      toggleSelect, 
-      toggleAll 
+      addToCart,
+      buyNow,
+      updateQuantity,
+      removeFromCart,
+      toggleSelect,
+      toggleAll
     }}>
       {children}
     </CartContext.Provider>

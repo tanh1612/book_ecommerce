@@ -27,7 +27,7 @@ const AddressBook = () => {
       const res = await addressApi.getAddresses();
       // Mở bọc Axios -> Mở bọc Laravel Resource
       setAddresses(res.data.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Không thể tải danh sách địa chỉ!");
     } finally {
       setIsLoading(false);
@@ -145,7 +145,7 @@ const AddressBook = () => {
         await addressApi.deleteAddress(id);
         toast.success("Đã xóa địa chỉ!");
         fetchAddresses();
-      } catch (error) {
+      } catch {
         toast.error("Lỗi khi xóa địa chỉ!");
       }
     }

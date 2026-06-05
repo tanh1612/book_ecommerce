@@ -51,10 +51,16 @@ export const WishlistProvider = ({ children }) => {
     }
 
     try {
-      await wishlistApi.addToWishlist(book.id);
+      const res = await wishlistApi.addToWishlist(book.id);
+      // Update state từ response thay vì fetchWishlist
+      const newItems = res.data?.data || res.data || [];
+      if (Array.isArray(newItems)) {
+        setWishlistItems(newItems);
+      } else {
+        setWishlistItems(prev => [...prev, book]);
+      }
       toast.success(`Đã thả tim "${book.name || book.title}"!`);
-      fetchWishlist(); // Gọi lại API để đồng bộ dữ liệu mới nhất
-    } catch (error) {
+    } catch {
       toast.error("Không thể thêm vào danh sách yêu thích lúc này.");
     }
   };
@@ -70,7 +76,7 @@ export const WishlistProvider = ({ children }) => {
     try {
       await wishlistApi.removeFromWishlist(bookId);
       toast.success("Đã xóa khỏi danh sách yêu thích.");
-    } catch (error) {
+    } catch {
       // Nếu API lỗi, khôi phục lại dữ liệu cũ
       setWishlistItems(previousItems);
       toast.error("Lỗi hệ thống khi xóa sách yêu thích.");
