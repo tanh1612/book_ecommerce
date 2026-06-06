@@ -34,6 +34,7 @@
         <env name="DB_PASSWORD" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="QUEUE_FAILED_DRIVER" value="database-uuids"/>
         <env name="SCOUT_DRIVER" value="null"/>
         <env name="SCOUT_QUEUE" value="false"/>
         <env name="SESSION_DRIVER" value="array"/>

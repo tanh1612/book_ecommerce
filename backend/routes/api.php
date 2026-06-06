@@ -1,28 +1,28 @@
 <?php
 
-use App\Http\Controllers\Api\V1\Ai\ChatController;
-use App\Http\Controllers\Api\V1\Ai\ChatFeedbackController;
 use App\Http\Controllers\Api\V1\Account\AddressController;
 use App\Http\Controllers\Api\V1\Account\OrderController;
-use App\Http\Controllers\Api\V1\Account\ReviewController;
-use App\Http\Controllers\Api\V1\Account\WishlistController;
 use App\Http\Controllers\Api\V1\Account\OrderRefundBankInfoController;
 use App\Http\Controllers\Api\V1\Account\PasswordController;
 use App\Http\Controllers\Api\V1\Account\ProfileController;
+use App\Http\Controllers\Api\V1\Account\ReviewController;
+use App\Http\Controllers\Api\V1\Account\WishlistController;
+use App\Http\Controllers\Api\V1\Ai\ChatController;
+use App\Http\Controllers\Api\V1\Ai\ChatFeedbackController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V1\Cart\CartController;
 use App\Http\Controllers\Api\V1\Catalog\BookController;
-use App\Http\Controllers\Api\V1\Content\BannerController;
-use App\Http\Controllers\Api\V1\Promotion\FlashSaleController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewController;
 use App\Http\Controllers\Api\V1\Catalog\BookReviewEligibilityController;
-use App\Http\Controllers\Api\V1\Recommendation\InteractionController;
-use App\Http\Controllers\Api\V1\Recommendation\RecommendationController;
 use App\Http\Controllers\Api\V1\Checkout\CheckoutController;
+use App\Http\Controllers\Api\V1\Content\BannerController;
 use App\Http\Controllers\Api\V1\Location\LocationController;
 use App\Http\Controllers\Api\V1\Payment\VnPayIpnController;
 use App\Http\Controllers\Api\V1\Payment\VnPayReturnController;
+use App\Http\Controllers\Api\V1\Promotion\FlashSaleController;
+use App\Http\Controllers\Api\V1\Recommendation\InteractionController;
+use App\Http\Controllers\Api\V1\Recommendation\RecommendationController;
 use App\Http\Controllers\Api\V1\Shipping\ShippingQuoteController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,7 +54,7 @@ Route::prefix('v1/auth')->group(function (): void {
         ->middleware('web');
 
     Route::post('logout', [AuthController::class, 'logout'])
-        ->middleware(['web', 'auth:sanctum']);
+        ->middleware(['web', 'auth:web']);
 });
 
 // Public location proxy
@@ -98,7 +98,7 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
 
     // Review eligibility for authenticated user on book detail page
     Route::get('{slug}/review-eligibility', [BookReviewEligibilityController::class, 'show'])
-        ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:60,1']);
+        ->middleware(['web', 'auth:web', 'account.active', 'throttle:60,1']);
 
     // Approved reviews for book detail page (public)
     Route::get('{slug}/reviews', [BookReviewController::class, 'index']);
@@ -126,7 +126,7 @@ Route::prefix('v1/cart')->middleware(['web', 'account.active', 'throttle:120,1']
 });
 
 // Account routes
-Route::prefix('v1/account')->middleware(['web', 'auth:sanctum', 'account.active'])->group(function (): void {
+Route::prefix('v1/account')->middleware(['web', 'auth:web', 'account.active'])->group(function (): void {
     // Get profile
     Route::get('profile', [ProfileController::class, 'show']);
 
@@ -185,15 +185,15 @@ Route::prefix('v1/account')->middleware(['web', 'auth:sanctum', 'account.active'
 
 // Checkout
 Route::post('v1/checkout', [CheckoutController::class, 'store'])
-    ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:30,1']);
+    ->middleware(['web', 'auth:web', 'account.active', 'throttle:30,1']);
 
 // Shipping quote
 Route::post('v1/shipping/quote', [ShippingQuoteController::class, 'store'])
-    ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:60,1']);
+    ->middleware(['web', 'auth:web', 'account.active', 'throttle:60,1']);
 
 // Recommendation interactions
 Route::post('v1/recommendations/interactions/books/{book}/view', [InteractionController::class, 'trackBookView'])
-    ->middleware(['web', 'auth:sanctum', 'account.active', 'throttle:60,1']);
+    ->middleware(['web', 'auth:web', 'account.active', 'throttle:60,1']);
 
 // Recommendation feed
 Route::get('v1/recommendations', [RecommendationController::class, 'index'])

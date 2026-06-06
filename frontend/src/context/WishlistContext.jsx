@@ -1,5 +1,5 @@
 // src/context/WishlistContext.jsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import wishlistApi from '../services/wishlistApi';
 import { useAuth } from './AuthContext'; // Import AuthContext để check đăng nhập
@@ -14,7 +14,7 @@ export const WishlistProvider = ({ children }) => {
   const { user } = useAuth();
 
   // 1. HÀM TẢI DANH SÁCH YÊU THÍCH TỪ BACKEND
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     if (!user) {
       setWishlistItems([]); // Khách vãng lai thì làm rỗng danh sách
       return;
@@ -29,12 +29,12 @@ export const WishlistProvider = ({ children }) => {
     } finally {
       setIsLoadingWishlist(false);
     }
-  };
+  }, [user]);
 
   // Tự động tải lại Wishlist mỗi khi trạng thái đăng nhập (user) thay đổi
   useEffect(() => {
     fetchWishlist();
-  }, [user]);
+  }, [fetchWishlist]);
 
   // 2. HÀM THÊM VÀO YÊU THÍCH
   const addToWishlist = async (book) => {
@@ -53,9 +53,11 @@ export const WishlistProvider = ({ children }) => {
     try {
       const res = await wishlistApi.addToWishlist(book.id);
       // Update state từ response thay vì fetchWishlist
-      const newItems = res.data?.data || res.data || [];
-      if (Array.isArray(newItems)) {
-        setWishlistItems(newItems);
+      const payload = res.data?.data || res.data || null;
+      if (Array.isArray(payload)) {
+        setWishlistItems(payload);
+      } else if (payload?.id) {
+        setWishlistItems(prev => [payload, ...prev.filter(item => item.id !== payload.id)]);
       } else {
         setWishlistItems(prev => [...prev, book]);
       }

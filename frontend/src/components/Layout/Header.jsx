@@ -1,5 +1,5 @@
 // src/components/Layout/Header.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FiSearch, FiShoppingCart, FiUser, FiHeart, FiMapPin, FiMenu, FiChevronRight } from 'react-icons/fi';
 import { toast } from 'react-toastify';
@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import bookApi from '../../services/bookApi';
+
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -27,22 +29,22 @@ const Header = () => {
   const searchRef = useRef(null);
   // Search cache với TTL (5 phút)
   const searchCache = useRef({});
-  const CACHE_TTL = 5 * 60 * 1000;
+  
 
-  const getCachedSuggestions = (keyword) => {
+  const getCachedSuggestions = useCallback((keyword) => {
     const cached = searchCache.current[keyword];
     if (!cached) return null;
-    const isExpired = Date.now() - cached.timestamp > CACHE_TTL;
+    const isExpired = Date.now() - cached.timestamp > SEARCH_CACHE_TTL;
     if (isExpired) {
       delete searchCache.current[keyword];
       return null;
     }
     return cached.data;
-  };
+  }, []);
 
-  const setCachedSuggestions = (keyword, data) => {
+  const setCachedSuggestions = useCallback((keyword, data) => {
     searchCache.current[keyword] = { data, timestamp: Date.now() };
-  };
+  }, []);
 
   // Lấy danh mục
   useEffect(() => {
@@ -125,7 +127,7 @@ const Header = () => {
       ignore = true;
       clearTimeout(delayDebounceFn);
     };
-  }, [searchTerm]);
+  }, [searchTerm, getCachedSuggestions, setCachedSuggestions]);
 
   // Hành động khi nhấn Enter hoặc Bấm kính lúp
   const handleSearch = () => {

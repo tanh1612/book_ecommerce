@@ -1,5 +1,5 @@
 // src/pages/Auth/ForgotPasswordPage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiEye, FiEyeOff, FiCheckCircle, FiAlertCircle, FiArrowLeft } from 'react-icons/fi';
 import { toast } from 'react-toastify';
@@ -24,12 +24,6 @@ const ForgotPasswordPage = () => {
   }, [countdown]);
 
   // Tự động kiểm tra OTP khi nhập đủ 6 số
-  useEffect(() => {
-    if (formData.otp.length === 6 && !isOtpVerified) {
-      handleVerifyOTP();
-    }
-  }, [formData.otp]);
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'otp' && value.length > 6) return; // Chỉ cho nhập 6 số
@@ -54,9 +48,9 @@ const ForgotPasswordPage = () => {
   };
 
   // 2. Xác thực OTP
-  const handleVerifyOTP = async () => {
+  const handleVerifyOTP = useCallback(async () => {
     try {
-      setLoading({ ...loading, verify: true });
+      setLoading(prev => ({ ...prev, verify: true }));
       const res = await authApi.verifyOtpForgot(formData.email, formData.otp);
       // Lưu lại token reset mật khẩu từ Backend trả về
       setResetToken(res.data.reset_token); 
@@ -64,11 +58,17 @@ const ForgotPasswordPage = () => {
       toast.success("Xác thực thành công! Mời bạn nhập mật khẩu mới.");
     } catch (err) {
       toast.error(err.response?.data?.message || "Mã OTP không chính xác!");
-      setFormData({ ...formData, otp: '' });
+      setFormData(prev => ({ ...prev, otp: '' }));
     } finally {
-      setLoading({ ...loading, verify: false });
+      setLoading(prev => ({ ...prev, verify: false }));
     }
-  };
+  }, [formData.email, formData.otp]);
+
+  useEffect(() => {
+    if (formData.otp.length === 6 && !isOtpVerified) {
+      void handleVerifyOTP();
+    }
+  }, [formData.otp, handleVerifyOTP, isOtpVerified]);
 
   // 3. Đặt lại mật khẩu mới
   const handleSubmit = async (e) => {

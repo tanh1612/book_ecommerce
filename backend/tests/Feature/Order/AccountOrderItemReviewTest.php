@@ -61,7 +61,7 @@ test('user can submit review for own completed order item', function (): void {
     $book = Book::factory()->create();
     $item = reviewTestOrderItem($order, $book);
 
-    $this->actingAs($account, 'sanctum')
+    $this->actingAs($account, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", [
             'rating' => 5,
             'comment' => 'Sách đẹp, nội dung tốt.',
@@ -87,7 +87,7 @@ test('user cannot review order item belonging to another account', function (): 
     $order = reviewTestOrder($owner);
     $item = reviewTestOrderItem($order, Book::factory()->create());
 
-    $this->actingAs($other, 'sanctum')
+    $this->actingAs($other, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", [
             'rating' => 5,
             'comment' => 'Nice',
@@ -100,7 +100,7 @@ test('user cannot review when order is not completed', function (): void {
     $order = reviewTestOrder($account, OrderStatus::CONFIRMED);
     $item = reviewTestOrderItem($order, Book::factory()->create());
 
-    $this->actingAs($account, 'sanctum')
+    $this->actingAs($account, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", [
             'rating' => 4,
         ])
@@ -123,7 +123,7 @@ test('user cannot review already reviewed order item', function (): void {
         'status' => ReviewStatus::PENDING,
     ]);
 
-    $this->actingAs($account, 'sanctum')
+    $this->actingAs($account, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", [
             'rating' => 5,
         ])
@@ -138,11 +138,11 @@ test('user cannot submit duplicate review for same order item', function (): voi
 
     $payload = ['rating' => 5, 'comment' => 'First'];
 
-    $this->actingAs($account, 'sanctum')
+    $this->actingAs($account, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", $payload)
         ->assertCreated();
 
-    $this->actingAs($account, 'sanctum')
+    $this->actingAs($account, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", $payload)
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['order_item']);
@@ -153,7 +153,7 @@ test('user can submit half star rating', function (): void {
     $order = reviewTestOrder($account);
     $item = reviewTestOrderItem($order, Book::factory()->create());
 
-    $this->actingAs($account, 'sanctum')
+    $this->actingAs($account, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", [
             'rating' => 4.5,
             'comment' => 'Sản phẩm tốt',
@@ -169,7 +169,7 @@ test('submit review rejects invalid rating step', function (): void {
     $order = reviewTestOrder($account);
     $item = reviewTestOrderItem($order, Book::factory()->create());
 
-    $this->actingAs($account, 'sanctum')
+    $this->actingAs($account, 'web')
         ->postJson("/api/v1/account/order-items/{$item->id}/review", [
             'rating' => 4.3,
         ])

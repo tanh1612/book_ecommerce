@@ -1,5 +1,5 @@
 // src/pages/Checkout/CheckoutPage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiChevronRight, FiMapPin, FiTruck, FiCreditCard, FiAlertCircle } from 'react-icons/fi';
 import { toast } from 'react-toastify';
@@ -29,19 +29,23 @@ const CheckoutPage = () => {
   
   // Lưu trữ dữ liệu giỏ hàng để lấy "pricing_expectations"
   const [cartInfo, setCartInfo] = useState(null);
+  const [checkoutCartItems, setCheckoutCartItems] = useState([]);
 
   const [formData, setFormData] = useState({
     recipient_name: '', recipient_phone: '', province_code: '', ward_code: '',
     detail_address: '', note: '', shipping_method_id: 1, payment_method: 'cod'
   });
 
-  const selectedItems = cartItems.filter(item => item.selected);
+  const selectedItems = useMemo(() => {
+    const sourceItems = cartItems.length > 0 ? cartItems : checkoutCartItems;
+    return sourceItems.filter(item => item.selected);
+  }, [cartItems, checkoutCartItems]);
   
   // TÍNH TỔNG TIỀN DỰA TRÊN DỮ LIỆU CỦA TUẤN ANH
   const subTotal = cartInfo?.selected_subtotal_after_discount || 0;
   const totalAmount = subTotal + (shippingFee || 0);
 
-  const loadWards = async (code) => {
+  const loadWards = useCallback(async (code) => {
     setIsFetchingWards(true);
     try {
       const res = await addressApi.getWards(code);
@@ -49,9 +53,9 @@ const CheckoutPage = () => {
     } finally {
       setIsFetchingWards(false);
     }
-  };
+  }, []);
 
-  const calculateShipping = async ({ provinceCode, addressId }, methodId) => {
+  const calculateShipping = useCallback(async ({ provinceCode, addressId }, methodId) => {
     if (!provinceCode && !addressId) return;
     setIsCalculatingFee(true);
     setShippingError(null); 
@@ -73,16 +77,10 @@ const CheckoutPage = () => {
     } finally {
       setIsCalculatingFee(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const abortController = new AbortController();
-
-    if (selectedItems.length === 0) {
-      toast.warning("Vui lòng chọn sản phẩm để thanh toán!");
-      navigate('/cart');
-      return;
-    }
 
     const initData = async () => {
       try {
@@ -95,7 +93,18 @@ const CheckoutPage = () => {
         if (abortController.signal.aborted) return;
 
         setProvinces(provinceRes.data?.data || provinceRes.data || []);
-        setCartInfo(cartRes.data?.data || cartRes.data);
+        const cartPayload = cartRes.data?.data || cartRes.data || {};
+        const cartPayloadItems = cartPayload.items || [];
+        const selectedCartItems = cartPayloadItems.filter(item => item.selected);
+
+        if (selectedCartItems.length === 0) {
+          toast.warning("Vui lòng chọn sản phẩm để thanh toán!");
+          navigate('/cart');
+          return;
+        }
+
+        setCartInfo(cartPayload);
+        setCheckoutCartItems(cartPayloadItems);
 
         const addressList = addressRes.data?.data || addressRes.data || [];
         const defaultAddress = addressList.find(addr => addr.is_default === 1 || addr.is_default === true);
@@ -130,7 +139,7 @@ const CheckoutPage = () => {
     initData();
 
     return () => { abortController.abort(); };
-  }, []);
+  }, [calculateShipping, loadWards, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

@@ -16,7 +16,7 @@ const CartPage = () => {
 
   useEffect(() => {
     fetchCart();
-  }, []);
+  }, [fetchCart]);
 
   // ĐỒNG BỘ DATA BACKEND: Mỗi khi có sự thay đổi item trong giỏ, lấy lại data tổng
   useEffect(() => {

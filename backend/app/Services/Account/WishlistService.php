@@ -22,7 +22,9 @@ class WishlistService
      * @var list<string>
      */
     private const BOOK_EAGER_LOADS = [
+        'authors:id,name',
         'images:id,book_id,image_url,sort_order',
+        'inventories:id,book_id,quantity,reserved_quantity',
     ];
 
     /**

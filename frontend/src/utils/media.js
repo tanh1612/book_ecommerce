@@ -1,4 +1,10 @@
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || 'http://127.0.0.1:8000';
+const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
+
+const API_ORIGIN = trimTrailingSlash(
+  import.meta.env.VITE_BACKEND_ORIGIN
+    || import.meta.env.VITE_API_ORIGIN
+    || 'http://127.0.0.1:8000'
+);
 
 export const resolveMediaUrl = (url, fallback = 'https://placehold.co/80x120?text=No+Image') => {
   if (!url) return fallback;

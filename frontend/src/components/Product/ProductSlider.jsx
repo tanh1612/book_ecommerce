@@ -28,9 +28,9 @@ const ProductSlider = ({ products }) => {
         }}
         className="!pb-6 !pt-2" // Padding để không bị lẹm hiệu ứng shadow khi hover thẻ
       >
-        {products.map((book) => (
+        {products.map((book, index) => (
           // Đảm bảo chiều cao các thẻ bằng nhau với h-auto và !h-full
-          <SwiperSlide key={book.id} className="h-auto">
+          <SwiperSlide key={book.promotion_item_id || book.id || book.book?.id || index} className="h-auto">
             <div className="h-full">
               <ProductCard book={book} />
             </div>

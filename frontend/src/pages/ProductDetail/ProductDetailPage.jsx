@@ -4,14 +4,19 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FiShoppingCart, FiMinus, FiPlus, FiChevronRight, FiHeart, FiChevronDown } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import bookApi from '../../services/bookApi';
+import recommendationApi from '../../services/recommendationApi';
+import reviewApi from '../../services/reviewApi';
 import { formatCurrency } from '../../utils/formatters';
+import { resolveMediaUrl } from '../../utils/media';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { useAuth } from '../../context/AuthContext';
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { addToCart, buyNow } = useCart();
+  const { user } = useAuth();
   
   // 🔥 ĐÃ ĐỒNG BỘ: Sử dụng các hàm chuẩn từ WishlistContext mới
   const { checkInWishlist, addToWishlist, removeFromWishlist } = useWishlist(); 
@@ -21,6 +26,9 @@ const ProductDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [mainImage, setMainImage] = useState('');
   const [isDescExpanded, setIsDescExpanded] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [reviewMeta, setReviewMeta] = useState(null);
+  const [reviewEligibility, setReviewEligibility] = useState(null);
 
   useEffect(() => {
     const fetchBook = async () => {
@@ -29,7 +37,7 @@ const ProductDetailPage = () => {
         const res = await bookApi.getBookDetail(slug);
         const bookData = res.data?.data || res.data;
         setBook(bookData);
-        setMainImage(bookData.thumbnail_url || ''); 
+        setMainImage(resolveMediaUrl(bookData.thumbnail_url, 'https://placehold.co/450x600?text=No+Image')); 
       } catch {
         toast.error("Không tìm thấy thông tin sách!");
       } finally {
@@ -40,11 +48,70 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, [slug]);
 
-  const stock = book?.available_stock > 0 ? book.available_stock : 999;
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchReviews = async () => {
+      try {
+        const res = await reviewApi.getBookReviews(slug, { per_page: 5 });
+        if (!ignore) {
+          setReviews(res.data?.data || []);
+          setReviewMeta(res.data?.meta || null);
+        }
+      } catch {
+        if (!ignore) {
+          setReviews([]);
+          setReviewMeta(null);
+        }
+      }
+    };
+
+    fetchReviews();
+
+    return () => {
+      ignore = true;
+    };
+  }, [slug]);
+
+  useEffect(() => {
+    if (!user) {
+      setReviewEligibility(null);
+      return;
+    }
+
+    let ignore = false;
+
+    reviewApi.getBookReviewEligibility(slug)
+      .then((res) => {
+        if (!ignore) setReviewEligibility(res.data?.data || res.data || null);
+      })
+      .catch(() => {
+        if (!ignore) setReviewEligibility(null);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [slug, user]);
+
+  const stock = Number.isFinite(Number(book?.available_stock)) ? Number(book.available_stock) : 999;
 
   useEffect(() => {
     setQuantity(stock <= 0 ? 0 : 1);
   }, [stock]);
+
+  useEffect(() => {
+    if (!user || !book?.id) return;
+
+    const storageKey = `book-view-tracked:${book.id}`;
+    if (sessionStorage.getItem(storageKey)) return;
+
+    recommendationApi.trackBookView(book.id, 'book_detail')
+      .then(() => {
+        sessionStorage.setItem(storageKey, '1');
+      })
+      .catch(() => {});
+  }, [book?.id, user]);
 
   const handleAddToCart = () => {
     if (stock <= 0) return toast.error("Sản phẩm hiện đã hết hàng!");
@@ -97,16 +164,16 @@ const ProductDetailPage = () => {
   const publisherName = book.publisher?.name || "Đang cập nhật";
 
   const pubYear = book.detail?.publication_year || "Đang cập nhật";
-  const numPages = book.detail?.page_count || "Đang cập nhật";
-  const format = book.detail?.format || "Đang cập nhật";
+  const numPages = book.detail?.num_pages || "Đang cập nhật";
+  const format = book.detail?.format_label || book.detail?.format || "Đang cập nhật";
   const translator = book.detail?.translator || "Đang cập nhật";
   const dimensions = book.detail?.dimensions || "Đang cập nhật";
-  const weight = book.detail?.weight_grams || "Đang cập nhật";
+  const weight = book.detail?.weight || "Đang cập nhật";
   const description = book.detail?.description || "<p>Chưa có mô tả cho sản phẩm này.</p>";
   
   const averageRating = book.average_rating || 0;
   const reviewCount = book.review_count || 0;
-  const galleryImages = book.images?.length > 0 ? book.images : [{ url: book.thumbnail_url }];
+  const galleryImages = book.images?.length > 0 ? book.images : [{ image_url: book.thumbnail_url }];
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20 pt-4">
@@ -128,11 +195,15 @@ const ProductDetailPage = () => {
             
             {galleryImages.length > 1 && (
               <div className="flex gap-3 justify-center overflow-x-auto py-2 mb-6">
-                {galleryImages.map((img, idx) => (
-                  <div key={idx} onMouseEnter={() => setMainImage(img.url)} className={`w-16 h-16 border rounded cursor-pointer overflow-hidden ${mainImage === img.url ? 'border-[#007b22] border-2' : 'border-gray-200'}`}>
-                    <img src={img.url} alt={`thumb-${idx}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
+                {galleryImages.map((img, idx) => {
+                  const imageUrl = resolveMediaUrl(img.image_url || img.url, 'https://placehold.co/80x120?text=No+Image');
+
+                  return (
+                    <div key={img.id || idx} onMouseEnter={() => setMainImage(imageUrl)} className={`w-16 h-16 border rounded cursor-pointer overflow-hidden ${mainImage === imageUrl ? 'border-[#007b22] border-2' : 'border-gray-200'}`}>
+                      <img src={imageUrl} alt={`thumb-${idx}`} className="w-full h-full object-cover" />
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -246,6 +317,47 @@ const ProductDetailPage = () => {
               <div className="flex"><span className="w-1/3 text-gray-500">Hình thức</span><span className="w-2/3 text-gray-800 font-semibold">{format}</span></div>
             </div>
           </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-6 mt-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5 pb-4 border-b border-gray-100">
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">Đánh giá sản phẩm</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {reviewMeta?.total ? `${reviewMeta.total} đánh giá đã được duyệt` : 'Các đánh giá từ khách hàng đã mua sách'}
+              </p>
+            </div>
+            {reviewEligibility?.can_review && (
+              <div className="text-sm font-medium text-[#157a2c] bg-green-50 border border-green-100 rounded px-3 py-2">
+                Bạn có thể đánh giá sách này trong mục đơn hàng.
+              </div>
+            )}
+          </div>
+
+          {reviews.length > 0 ? (
+            <div className="flex flex-col divide-y divide-gray-100">
+              {reviews.map((review) => (
+                <div key={review.id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <span className="font-bold text-gray-800">{review.reviewer_name || 'Khách hàng'}</span>
+                    <span className="text-amber-500 text-sm font-semibold">{Number(review.rating || 0).toFixed(1)} sao</span>
+                    {review.created_at && (
+                      <span className="text-xs text-gray-400">
+                        {new Date(review.created_at).toLocaleDateString('vi-VN')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {review.comment || 'Khách hàng không để lại bình luận.'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded py-8">
+              Chưa có đánh giá nào cho sản phẩm này.
+            </div>
+          )}
         </div>
       </div>
     </div>

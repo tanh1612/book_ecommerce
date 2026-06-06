@@ -1,10 +1,12 @@
 // src/components/Home/FlashSaleTimer.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-const FlashSaleTimer = () => {
-  // Giả định Flash Sale kết thúc vào cuối ngày hôm nay
-  const calculateTimeLeft = () => {
-    const difference = new Date().setHours(23, 59, 59) - new Date();
+const FlashSaleTimer = ({ endAt }) => {
+  // Fallback to end of day when the API response does not include an end time.
+  const calculateTimeLeft = useCallback(() => {
+    const fallbackDeadline = new Date().setHours(23, 59, 59, 999);
+    const deadline = endAt ? new Date(endAt).getTime() : fallbackDeadline;
+    const difference = deadline - Date.now();
     let timeLeft = {};
 
     if (difference > 0) {
@@ -15,16 +17,17 @@ const FlashSaleTimer = () => {
       };
     }
     return timeLeft;
-  };
+  }, [endAt]);
 
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+  const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft());
 
   useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
     const timer = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [calculateTimeLeft]);
 
   const formatNumber = (num) => String(num).padStart(2, '0');
 

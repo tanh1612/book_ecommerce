@@ -7,10 +7,13 @@ import ProductSlider from "../../components/Product/ProductSlider";
 import ProductCard from "../../components/Product/ProductCard";
 import FlashSaleTimer from "../../components/Home/FlashSaleTimer"; 
 import bookApi from "../../services/bookApi";
+import recommendationApi from "../../services/recommendationApi";
 
 const HomePage = () => {
   const [books, setBooks] = useState([]);
   const [flashSaleBooks, setFlashSaleBooks] = useState([]); // 🔥 State mới lưu sách Flash Sale thật
+  const [flashSaleEndsAt, setFlashSaleEndsAt] = useState(null);
+  const [recommendedBooks, setRecommendedBooks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +27,15 @@ const HomePage = () => {
         else if (resBooks.data?.data?.data && Array.isArray(resBooks.data.data.data)) booksArray = resBooks.data.data.data;
         setBooks(booksArray);
 
+        try {
+          const resRecommendations = await recommendationApi.getRecommendations({ limit: 10 });
+          const recommendationData = resRecommendations.data?.data || resRecommendations.data || [];
+          setRecommendedBooks(Array.isArray(recommendationData) ? recommendationData : []);
+        } catch (recommendationError) {
+          console.log("KhÃ´ng thá»ƒ táº£i gá»£i Ã½ cÃ¡ nhÃ¢n, dÃ¹ng danh sÃ¡ch fallback", recommendationError);
+          setRecommendedBooks([]);
+        }
+
         // 2. 🔥 Gọi API lấy sách Flash Sale xịn từ Backend
         try {
           const resFlashSale = await bookApi.getActiveFlashSale();
@@ -32,9 +44,15 @@ const HomePage = () => {
           // API Flash Sale trả về cấu trúc { id, start_at, items: [...] }
           if (fsData && Array.isArray(fsData.items)) {
             setFlashSaleBooks(fsData.items);
+            setFlashSaleEndsAt(fsData.end_at || null);
+          } else {
+            setFlashSaleBooks([]);
+            setFlashSaleEndsAt(null);
           }
         } catch (fsError) {
           console.log("Hiện không có Flash Sale nào đang chạy", fsError);
+          setFlashSaleBooks([]);
+          setFlashSaleEndsAt(null);
         }
 
       } catch (error) {
@@ -50,7 +68,7 @@ const HomePage = () => {
   const safeBooks = Array.isArray(books) ? books : [];
   
   const newBooks = safeBooks.slice(0, 8);
-  const suggestBooks = safeBooks.slice(0, 10);
+  const suggestBooks = recommendedBooks.length > 0 ? recommendedBooks : safeBooks.slice(0, 10);
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center text-[#157a2c] font-bold">Đang tải dữ liệu...</div>;
@@ -78,11 +96,7 @@ const HomePage = () => {
               </div>
 
               <div className="flex items-center gap-6 bg-black/20 px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10">
-                <FlashSaleTimer />
-                <Link to="/sach-khuyen-mai" className="text-white hover:text-yellow-400 text-sm font-bold flex items-center gap-1 transition-all group">
-                  Xem tất cả 
-                  <FiChevronRight className="group-hover:translate-x-1 transition-transform" />
-                </Link>
+                <FlashSaleTimer endAt={flashSaleEndsAt} />
               </div>
             </div>
 

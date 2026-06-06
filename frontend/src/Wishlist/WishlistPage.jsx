@@ -4,6 +4,7 @@ import { FiTrash2, FiShoppingCart, FiChevronRight } from 'react-icons/fi';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { formatCurrency } from '../utils/formatters';
+import { resolveMediaUrl } from '../utils/media';
 
 const WishlistPage = () => {
   const { wishlistItems, removeFromWishlist } = useWishlist();
@@ -39,7 +40,7 @@ const WishlistPage = () => {
             {wishlistItems.map((item, index) => {
               // Đồng bộ tên trường lấy từ cấu trúc API mới
               const itemTitle = item.name || item.title || "Đang cập nhật";
-              const itemThumbnail = item.thumbnail_url || item.thumbnail || "https://placehold.co/100x150";
+              const itemThumbnail = resolveMediaUrl(item.thumbnail_url || item.thumbnail, "https://placehold.co/100x150");
               const itemPrice = item.selling_price || item.price || 0;
               const itemOriginalPrice = item.original_price || itemPrice;
               const itemAuthor = Array.isArray(item.authors) ? item.authors.map(a => a.name).join(', ') : (item.author || "Đang cập nhật");

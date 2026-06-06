@@ -4,8 +4,18 @@ import { toast } from 'react-toastify';
 
 const MUTATING_METHODS = ['post', 'put', 'patch', 'delete'];
 
+const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const BACKEND_ORIGIN = trimTrailingSlash(
+  import.meta.env.VITE_BACKEND_ORIGIN || import.meta.env.VITE_API_ORIGIN || ''
+);
+const CSRF_URL = BACKEND_ORIGIN
+  ? `${BACKEND_ORIGIN}/sanctum/csrf-cookie`
+  : '/sanctum/csrf-cookie';
+
 const axiosClient = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -48,7 +58,7 @@ export const getCsrfToken = async ({ force = false } = {}) => {
   let token = force ? null : getCsrfTokenFromCookie();
 
   if (!token) {
-    csrfRequest ??= axios.get('/sanctum/csrf-cookie', { withCredentials: true });
+    csrfRequest ??= axios.get(CSRF_URL, { withCredentials: true });
     await csrfRequest.finally(() => {
       csrfRequest = null;
     });

@@ -1,5 +1,5 @@
 // src/pages/Auth/RegisterPage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiEye, FiEyeOff, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import { toast } from 'react-toastify';
@@ -24,12 +24,6 @@ const RegisterPage = () => {
   }, [countdown]);
 
   // Tự động kích hoạt kiểm tra OTP khi nhập đủ 6 số
-  useEffect(() => {
-    if (formData.otp.length === 6 && !isOtpVerified) {
-      handleVerifyOTP();
-    }
-  }, [formData.otp]);
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'otp' && value.length > 6) return; // Giới hạn 6 số
@@ -55,22 +49,28 @@ const RegisterPage = () => {
   };
 
   // Bước 2: Gọi API Xác nhận OTP
-  const handleVerifyOTP = async () => {
+  const handleVerifyOTP = useCallback(async () => {
     try {
-      setLoading({ ...loading, verify: true });
+      setLoading(prev => ({ ...prev, verify: true }));
       const res = await authApi.verifyOtp(formData.email, formData.otp);
       setRegisterToken(res.data.register_token); // Giữ token để bước 3 dùng
       setIsOtpVerified(true);
       toast.success("Xác thực mã thành công!");
     } catch (err) {
       toast.error(err.response?.data?.message || "Mã OTP không chính xác!");
-      setFormData({ ...formData, otp: '' }); // Xóa mã sai đi
+      setFormData(prev => ({ ...prev, otp: '' }));
     } finally {
-      setLoading({ ...loading, verify: false });
+      setLoading(prev => ({ ...prev, verify: false }));
     }
-  };
+  }, [formData.email, formData.otp]);
 
   // Bước 3: Đăng ký
+  useEffect(() => {
+    if (formData.otp.length === 6 && !isOtpVerified) {
+      void handleVerifyOTP();
+    }
+  }, [formData.otp, handleVerifyOTP, isOtpVerified]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const passRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;

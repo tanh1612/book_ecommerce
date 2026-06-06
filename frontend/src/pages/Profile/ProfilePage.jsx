@@ -1,6 +1,6 @@
 // src/pages/Profile/ProfilePage.jsx
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FiUser, FiMapPin, FiPackage, FiLogOut, FiChevronRight, FiLock } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ import AddressBook from './AddressBook';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, login, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('profile'); 
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -56,6 +57,15 @@ const ProfilePage = () => {
       setFormData(extractUserData(user));
     }
   }, [user]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const supportedTabs = ['profile', 'password', 'orders', 'addresses'];
+
+    if (supportedTabs.includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

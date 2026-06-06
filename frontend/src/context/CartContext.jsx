@@ -1,5 +1,5 @@
 // src/context/CartContext.jsx
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import cartApi from '../services/cartApi';
 import { toast } from 'react-toastify';
 import { useAuth } from './AuthContext';
@@ -11,7 +11,7 @@ export const CartProvider = ({ children }) => {
   const [isLoadingCart, setIsLoadingCart] = useState(false);
   const { user } = useAuth();
 
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     setIsLoadingCart(true);
     try {
       const res = await cartApi.getCart();
@@ -22,11 +22,11 @@ export const CartProvider = ({ children }) => {
     } finally {
       setIsLoadingCart(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCart();
-  }, [user]);
+  }, [fetchCart, user]);
 
   const totalQuantity = useMemo(() =>
     cartItems.reduce((total, item) => total + (item.quantity || 1), 0)

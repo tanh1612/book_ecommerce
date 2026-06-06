@@ -1,21 +1,22 @@
-// src/pages/Profile/MyOrders.jsx
+﻿// src/pages/Profile/MyOrders.jsx
 import { useState, useEffect } from 'react';
-import { FiX, FiAlertCircle, FiClock, FiPackage } from 'react-icons/fi';
+import { FiX, FiAlertCircle, FiClock, FiPackage, FiStar } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { formatCurrency } from '../../utils/formatters';
 import { resolveMediaUrl } from '../../utils/media';
 import orderApi from '../../services/orderApi';
+import reviewApi from '../../services/reviewApi';
 
-// Danh sách các trạng thái dùng cho Tab Bộ lọc & Hiển thị (Khớp 100% với OrderStatus.php)
+// Danh sÃ¡ch cÃ¡c tráº¡ng thÃ¡i dÃ¹ng cho Tab Bá»™ lá»c & Hiá»ƒn thá»‹ (Khá»›p 100% vá»›i OrderStatus.php)
 const ORDER_STATUSES = [
-  { label: 'Tất cả', value: null, color: 'text-gray-800 bg-gray-100' },
-  { label: 'Chờ xử lý', value: 'pending', color: 'text-yellow-600 bg-yellow-100' },
-  { label: 'Đã xác nhận', value: 'confirmed', color: 'text-blue-600 bg-blue-100' },
-  { label: 'Đang xử lý', value: 'processing', color: 'text-indigo-600 bg-indigo-100' },
-  { label: 'Đang giao hàng', value: 'shipping', color: 'text-gray-600 bg-gray-200' },
-  { label: 'Hoàn tất', value: 'completed', color: 'text-green-600 bg-green-100' },
-  { label: 'Đã hủy', value: 'cancelled', color: 'text-red-600 bg-red-100' },
-  { label: 'Không hoàn tiền', value: 'refund_closed', color: 'text-gray-500 bg-gray-100' },
+  { label: 'Táº¥t cáº£', value: null, color: 'text-gray-800 bg-gray-100' },
+  { label: 'Chá» xá»­ lÃ½', value: 'pending', color: 'text-yellow-600 bg-yellow-100' },
+  { label: 'ÄÃ£ xÃ¡c nháº­n', value: 'confirmed', color: 'text-blue-600 bg-blue-100' },
+  { label: 'Äang xá»­ lÃ½', value: 'processing', color: 'text-indigo-600 bg-indigo-100' },
+  { label: 'Äang giao hÃ ng', value: 'shipping', color: 'text-gray-600 bg-gray-200' },
+  { label: 'HoÃ n táº¥t', value: 'completed', color: 'text-green-600 bg-green-100' },
+  { label: 'ÄÃ£ há»§y', value: 'cancelled', color: 'text-red-600 bg-red-100' },
+  { label: 'KhÃ´ng hoÃ n tiá»n', value: 'refund_closed', color: 'text-gray-500 bg-gray-100' },
 ];
 
 const getOrderItemId = (item) => item.id || item.review_target_id;
@@ -44,17 +45,20 @@ const MyOrders = () => {
   const [filterStatus, setFilterStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // State quản lý Modals
+  // State quáº£n lÃ½ Modals
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedReviewItem, setSelectedReviewItem] = useState(null);
+  const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   
-  // State Form Hoàn tiền (Khớp với OrderRefundBankInfoController)
+  // State Form HoÃ n tiá»n (Khá»›p vá»›i OrderRefundBankInfoController)
   const [refundBanks, setRefundBanks] = useState([]);
   const [refundData, setRefundData] = useState({ bank_code: '', account_number: '', account_holder: '' });
 
-  // 1. LẤY DANH SÁCH ĐƠN HÀNG (CÓ LỌC)
+  // 1. Láº¤Y DANH SÃCH ÄÆ N HÃ€NG (CÃ“ Lá»ŒC)
   const fetchOrders = async (status = null) => {
     setIsLoading(true);
     try {
@@ -75,7 +79,7 @@ const MyOrders = () => {
 
       setOrders(enrichedOrders);
     } catch {
-      toast.error("Không thể tải danh sách đơn hàng!");
+      toast.error("KhÃ´ng thá»ƒ táº£i danh sÃ¡ch Ä‘Æ¡n hÃ ng!");
     } finally {
       setIsLoading(false);
     }
@@ -85,51 +89,51 @@ const MyOrders = () => {
     fetchOrders(filterStatus);
   }, [filterStatus]);
 
-  // 2. XỬ LÝ HỦY ĐƠN
+  // 2. Xá»¬ LÃ Há»¦Y ÄÆ N
   const handleCancelOrder = async () => {
     if (!selectedOrder) return;
     try {
       await orderApi.cancelOrder(selectedOrder.id);
-      toast.success("Hủy đơn hàng thành công!");
+      toast.success("Há»§y Ä‘Æ¡n hÃ ng thÃ nh cÃ´ng!");
       setIsCancelModalOpen(false);
       fetchOrders(filterStatus);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Lỗi khi hủy đơn hàng!");
+      toast.error(error.response?.data?.message || "Lá»—i khi há»§y Ä‘Æ¡n hÃ ng!");
     }
   };
 
-  // 3. XỬ LÝ THANH TOÁN LẠI VNPAY
+  // 3. Xá»¬ LÃ THANH TOÃN Láº I VNPAY
   const handleRetryPayment = async (orderId) => {
     try {
-      toast.info("Đang tạo link thanh toán mới...");
+      toast.info("Äang táº¡o link thanh toÃ¡n má»›i...");
       const res = await orderApi.getVnPayPaymentUrl(orderId);
       
       const paymentUrl = res.data?.data?.payment_url;
       
       if (paymentUrl && typeof paymentUrl === 'string' && paymentUrl.startsWith('http')) {
-        window.location.href = paymentUrl; // Chuyển hướng sang VNPay
+        window.location.href = paymentUrl; // Chuyá»ƒn hÆ°á»›ng sang VNPay
       } else {
-        toast.error("Không nhận được link thanh toán từ hệ thống!");
+        toast.error("KhÃ´ng nháº­n Ä‘Æ°á»£c link thanh toÃ¡n tá»« há»‡ thá»‘ng!");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Lỗi khi tạo lại thanh toán VNPay!");
+      toast.error(error.response?.data?.message || "Lá»—i khi táº¡o láº¡i thanh toÃ¡n VNPay!");
     }
   };
 
-  // 4. XỬ LÝ XEM CHI TIẾT
+  // 4. Xá»¬ LÃ XEM CHI TIáº¾T
   const handleViewDetails = async (orderId) => {
     try {
-      toast.info("Đang tải dữ liệu...", { autoClose: 500 });
+      toast.info("Äang táº£i dá»¯ liá»‡u...", { autoClose: 500 });
       const res = await orderApi.getOrderDetail(orderId);
       const summaryOrder = orders.find((order) => order.id === orderId);
       setSelectedOrder(mergeOrderSummaryAndDetail(summaryOrder || {}, res.data?.data || res.data));
       setIsDetailModalOpen(true);
     } catch {
-      toast.error("Không thể lấy chi tiết đơn hàng");
+      toast.error("KhÃ´ng thá»ƒ láº¥y chi tiáº¿t Ä‘Æ¡n hÃ ng");
     }
   };
 
-  // 5. XỬ LÝ HOÀN TIỀN
+  // 5. Xá»¬ LÃ HOÃ€N TIá»€N
   const openRefundModal = async (order) => {
     setSelectedOrder(order);
     setIsRefundModalOpen(true);
@@ -137,7 +141,7 @@ const MyOrders = () => {
       const res = await orderApi.getRefundBanks();
       setRefundBanks(res.data?.data || res.data || []);
     } catch {
-      toast.error("Không thể tải danh sách ngân hàng");
+      toast.error("KhÃ´ng thá»ƒ táº£i danh sÃ¡ch ngÃ¢n hÃ ng");
     }
   };
 
@@ -145,11 +149,48 @@ const MyOrders = () => {
     e.preventDefault();
     try {
       await orderApi.submitRefundBank(selectedOrder.id, refundData);
-      toast.success("Đã gửi thông tin nhận hoàn tiền thành công!");
+      toast.success("ÄÃ£ gá»­i thÃ´ng tin nháº­n hoÃ n tiá»n thÃ nh cÃ´ng!");
       setIsRefundModalOpen(false);
       fetchOrders(filterStatus);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Lỗi gửi thông tin hoàn tiền!");
+      toast.error(error.response?.data?.message || "Lá»—i gá»­i thÃ´ng tin hoÃ n tiá»n!");
+    }
+  };
+
+  const openReviewModal = (order) => {
+    const reviewableItem = (order.items || []).find((item) => item.can_review);
+
+    if (!reviewableItem) {
+      toast.info('ÄÆ¡n hÃ ng nÃ y khÃ´ng cÃ²n sáº£n pháº©m nÃ o cÃ³ thá»ƒ Ä‘Ã¡nh giÃ¡.');
+      return;
+    }
+
+    setSelectedOrder(order);
+    setSelectedReviewItem(reviewableItem);
+    setReviewData({ rating: 5, comment: '' });
+    setIsReviewModalOpen(true);
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    const orderItemId = getOrderItemId(selectedReviewItem);
+
+    if (!orderItemId) {
+      toast.error('KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c sáº£n pháº©m cáº§n Ä‘Ã¡nh giÃ¡.');
+      return;
+    }
+
+    try {
+      await reviewApi.submitOrderItemReview(orderItemId, {
+        rating: Number(reviewData.rating),
+        comment: reviewData.comment.trim() || null,
+      });
+      toast.success('ÄÃ£ gá»­i Ä‘Ã¡nh giÃ¡. Cáº£m Æ¡n báº¡n!');
+      setIsReviewModalOpen(false);
+      setSelectedReviewItem(null);
+      fetchOrders(filterStatus);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'KhÃ´ng thá»ƒ gá»­i Ä‘Ã¡nh giÃ¡ lÃºc nÃ y.');
     }
   };
 
@@ -157,7 +198,7 @@ const MyOrders = () => {
   const renderOrderItems = (items) => {
     return items.map((item) => {
       const bookData = item.book || {};
-      const bookName = item.book_name || bookData.name || bookData.title || "Sản phẩm";
+      const bookName = item.book_name || bookData.name || bookData.title || "Sáº£n pháº©m";
       const thumbnail = resolveMediaUrl(
         item.thumbnail_url ||
         (bookData.images && (bookData.images[0]?.url || bookData.images[0]?.image_url)) ||
@@ -181,10 +222,10 @@ const MyOrders = () => {
           />
           <div className="flex-grow">
             <h3 className="font-medium text-gray-800 line-clamp-2">{bookName}</h3>
-            {quantity > 0 && <div className="text-sm text-gray-500">Số lượng: x{quantity}</div>}
+            {quantity > 0 && <div className="text-sm text-gray-500">Sá»‘ lÆ°á»£ng: x{quantity}</div>}
           </div>
           <div className="font-bold text-[#157a2c]">
-            {displayPrice > 0 ? formatCurrency(displayPrice) : 'Đang cập nhật'}
+            {displayPrice > 0 ? formatCurrency(displayPrice) : 'Äang cáº­p nháº­t'}
           </div>
         </div>
       );
@@ -193,9 +234,9 @@ const MyOrders = () => {
 
   return (
     <div className="bg-white p-4 md:p-8 rounded-lg shadow-sm border border-gray-100">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">Đơn hàng của tôi</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">ÄÆ¡n hÃ ng cá»§a tÃ´i</h1>
       
-      {/* --- TAB BỘ LỌC TRẠNG THÁI --- */}
+      {/* --- TAB Bá»˜ Lá»ŒC TRáº NG THÃI --- */}
       <div className="flex gap-2 mb-6 border-b pb-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
         {ORDER_STATUSES.map((status, index) => (
           <button
@@ -217,19 +258,19 @@ const MyOrders = () => {
       ) : orders.length === 0 ? (
         <div className="text-center py-16 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
           <FiPackage size={48} className="text-gray-300 mb-3" />
-          <p className="text-gray-500 font-medium">Không tìm thấy đơn hàng nào ở trạng thái này.</p>
+          <p className="text-gray-500 font-medium">KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng nÃ o á»Ÿ tráº¡ng thÃ¡i nÃ y.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
           {orders.map((order) => {
-            // An toàn ép kiểu Enum thành String
+            // An toÃ n Ã©p kiá»ƒu Enum thÃ nh String
             const currentStatus = typeof order.current_status === 'object' ? order.current_status.value : order.current_status;
             const paymentStatus = typeof order.payment_status === 'object' ? order.payment_status.value : order.payment_status;
             const paymentMethod = typeof order.payment_method === 'object' ? order.payment_method.value : order.payment_method;
             
             const statusUi = ORDER_STATUSES.find(s => s.value === currentStatus) || ORDER_STATUSES[0];
             
-            // Logic hiển thị nút
+            // Logic hiá»ƒn thá»‹ nÃºt
             const isVnpayPending = paymentMethod === 'vnpay' && paymentStatus === 'pending' && currentStatus !== 'cancelled';
             const canRefund = paymentStatus === 'refunding' || (currentStatus === 'cancelled' && paymentStatus === 'paid');
 
@@ -237,13 +278,13 @@ const MyOrders = () => {
               <div key={order.id} className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="bg-gray-50 p-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 text-sm">
                   <div className="flex gap-4 items-center">
-                    <span className="font-bold text-gray-800">Mã đơn: #{order.id}</span>
+                    <span className="font-bold text-gray-800">MÃ£ Ä‘Æ¡n: #{order.id}</span>
                     <span className="text-gray-500">{new Date(order.created_at).toLocaleDateString('vi-VN')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     {paymentMethod === 'vnpay' && (
                        <span className={`text-xs font-bold px-2 py-1 rounded ${paymentStatus === 'paid' ? 'text-green-700 bg-green-100' : 'text-orange-700 bg-orange-100'}`}>
-                         {paymentStatus === 'paid' ? 'Đã TT VNPay' : 'Chưa TT VNPay'}
+                         {paymentStatus === 'paid' ? 'ÄÃ£ TT VNPay' : 'ChÆ°a TT VNPay'}
                        </span>
                     )}
                     <span className={`font-medium px-3 py-1 rounded-full text-xs ${statusUi.color}`}>
@@ -258,57 +299,57 @@ const MyOrders = () => {
 
                 <div className="bg-gray-50 p-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                   <div className="text-sm text-gray-600">
-                    Thành tiền: <span className="text-xl font-bold text-[#ff424e]">{formatCurrency(order.final_amount)}</span>
+                    ThÃ nh tiá»n: <span className="text-xl font-bold text-[#ff424e]">{formatCurrency(order.final_amount)}</span>
                   </div>
                   
                   <div className="flex gap-2 w-full sm:w-auto flex-wrap justify-end">
                     
-                    {/* NÚT THANH TOÁN LẠI VNPAY */}
+                    {/* NÃšT THANH TOÃN Láº I VNPAY */}
                     {isVnpayPending && (
                       <button 
                         onClick={() => handleRetryPayment(order.id)} 
                         className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
                       >
-                         <FiClock /> Thanh toán ngay
+                         <FiClock /> Thanh toÃ¡n ngay
                       </button>
                     )}
 
-                    {/* NÚT HOÀN TIỀN */}
+                    {/* NÃšT HOÃ€N TIá»€N */}
                     {canRefund && (
                       <button 
                         onClick={() => openRefundModal(order)} 
                         className="px-4 py-2 bg-purple-600 text-white rounded text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2"
                       >
-                        <FiAlertCircle /> Nhận hoàn tiền
+                        <FiAlertCircle /> Nháº­n hoÃ n tiá»n
                       </button>
                     )}
 
-                    {/* NÚT HỦY ĐƠN */}
+                    {/* NÃšT Há»¦Y ÄÆ N */}
                     {currentStatus === 'pending' && (
                       <button 
                         onClick={() => { setSelectedOrder(order); setIsCancelModalOpen(true); }} 
                         className="px-4 py-2 border border-red-500 text-red-500 bg-white rounded text-sm font-medium hover:bg-red-50 transition"
                       >
-                        Hủy đơn
+                        Há»§y Ä‘Æ¡n
                       </button>
                     )}
 
-                    {/* NÚT ĐÁNH GIÁ */}
-                    {currentStatus === 'completed' && (
+                    {/* NÃšT ÄÃNH GIÃ */}
+                    {currentStatus === 'completed' && (order.items || []).some((item) => item.can_review) && (
                       <button 
-                        onClick={() => toast.info('Tính năng đánh giá đang được phát triển!')} 
-                        className="px-4 py-2 border border-[#157a2c] text-[#157a2c] bg-white rounded text-sm font-medium hover:bg-green-50 transition"
+                        onClick={() => openReviewModal(order)} 
+                        className="px-4 py-2 border border-[#157a2c] text-[#157a2c] bg-white rounded text-sm font-medium hover:bg-green-50 transition flex items-center gap-2"
                       >
-                        Đánh giá
+                        <FiStar /> ÄÃ¡nh giÃ¡
                       </button>
                     )}
 
-                    {/* NÚT XEM CHI TIẾT */}
+                    {/* NÃšT XEM CHI TIáº¾T */}
                     <button 
                       onClick={() => handleViewDetails(order.id)} 
                       className="px-4 py-2 bg-[#157a2c] text-white rounded text-sm font-medium hover:bg-green-800 transition"
                     >
-                      Chi tiết
+                      Chi tiáº¿t
                     </button>
                   </div>
                 </div>
@@ -318,34 +359,34 @@ const MyOrders = () => {
         </div>
       )}
 
-      {/* ================= MODAL CHI TIẾT ĐƠN HÀNG ================= */}
+      {/* ================= MODAL CHI TIáº¾T ÄÆ N HÃ€NG ================= */}
       {isDetailModalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h2 className="text-lg font-bold text-gray-800">Chi tiết đơn hàng #{selectedOrder.id}</h2>
+              <h2 className="text-lg font-bold text-gray-800">Chi tiáº¿t Ä‘Æ¡n hÃ ng #{selectedOrder.id}</h2>
               <button onClick={() => setIsDetailModalOpen(false)} className="text-gray-400 hover:text-red-500"><FiX size={24}/></button>
             </div>
             
             <div className="p-6">
               <div className="bg-green-50 border border-green-100 p-4 rounded-lg mb-6">
-                <h3 className="font-bold text-[#157a2c] mb-2 uppercase text-xs">Thông tin giao hàng</h3>
+                <h3 className="font-bold text-[#157a2c] mb-2 uppercase text-xs">ThÃ´ng tin giao hÃ ng</h3>
                 <p className="font-medium text-gray-800">{selectedOrder.shipping_name}</p>
-                <p className="text-sm text-gray-600">SĐT: {selectedOrder.shipping_phone}</p>
-                <p className="text-sm text-gray-600">Địa chỉ: {selectedOrder.shipping_address}</p>
-                <p className="text-sm text-gray-600 mt-2">Ghi chú: {selectedOrder.note || 'Không có ghi chú'}</p>
+                <p className="text-sm text-gray-600">SÄT: {selectedOrder.shipping_phone}</p>
+                <p className="text-sm text-gray-600">Äá»‹a chá»‰: {selectedOrder.shipping_address}</p>
+                <p className="text-sm text-gray-600 mt-2">Ghi chÃº: {selectedOrder.note || 'KhÃ´ng cÃ³ ghi chÃº'}</p>
               </div>
 
-              <h3 className="font-bold text-gray-800 mb-3 border-b pb-2">Danh sách sản phẩm</h3>
+              <h3 className="font-bold text-gray-800 mb-3 border-b pb-2">Danh sÃ¡ch sáº£n pháº©m</h3>
               <div className="mb-6">
                 {renderOrderItems(selectedOrder.items || [])}
               </div>
 
               <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600 flex flex-col gap-2">
-                <div className="flex justify-between"><span>Tổng tiền sách:</span> <span>{formatCurrency(selectedOrder.total_amount)}</span></div>
-                <div className="flex justify-between"><span>Phí vận chuyển:</span> <span>{formatCurrency(selectedOrder.shipping_fee)}</span></div>
+                <div className="flex justify-between"><span>Tá»•ng tiá»n sÃ¡ch:</span> <span>{formatCurrency(selectedOrder.total_amount)}</span></div>
+                <div className="flex justify-between"><span>PhÃ­ váº­n chuyá»ƒn:</span> <span>{formatCurrency(selectedOrder.shipping_fee)}</span></div>
                 <div className="flex justify-between border-t pt-2 mt-2">
-                  <span className="font-bold text-gray-800">Thành tiền:</span> 
+                  <span className="font-bold text-gray-800">ThÃ nh tiá»n:</span> 
                   <span className="font-bold text-xl text-[#ff424e]">{formatCurrency(selectedOrder.final_amount)}</span>
                 </div>
               </div>
@@ -354,43 +395,43 @@ const MyOrders = () => {
         </div>
       )}
 
-      {/* ================= MODAL HỦY ĐƠN ================= */}
+      {/* ================= MODAL Há»¦Y ÄÆ N ================= */}
       {isCancelModalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Xác nhận hủy đơn</h2>
-            <p className="text-gray-600 mb-6">Bạn có chắc chắn muốn hủy đơn hàng <strong>#{selectedOrder.id}</strong> không? Hành động này không thể hoàn tác.</p>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">XÃ¡c nháº­n há»§y Ä‘Æ¡n</h2>
+            <p className="text-gray-600 mb-6">Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n há»§y Ä‘Æ¡n hÃ ng <strong>#{selectedOrder.id}</strong> khÃ´ng? HÃ nh Ä‘á»™ng nÃ y khÃ´ng thá»ƒ hoÃ n tÃ¡c.</p>
             <div className="flex gap-4 justify-end">
-              <button onClick={() => setIsCancelModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-medium hover:bg-gray-300">Đóng</button>
-              <button onClick={handleCancelOrder} className="px-4 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700">Đồng ý Hủy</button>
+              <button onClick={() => setIsCancelModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-medium hover:bg-gray-300">ÄÃ³ng</button>
+              <button onClick={handleCancelOrder} className="px-4 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700">Äá»“ng Ã½ Há»§y</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ================= MODAL NHẬP THÔNG TIN HOÀN TIỀN ================= */}
+      {/* ================= MODAL NHáº¬P THÃ”NG TIN HOÃ€N TIá»€N ================= */}
       {isRefundModalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Nhập thông tin hoàn tiền</h2>
+              <h2 className="text-xl font-bold text-gray-800">Nháº­p thÃ´ng tin hoÃ n tiá»n</h2>
               <button onClick={() => setIsRefundModalOpen(false)} className="text-gray-400 hover:text-red-500"><FiX size={24}/></button>
             </div>
             
             <p className="text-sm text-gray-600 mb-4 bg-purple-50 p-3 rounded border border-purple-100">
-              Đơn hàng <strong>#{selectedOrder.id}</strong> của bạn đã thanh toán nhưng bị hủy/giao thất bại. Vui lòng cung cấp STK để nhận lại <strong>{formatCurrency(selectedOrder.final_amount)}</strong>.
+              ÄÆ¡n hÃ ng <strong>#{selectedOrder.id}</strong> cá»§a báº¡n Ä‘Ã£ thanh toÃ¡n nhÆ°ng bá»‹ há»§y/giao tháº¥t báº¡i. Vui lÃ²ng cung cáº¥p STK Ä‘á»ƒ nháº­n láº¡i <strong>{formatCurrency(selectedOrder.final_amount)}</strong>.
             </p>
 
             <form onSubmit={handleSubmitRefund} className="flex flex-col gap-4">
               <div>
-                <label className="block text-sm text-gray-700 mb-1 font-medium">Ngân hàng *</label>
+                <label className="block text-sm text-gray-700 mb-1 font-medium">NgÃ¢n hÃ ng *</label>
                 <select 
                   className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none"
                   value={refundData.bank_code}
                   onChange={(e) => setRefundData({...refundData, bank_code: e.target.value})}
                   required
                 >
-                  <option value="">-- Chọn ngân hàng --</option>
+                  <option value="">-- Chá»n ngÃ¢n hÃ ng --</option>
                   {refundBanks.map(bank => (
                     <option key={bank.code} value={bank.code}>{bank.short_name} - {bank.name}</option>
                   ))}
@@ -398,19 +439,19 @@ const MyOrders = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-700 mb-1 font-medium">Số tài khoản *</label>
+                <label className="block text-sm text-gray-700 mb-1 font-medium">Sá»‘ tÃ i khoáº£n *</label>
                 <input 
                   type="text" 
                   className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none"
                   value={refundData.account_number}
                   onChange={(e) => setRefundData({...refundData, account_number: e.target.value})}
-                  placeholder="Nhập số tài khoản..."
+                  placeholder="Nháº­p sá»‘ tÃ i khoáº£n..."
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-700 mb-1 font-medium">Tên chủ tài khoản *</label>
+                <label className="block text-sm text-gray-700 mb-1 font-medium">TÃªn chá»§ tÃ i khoáº£n *</label>
                 <input 
                   type="text" 
                   className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none uppercase"
@@ -422,7 +463,59 @@ const MyOrders = () => {
               </div>
 
               <button type="submit" className="w-full bg-[#157a2c] text-white rounded p-3 font-bold hover:bg-green-800 transition mt-2">
-                GỬI THÔNG TIN HOÀN TIỀN
+                Gá»¬I THÃ”NG TIN HOÃ€N TIá»€N
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isReviewModalOpen && selectedReviewItem && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800">Đánh giá sản phẩm</h2>
+              <button onClick={() => setIsReviewModalOpen(false)} className="text-gray-400 hover:text-red-500"><FiX size={24}/></button>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-100 rounded p-3 mb-4 text-sm text-gray-700">
+              <div className="font-bold text-gray-800 line-clamp-2">
+                {selectedReviewItem.book_name || selectedReviewItem.book?.name || 'Sản phẩm'}
+              </div>
+              {selectedOrder?.id && (
+                <div className="text-gray-500 mt-1">Đơn hàng #{selectedOrder.id}</div>
+              )}
+            </div>
+
+            <form onSubmit={handleSubmitReview} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1 font-medium">Điểm đánh giá *</label>
+                <select
+                  className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none bg-white"
+                  value={reviewData.rating}
+                  onChange={(e) => setReviewData({ ...reviewData, rating: e.target.value })}
+                  required
+                >
+                  {[5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5].map((rating) => (
+                    <option key={rating} value={rating}>{rating} sao</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1 font-medium">Bình luận</label>
+                <textarea
+                  rows="4"
+                  maxLength="2000"
+                  className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none"
+                  value={reviewData.comment}
+                  onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
+                  placeholder="Chia sẻ cảm nhận của bạn về cuốn sách..."
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-[#157a2c] text-white rounded p-3 font-bold hover:bg-green-800 transition">
+                Gửi đánh giá
               </button>
             </form>
           </div>
@@ -434,3 +527,5 @@ const MyOrders = () => {
 };
 
 export default MyOrders;
+
+
