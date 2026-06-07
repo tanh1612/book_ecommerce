@@ -1,0 +1,33 @@
+@theme {
+  --font-sans: "Inter", "Segoe UI", Arial, sans-serif;
+
+  --color-primary: #157a2c;
+  --color-primary-dark: #0e5c1f;
+  --color-primary-deep: #0a4d1a;
+  --color-primary-strong: #007b22;
+  --color-primary-soft: #f0f9f3;
+
+  --color-danger: #ff424e;
+  --color-page-surface: #f3f4f6;
+  --color-auth-surface: #f0f0f0;
+  --color-chat-surface: #f8f9fa;
+
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: #f9fafb;
+  --color-surface-muted: #f3f4f6;
+  --color-text-main: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-text-soft: #9ca3af;
+  --color-border-subtle: #f3f4f6;
+  --color-border-default: #d1d5db;
+  --color-footer-link: #d1d5db;
+  --color-overlay-scrim: rgb(17 24 39 / 0.3);
+  --color-warning: #f59e0b;
+  --color-sale-accent: #facc15;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+  }
+}

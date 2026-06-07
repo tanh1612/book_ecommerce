@@ -45,15 +45,15 @@ const CartPage = () => {
 
   if (isLoadingCart && cartItems.length === 0) {
     return (
-      <div className="bg-gray-50 min-h-screen pb-12">
+      <div className="min-h-screen pb-12">
         <div className="bg-white py-3 border-b border-gray-200 mb-8">
-          <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
-            <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
+          <div className="container mx-auto px-8 lg:px-10 text-sm text-gray-600 flex items-center gap-2">
+            <Link to="/" className="hover:text-primary cursor-pointer">Trang chủ</Link>
             <FiChevronRight size={14} className="text-gray-400" />
-            <span className="text-[#157a2c] font-medium">Giỏ hàng của bạn</span>
+            <span className="text-primary font-medium">Giỏ hàng của bạn</span>
           </div>
         </div>
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-8 lg:px-10">
           <h1 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Giỏ hàng</h1>
           <div className="bg-white rounded-lg shadow-sm">
             {[1, 2, 3].map(i => <CartItemSkeleton key={i} />)}
@@ -64,29 +64,29 @@ const CartPage = () => {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-12">
+    <div className="min-h-screen pb-12">
       <div className="bg-white py-3 border-b border-gray-200 mb-8">
-        <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
-          <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
+        <div className="container mx-auto px-8 lg:px-10 text-sm text-gray-600 flex items-center gap-2">
+          <Link to="/" className="hover:text-primary cursor-pointer">Trang chủ</Link>
           <FiChevronRight size={14} className="text-gray-400" />
-          <span className="text-[#157a2c] font-medium">Giỏ hàng của bạn</span>
+          <span className="text-primary font-medium">Giỏ hàng của bạn</span>
         </div>
       </div>
 
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-8 lg:px-10">
         <h1 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Giỏ hàng ({cartItems.length} sản phẩm)</h1>
 
         {cartItems.length === 0 ? (
           <div className="bg-white p-10 rounded-lg shadow-sm text-center">
             <p className="text-gray-500 mb-4">Giỏ hàng của bạn đang trống.</p>
-            <Link to="/catalog" className="inline-block bg-[#157a2c] text-white px-6 py-2 rounded-md hover:bg-green-800 transition">Tiếp tục mua sắm</Link>
+            <Link to="/catalog" className="inline-block bg-primary text-white px-6 py-2 rounded-md hover:bg-green-800 transition">Tiếp tục mua sắm</Link>
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-8">
             <div className="lg:w-2/3">
               <div className="bg-white p-4 rounded-lg shadow-sm flex items-center mb-4 text-sm font-medium text-gray-600">
                 <div className="w-1/2 flex items-center gap-4">
-                  <input type="checkbox" className="w-4 h-4 text-[#157a2c] rounded border-gray-300" checked={isAllSelected} onChange={(e) => toggleAll(e.target.checked)} />
+                  <input type="checkbox" className="w-4 h-4 text-primary rounded border-gray-300" checked={isAllSelected} onChange={(e) => toggleAll(e.target.checked)} />
                   <span>Chọn tất cả ({cartItems.length} sản phẩm)</span>
                 </div>
                 <div className="w-1/6 text-center">Số lượng</div>
@@ -110,10 +110,10 @@ const CartPage = () => {
                   return (
                     <div key={item.id} className={`p-4 flex items-center border-gray-100 ${index !== cartItems.length - 1 ? 'border-b' : ''}`}>
                       <div className="w-1/2 flex items-center gap-4">
-                        <input type="checkbox" className="w-4 h-4 text-[#157a2c] rounded border-gray-300 cursor-pointer" checked={!!item.selected} onChange={() => toggleSelect(item.id, item.selected)} />
+                        <input type="checkbox" className="w-4 h-4 text-primary rounded border-gray-300 cursor-pointer" checked={!!item.selected} onChange={() => toggleSelect(item.id, item.selected)} />
                         <img src={itemThumbnail} alt={itemTitle} className="w-20 h-28 object-cover border border-gray-200 rounded" />
                         <div className="flex flex-col">
-                          <Link to={`/book/${bookData.slug}`} className="text-[15px] font-medium text-gray-800 hover:text-[#157a2c] line-clamp-2">{itemTitle}</Link>
+                          <Link to={`/book/${bookData.slug}`} className="text-[15px] font-medium text-gray-800 hover:text-primary line-clamp-2">{itemTitle}</Link>
                           <div className="flex items-center gap-2 mt-2">
                             <span className="font-bold text-black">{formatCurrency(itemPrice)}</span>
                             {itemOriginal > itemPrice && (
@@ -131,7 +131,7 @@ const CartPage = () => {
                         </div>
                       </div>
 
-                      <div className="w-1/4 text-right font-bold text-[#157a2c] text-lg">
+                      <div className="w-1/4 text-right font-bold text-primary text-lg">
                         {/* 🔥 Dùng item.line_total Backend gửi về */}
                         {formatCurrency(itemTotal)}
                       </div>
@@ -153,11 +153,11 @@ const CartPage = () => {
                 </div>
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-gray-800 font-medium">Tổng tiền:</span>
-                  <span className="text-2xl font-bold text-[#157a2c]">{formatCurrency(totalPrice)}</span>
+                  <span className="text-2xl font-bold text-primary">{formatCurrency(totalPrice)}</span>
                 </div>
                 <div className="text-xs text-gray-500 italic text-right mb-6">(Chưa bao gồm phí vận chuyển)</div>
                 <button 
-                  className={`w-full py-3 rounded-md font-bold text-lg transition shadow-sm ${totalItems > 0 ? 'bg-[#157a2c] text-white hover:bg-green-800 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                  className={`w-full py-3 rounded-md font-bold text-lg transition shadow-sm ${totalItems > 0 ? 'bg-primary text-white hover:bg-green-800 cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                   disabled={totalItems === 0}
                   onClick={() => navigate('/checkout')}
                 >

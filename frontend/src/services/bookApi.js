@@ -8,7 +8,7 @@ const bookApi = {
   },
   
   // 🔥 THÊM HÀM MỚI NÀY VÀO: Lấy gợi ý tìm kiếm
-  getSuggestions: (keyword) => axiosClient.get('/v1/books/suggestions', { params: { keyword } }),
+  getSuggestions: (keyword, limit = 8) => axiosClient.get('/v1/books/suggestions', { params: { keyword, limit } }),
   // 🔥 THÊM HÀM NÀY: Gọi API Flash Sale thật từ Backend
   getActiveFlashSale: () => axiosClient.get('/v1/flash-sales/active'),
   // Lấy danh sách sách (kèm các tham số lọc như category, publisher, sort...)

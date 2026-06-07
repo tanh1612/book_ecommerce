@@ -41,7 +41,7 @@ const BannerSlider = () => {
 
   if (isLoading) {
     return (
-      <div className="w-full aspect-[21/8] bg-gray-100 animate-pulse" />
+      <div className="w-full aspect-[2400/795] header-dropdown-muted animate-pulse" />
     );
   }
 
@@ -50,7 +50,7 @@ const BannerSlider = () => {
   }
 
   return (
-    <div className="w-full overflow-hidden bg-gray-100">
+    <div className="w-full overflow-hidden header-dropdown-muted">
       <Swiper
         spaceBetween={0}
         slidesPerView={1}
@@ -66,7 +66,7 @@ const BannerSlider = () => {
             <img
               src={resolveMediaUrl(banner.image_url)}
               alt={banner.title || 'Bookify banner'}
-              className="w-full aspect-[21/8] object-cover"
+              className="w-full aspect-[2400/795] object-cover"
               loading="eager"
               onError={(event) => {
                 event.currentTarget.style.display = 'none';

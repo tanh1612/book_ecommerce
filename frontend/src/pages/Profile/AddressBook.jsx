@@ -155,24 +155,24 @@ const AddressBook = () => {
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 h-full">
       <div className="p-4 md:p-6 flex justify-between items-center border-b">
         <h2 className="text-xl font-bold text-gray-800">Sổ địa chỉ</h2>
-        <button onClick={() => handleOpenModal()} className="bg-[#157a2c] text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2 hover:bg-green-800 transition">
+        <button onClick={() => handleOpenModal()} className="bg-primary text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2 hover:bg-green-800 transition">
           <FiPlus /> Thêm địa chỉ mới
         </button>
       </div>
 
       <div className="p-4 md:p-6">
         {isLoading ? (
-          <div className="flex justify-center py-10"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>
+          <div className="flex justify-center py-10"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
         ) : addresses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {addresses.map(address => (
-              <div key={address.id} className={`border rounded-lg p-4 relative ${address.is_default ? 'border-[#157a2c] bg-green-50' : 'border-gray-200 bg-white'}`}>
+              <div key={address.id} className={`border rounded-lg p-4 relative ${address.is_default ? 'border-primary bg-green-50' : 'border-gray-200 bg-white'}`}>
                 {address.is_default && (
-                  <div className="absolute top-0 right-0 bg-[#157a2c] text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">Mặc định</div>
+                  <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">Mặc định</div>
                 )}
                 
                 <div className="flex items-start gap-3 mb-2 mt-2">
-                  <FiMapPin className="text-[#157a2c] mt-1 flex-shrink-0" />
+                  <FiMapPin className="text-primary mt-1 flex-shrink-0" />
                   <div>
                     <h3 className="font-bold text-gray-800 flex items-center gap-2">
                       {address.recipient_name} <span className="text-gray-400 font-normal">|</span> <span className="text-gray-600 font-normal">{address.recipient_phone}</span>
@@ -203,7 +203,7 @@ const AddressBook = () => {
             <FiMapPin className="mx-auto text-4xl text-gray-300 mb-3" />
             <h3 className="text-lg font-bold text-gray-800 mb-1">Sổ địa chỉ trống</h3>
             <p className="text-gray-500 text-sm mb-4">Bạn chưa lưu địa chỉ nhận hàng nào</p>
-            <button onClick={() => handleOpenModal()} className="text-[#157a2c] font-bold text-sm hover:underline">Thêm ngay</button>
+            <button onClick={() => handleOpenModal()} className="text-primary font-bold text-sm hover:underline">Thêm ngay</button>
           </div>
         )}
       </div>
@@ -219,20 +219,20 @@ const AddressBook = () => {
             
             <form onSubmit={handleSaveAddress} className="p-4 md:p-6 flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm text-gray-600 mb-1">Họ và tên *</label><input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" value={addressForm.recipient_name} onChange={(e) => setAddressForm({...addressForm, recipient_name: e.target.value})} /></div>
-                <div><label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label><input type="tel" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" value={addressForm.recipient_phone} onChange={(e) => setAddressForm({...addressForm, recipient_phone: e.target.value})} /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Họ và tên *</label><input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.recipient_name} onChange={(e) => setAddressForm({...addressForm, recipient_name: e.target.value})} /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label><input type="tel" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.recipient_phone} onChange={(e) => setAddressForm({...addressForm, recipient_phone: e.target.value})} /></div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Tỉnh/Thành phố *</label>
-                  <select required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c] bg-white" value={addressForm.province_code} onChange={handleProvinceChange}>
+                  <select required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary bg-white" value={addressForm.province_code} onChange={handleProvinceChange}>
                     <option value="">Chọn Tỉnh/Thành</option>{provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Quận/Huyện/Xã *</label>
-                  <select required disabled={!addressForm.province_code} className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c] bg-white" value={addressForm.ward_code} onChange={(e) => setAddressForm({...addressForm, ward_code: e.target.value})}>
+                  <select required disabled={!addressForm.province_code} className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary bg-white" value={addressForm.ward_code} onChange={(e) => setAddressForm({...addressForm, ward_code: e.target.value})}>
                     <option value="">Chọn Phường/Xã</option>{wards.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
                   </select>
                 </div>
@@ -240,17 +240,17 @@ const AddressBook = () => {
 
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Địa chỉ chi tiết (Số nhà, đường...) *</label>
-                <input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" value={addressForm.detail_address} onChange={(e) => setAddressForm({...addressForm, detail_address: e.target.value})} />
+                <input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.detail_address} onChange={(e) => setAddressForm({...addressForm, detail_address: e.target.value})} />
               </div>
 
               <label className="flex items-center gap-2 mt-2 cursor-pointer w-fit">
-                <input type="checkbox" className="w-4 h-4 text-[#157a2c] rounded border-gray-300" checked={addressForm.is_default} onChange={(e) => setAddressForm({...addressForm, is_default: e.target.checked})} />
+                <input type="checkbox" className="w-4 h-4 text-primary rounded border-gray-300" checked={addressForm.is_default} onChange={(e) => setAddressForm({...addressForm, is_default: e.target.checked})} />
                 <span className="text-sm font-medium text-gray-700">Đặt làm địa chỉ mặc định</span>
               </label>
 
               <div className="flex gap-4 mt-4">
                 <button type="button" disabled={isSubmitting} onClick={() => setIsModalOpen(false)} className="w-1/2 border border-gray-300 text-gray-700 py-2.5 rounded font-medium hover:bg-gray-50 transition">Hủy</button>
-                <button type="submit" disabled={isSubmitting} className={`w-1/2 bg-[#157a2c] text-white py-2.5 rounded font-medium transition flex justify-center items-center gap-2 ${isSubmitting ? 'opacity-70' : 'hover:bg-green-800'}`}>
+                <button type="submit" disabled={isSubmitting} className={`w-1/2 bg-primary text-white py-2.5 rounded font-medium transition flex justify-center items-center gap-2 ${isSubmitting ? 'opacity-70' : 'hover:bg-green-800'}`}>
                   {isSubmitting ? 'Đang lưu...' : 'Lưu địa chỉ'}
                 </button>
               </div>

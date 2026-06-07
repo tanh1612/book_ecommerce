@@ -134,21 +134,21 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-12">
+    <div className="min-h-screen pb-12">
       <div className="bg-white py-3 border-b border-gray-200 mb-8">
-        <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
-          <Link to="/" className="hover:text-[#157a2c] cursor-pointer">Trang chủ</Link>
+        <div className="container mx-auto px-8 lg:px-10 text-sm text-gray-600 flex items-center gap-2">
+          <Link to="/" className="hover:text-primary cursor-pointer">Trang chủ</Link>
           <FiChevronRight size={14} className="text-gray-400" />
-          <span className="text-[#157a2c] font-medium">Tài khoản</span>
+          <span className="text-primary font-medium">Tài khoản</span>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 flex flex-col md:flex-row gap-8">
+      <div className="container mx-auto px-8 lg:px-10 flex flex-col md:flex-row gap-8">
         {/* SIDEBAR MENU */}
         <div className="w-full md:w-1/4">
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex items-center gap-4 bg-[#f0f9f3]">
-              <div className="w-12 h-12 bg-[#157a2c] text-white rounded-full flex items-center justify-center font-bold text-xl uppercase">
+            <div className="p-6 border-b border-gray-100 flex items-center gap-4 bg-primary-soft">
+              <div className="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center font-bold text-xl uppercase">
                 {formData.first_name ? formData.first_name.charAt(0) : "U"}
               </div>
               <div>
@@ -159,10 +159,10 @@ const ProfilePage = () => {
               </div>
             </div>
             <ul className="flex flex-col text-gray-700">
-              <li onClick={() => setActiveTab('profile')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'text-[#157a2c] bg-gray-50 border-l-4 border-[#157a2c] font-medium' : 'border-l-4 border-transparent hover:text-[#157a2c]'}`}><FiUser size={18} /> Hồ sơ của tôi</li>
-              <li onClick={() => setActiveTab('password')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'password' ? 'text-[#157a2c] bg-gray-50 border-l-4 border-[#157a2c] font-medium' : 'border-l-4 border-transparent hover:text-[#157a2c]'}`}><FiLock size={18} /> Đổi mật khẩu</li>
-              <li onClick={() => setActiveTab('orders')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'orders' ? 'text-[#157a2c] bg-gray-50 border-l-4 border-[#157a2c] font-medium' : 'border-l-4 border-transparent hover:text-[#157a2c]'}`}><FiPackage size={18} /> Đơn hàng của tôi</li>
-              <li onClick={() => setActiveTab('addresses')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'addresses' ? 'text-[#157a2c] bg-gray-50 border-l-4 border-[#157a2c] font-medium' : 'border-l-4 border-transparent hover:text-[#157a2c]'}`}><FiMapPin size={18} /> Sổ địa chỉ</li>
+              <li onClick={() => setActiveTab('profile')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'text-primary bg-gray-50 border-l-4 border-primary font-medium' : 'border-l-4 border-transparent hover:text-primary'}`}><FiUser size={18} /> Hồ sơ của tôi</li>
+              <li onClick={() => setActiveTab('password')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'password' ? 'text-primary bg-gray-50 border-l-4 border-primary font-medium' : 'border-l-4 border-transparent hover:text-primary'}`}><FiLock size={18} /> Đổi mật khẩu</li>
+              <li onClick={() => setActiveTab('orders')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'orders' ? 'text-primary bg-gray-50 border-l-4 border-primary font-medium' : 'border-l-4 border-transparent hover:text-primary'}`}><FiPackage size={18} /> Đơn hàng của tôi</li>
+              <li onClick={() => setActiveTab('addresses')} className={`p-4 cursor-pointer flex items-center gap-3 transition-colors ${activeTab === 'addresses' ? 'text-primary bg-gray-50 border-l-4 border-primary font-medium' : 'border-l-4 border-transparent hover:text-primary'}`}><FiMapPin size={18} /> Sổ địa chỉ</li>
               <li onClick={handleLogout} className="p-4 cursor-pointer flex items-center gap-3 text-red-500 hover:bg-red-50 border-l-4 border-transparent"><FiLogOut size={18} /> Đăng xuất</li>
             </ul>
           </div>
@@ -194,15 +194,15 @@ const ProfilePage = () => {
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8 mb-6">
                   <label className="md:w-1/4 text-sm font-medium text-gray-700 md:text-right">Họ & Tên</label>
                   <div className="md:w-3/4 flex gap-4">
-                    <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} placeholder="Họ" className="w-1/2 border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" />
-                    <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} placeholder="Tên" className="w-1/2 border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" />
+                    <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} placeholder="Họ" className="w-1/2 border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" />
+                    <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} placeholder="Tên" className="w-1/2 border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" />
                   </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8 mb-6">
                   <label className="md:w-1/4 text-sm font-medium text-gray-700 md:text-right">Số điện thoại</label>
                   <div className="md:w-3/4">
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" />
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" />
                   </div>
                 </div>
 
@@ -210,10 +210,10 @@ const ProfilePage = () => {
                   <label className="md:w-1/4 text-sm font-medium text-gray-700 md:text-right">Giới tính</label>
                   <div className="md:w-3/4 flex gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="gender" value="male" checked={formData.gender === 'male'} onChange={handleInputChange} className="text-[#157a2c] focus:ring-[#157a2c]" /> Nam
+                      <input type="radio" name="gender" value="male" checked={formData.gender === 'male'} onChange={handleInputChange} className="text-primary focus:ring-primary" /> Nam
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="gender" value="female" checked={formData.gender === 'female'} onChange={handleInputChange} className="text-[#157a2c] focus:ring-[#157a2c]" /> Nữ
+                      <input type="radio" name="gender" value="female" checked={formData.gender === 'female'} onChange={handleInputChange} className="text-primary focus:ring-primary" /> Nữ
                     </label>
                   </div>
                 </div>
@@ -221,14 +221,14 @@ const ProfilePage = () => {
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8 mb-8">
                   <label className="md:w-1/4 text-sm font-medium text-gray-700 md:text-right">Ngày sinh</label>
                   <div className="md:w-3/4">
-                    <input type="date" name="birthday" value={formData.birthday} onChange={handleInputChange} className="border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" />
+                    <input type="date" name="birthday" value={formData.birthday} onChange={handleInputChange} className="border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" />
                   </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-2 md:gap-8">
                   <div className="md:w-1/4"></div>
                   <div className="md:w-3/4">
-                    <button type="submit" disabled={loadingProfile} className={`bg-[#157a2c] text-white px-8 py-2.5 rounded hover:bg-green-800 transition font-medium shadow-sm ${loadingProfile ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                    <button type="submit" disabled={loadingProfile} className={`bg-primary text-white px-8 py-2.5 rounded hover:bg-green-800 transition font-medium shadow-sm ${loadingProfile ? 'opacity-70 cursor-not-allowed' : ''}`}>
                       {loadingProfile ? "Đang lưu..." : "Lưu Thay Đổi"}
                     </button>
                   </div>
@@ -247,28 +247,28 @@ const ProfilePage = () => {
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8 mb-6">
                   <label className="md:w-1/3 text-sm font-medium text-gray-700 md:text-right">Mật khẩu hiện tại</label>
                   <div className="md:w-2/3">
-                    <input type="password" name="current_password" required value={passwordData.current_password} onChange={handlePasswordChange} placeholder="Nhập mật khẩu hiện tại" className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" />
+                    <input type="password" name="current_password" required value={passwordData.current_password} onChange={handlePasswordChange} placeholder="Nhập mật khẩu hiện tại" className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" />
                   </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8 mb-6">
                   <label className="md:w-1/3 text-sm font-medium text-gray-700 md:text-right">Mật khẩu mới</label>
                   <div className="md:w-2/3">
-                    <input type="password" name="password" required value={passwordData.password} onChange={handlePasswordChange} placeholder="Ít nhất 8 ký tự, gồm cả chữ và số" className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" />
+                    <input type="password" name="password" required value={passwordData.password} onChange={handlePasswordChange} placeholder="Ít nhất 8 ký tự, gồm cả chữ và số" className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" />
                   </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8 mb-8">
                   <label className="md:w-1/3 text-sm font-medium text-gray-700 md:text-right">Xác nhận mật khẩu</label>
                   <div className="md:w-2/3">
-                    <input type="password" name="password_confirmation" required value={passwordData.password_confirmation} onChange={handlePasswordChange} placeholder="Nhập lại mật khẩu mới" className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-[#157a2c]" />
+                    <input type="password" name="password_confirmation" required value={passwordData.password_confirmation} onChange={handlePasswordChange} placeholder="Nhập lại mật khẩu mới" className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" />
                   </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-2 md:gap-8">
                   <div className="md:w-1/3"></div>
                   <div className="md:w-2/3">
-                    <button type="submit" disabled={loadingPassword} className={`bg-[#157a2c] text-white px-8 py-2.5 rounded hover:bg-green-800 transition font-medium shadow-sm ${loadingPassword ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                    <button type="submit" disabled={loadingPassword} className={`bg-primary text-white px-8 py-2.5 rounded hover:bg-green-800 transition font-medium shadow-sm ${loadingPassword ? 'opacity-70 cursor-not-allowed' : ''}`}>
                       {loadingPassword ? "Đang xử lý..." : "Đổi mật khẩu"}
                     </button>
                   </div>

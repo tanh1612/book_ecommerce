@@ -25,7 +25,7 @@ class ErrorBoundary extends React.Component {
             <p className="text-gray-600 mb-4 text-sm">Rất tiếc, ứng dụng gặp sự cố. Vui lòng tải lại trang.</p>
             <button
               onClick={() => window.location.reload()}
-              className="w-full bg-[#157a2c] text-white py-2 rounded-md font-medium hover:bg-green-800 transition"
+              className="w-full bg-primary text-white py-2 rounded-md font-medium hover:bg-green-800 transition"
             >
               Tải lại trang
             </button>

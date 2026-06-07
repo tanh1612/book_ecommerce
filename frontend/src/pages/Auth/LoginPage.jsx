@@ -46,10 +46,10 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="bg-[#f0f0f0] min-h-screen py-10 flex justify-center px-4">
+    <div className="bg-auth-surface min-h-screen py-10 flex justify-center px-4">
       <div className="bg-white rounded-lg shadow-sm w-full max-w-[450px] p-10 border border-gray-100 h-fit">
         <div className="flex mb-8 border-b border-gray-200">
-          <div className="flex-1 text-center pb-3 text-[#157a2c] font-medium border-b-2 border-[#157a2c]">Đăng nhập</div>
+          <div className="flex-1 text-center pb-3 text-primary font-medium border-b-2 border-primary">Đăng nhập</div>
           <Link to="/register" className="flex-1 text-center pb-3 text-gray-500 font-medium">Đăng ký</Link>
         </div>
 
@@ -59,7 +59,7 @@ const LoginPage = () => {
             <input
               type="email"
               placeholder="Nhập email"
-              className={`w-full border rounded py-2.5 px-3 outline-none focus:border-[#157a2c] ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full border rounded py-2.5 px-3 outline-none focus:border-primary ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -75,7 +75,7 @@ const LoginPage = () => {
               <input
                 type={showPassword ? "text" : "password"}
                 placeholder="Nhập mật khẩu"
-                className={`w-full border rounded py-2.5 px-3 outline-none focus:border-[#157a2c] ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full border rounded py-2.5 px-3 outline-none focus:border-primary ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -84,7 +84,7 @@ const LoginPage = () => {
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#157a2c]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
@@ -95,16 +95,16 @@ const LoginPage = () => {
 
           <div className="flex justify-between items-center text-sm">
             <label className="flex items-center gap-2 cursor-pointer text-gray-600">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-[#157a2c]" />
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-primary" />
               Ghi nhớ đăng nhập
             </label>
-            <Link to="/forgot-password" className="text-[#157a2c] hover:underline">Quên mật khẩu?</Link>
+            <Link to="/forgot-password" className="text-primary hover:underline">Quên mật khẩu?</Link>
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full py-3 rounded font-bold text-white transition-all ${isSubmitting ? 'bg-gray-400' : 'bg-[#157a2c] hover:bg-green-800'}`}
+            className={`w-full py-3 rounded font-bold text-white transition-all ${isSubmitting ? 'bg-gray-400' : 'bg-primary hover:bg-green-800'}`}
           >
             {isSubmitting ? "ĐANG XỬ LÝ..." : "ĐĂNG NHẬP"}
           </button>

@@ -257,52 +257,52 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-12">
+    <div className="min-h-screen pb-12">
       <div className="bg-white py-3 border-b border-gray-200 mb-8">
-        <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
-          <Link to="/" className="hover:text-[#157a2c]">Trang chủ</Link>
+        <div className="container mx-auto px-8 lg:px-10 text-sm text-gray-600 flex items-center gap-2">
+          <Link to="/" className="hover:text-primary">Trang chủ</Link>
           <FiChevronRight size={14} className="text-gray-400" />
-          <Link to="/cart" className="hover:text-[#157a2c]">Giỏ hàng</Link>
+          <Link to="/cart" className="hover:text-primary">Giỏ hàng</Link>
           <FiChevronRight size={14} className="text-gray-400" />
-          <span className="text-[#157a2c] font-medium">Thanh toán</span>
+          <span className="text-primary font-medium">Thanh toán</span>
         </div>
       </div>
 
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-8 lg:px-10">
         <form onSubmit={handleCheckout} className="flex flex-col lg:flex-row gap-8">
           <div className="lg:w-2/3 flex flex-col gap-6">
             
             {/* THÔNG TIN NHẬN HÀNG */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiMapPin className="text-[#157a2c]" /> Thông tin nhận hàng</h2>
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiMapPin className="text-primary" /> Thông tin nhận hàng</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div><label className="block text-sm text-gray-600 mb-1">Họ và tên *</label><input type="text" name="recipient_name" value={formData.recipient_name} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none" /></div>
-                <div><label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label><input type="tel" name="recipient_phone" value={formData.recipient_phone} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none" /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Họ và tên *</label><input type="text" name="recipient_name" value={formData.recipient_name} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-primary outline-none" /></div>
+                <div><label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label><input type="tel" name="recipient_phone" value={formData.recipient_phone} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-primary outline-none" /></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Tỉnh/Thành phố *</label>
-                  <select name="province_code" value={formData.province_code} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none bg-white">
+                  <select name="province_code" value={formData.province_code} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-primary outline-none bg-white">
                     <option value="">Chọn Tỉnh/Thành</option>{provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Quận/Huyện/Xã</label>
-                  <select name="ward_code" value={formData.ward_code} onChange={handleInputChange} disabled={!formData.province_code || isFetchingWards} className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none bg-white">
+                  <select name="ward_code" value={formData.ward_code} onChange={handleInputChange} disabled={!formData.province_code || isFetchingWards} className="w-full border border-gray-300 rounded px-3 py-2 focus:border-primary outline-none bg-white">
                     <option value="">{isFetchingWards ? 'Đang tải dữ liệu...' : 'Chọn Phường/Xã'}</option>
                     {wards.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
                   </select>
                 </div>
               </div>
-              <div className="mb-4"><label className="block text-sm text-gray-600 mb-1">Địa chỉ chi tiết *</label><input type="text" name="detail_address" value={formData.detail_address} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none" /></div>
-              <div><label className="block text-sm text-gray-600 mb-1">Ghi chú đơn hàng</label><textarea name="note" value={formData.note} onChange={handleInputChange} rows="2" className="w-full border border-gray-300 rounded px-3 py-2 focus:border-[#157a2c] outline-none"></textarea></div>
+              <div className="mb-4"><label className="block text-sm text-gray-600 mb-1">Địa chỉ chi tiết *</label><input type="text" name="detail_address" value={formData.detail_address} onChange={handleInputChange} required className="w-full border border-gray-300 rounded px-3 py-2 focus:border-primary outline-none" /></div>
+              <div><label className="block text-sm text-gray-600 mb-1">Ghi chú đơn hàng</label><textarea name="note" value={formData.note} onChange={handleInputChange} rows="2" className="w-full border border-gray-300 rounded px-3 py-2 focus:border-primary outline-none"></textarea></div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
               {/* VẬN CHUYỂN */}
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiTruck className="text-[#157a2c]" /> Vận chuyển</h2>
+                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiTruck className="text-primary" /> Vận chuyển</h2>
                 
                 {shippingError && formData.province_code !== '' && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-start gap-2 text-red-600 text-sm">
@@ -312,17 +312,17 @@ const CheckoutPage = () => {
                 )}
 
                 <div className="flex flex-col gap-3">
-                  <label className={`border p-3 rounded flex gap-3 cursor-pointer transition ${formData.shipping_method_id == 1 ? 'border-[#157a2c] bg-green-50' : 'border-gray-200'}`}><input type="radio" name="shipping_method_id" value="1" checked={formData.shipping_method_id == 1} onChange={handleInputChange} className="mt-1 w-4 h-4 text-[#157a2c]" /><div><div className="font-medium text-gray-800 text-sm">Giao hàng tiêu chuẩn</div></div></label>
-                  <label className={`border p-3 rounded flex gap-3 cursor-pointer transition ${formData.shipping_method_id == 2 ? 'border-[#157a2c] bg-green-50' : 'border-gray-200'}`}><input type="radio" name="shipping_method_id" value="2" checked={formData.shipping_method_id == 2} onChange={handleInputChange} className="mt-1 w-4 h-4 text-[#157a2c]" /><div><div className="font-medium text-gray-800 text-sm">Giao hàng hỏa tốc</div></div></label>
+                  <label className={`border p-3 rounded flex gap-3 cursor-pointer transition ${formData.shipping_method_id == 1 ? 'border-primary bg-green-50' : 'border-gray-200'}`}><input type="radio" name="shipping_method_id" value="1" checked={formData.shipping_method_id == 1} onChange={handleInputChange} className="mt-1 w-4 h-4 text-primary" /><div><div className="font-medium text-gray-800 text-sm">Giao hàng tiêu chuẩn</div></div></label>
+                  <label className={`border p-3 rounded flex gap-3 cursor-pointer transition ${formData.shipping_method_id == 2 ? 'border-primary bg-green-50' : 'border-gray-200'}`}><input type="radio" name="shipping_method_id" value="2" checked={formData.shipping_method_id == 2} onChange={handleInputChange} className="mt-1 w-4 h-4 text-primary" /><div><div className="font-medium text-gray-800 text-sm">Giao hàng hỏa tốc</div></div></label>
                 </div>
               </div>
 
               {/* THANH TOÁN */}
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiCreditCard className="text-[#157a2c]" /> Thanh toán</h2>
+                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FiCreditCard className="text-primary" /> Thanh toán</h2>
                 <div className="flex flex-col gap-3">
-                  <label className={`border p-3 rounded flex items-center gap-3 cursor-pointer transition ${formData.payment_method === 'cod' ? 'border-[#157a2c] bg-green-50' : 'border-gray-200'}`}><input type="radio" name="payment_method" value="cod" checked={formData.payment_method === 'cod'} onChange={handleInputChange} className="w-4 h-4 text-[#157a2c]" /><span className="font-medium text-sm">Nhận hàng (COD)</span></label>
-                  <label className={`border p-3 rounded flex items-center gap-3 cursor-pointer transition ${formData.payment_method === 'vnpay' ? 'border-[#157a2c] bg-green-50' : 'border-gray-200'}`}><input type="radio" name="payment_method" value="vnpay" checked={formData.payment_method === 'vnpay'} onChange={handleInputChange} className="w-4 h-4 text-[#157a2c]" /><span className="font-medium text-sm text-blue-700">Chuyển khoản VNPay</span></label>
+                  <label className={`border p-3 rounded flex items-center gap-3 cursor-pointer transition ${formData.payment_method === 'cod' ? 'border-primary bg-green-50' : 'border-gray-200'}`}><input type="radio" name="payment_method" value="cod" checked={formData.payment_method === 'cod'} onChange={handleInputChange} className="w-4 h-4 text-primary" /><span className="font-medium text-sm">Nhận hàng (COD)</span></label>
+                  <label className={`border p-3 rounded flex items-center gap-3 cursor-pointer transition ${formData.payment_method === 'vnpay' ? 'border-primary bg-green-50' : 'border-gray-200'}`}><input type="radio" name="payment_method" value="vnpay" checked={formData.payment_method === 'vnpay'} onChange={handleInputChange} className="w-4 h-4 text-primary" /><span className="font-medium text-sm text-blue-700">Chuyển khoản VNPay</span></label>
                 </div>
               </div>
             </div>
@@ -350,7 +350,7 @@ const CheckoutPage = () => {
                       </div>
                       <div className="flex flex-col justify-between flex-grow">
                         <span className="font-medium text-gray-800 line-clamp-2">{bookData.name || bookData.title}</span>
-                        <span className="font-bold text-[#157a2c]">{formatCurrency(itemPrice * item.quantity)}</span>
+                        <span className="font-bold text-primary">{formatCurrency(itemPrice * item.quantity)}</span>
                       </div>
                     </div>
                   )
@@ -370,13 +370,13 @@ const CheckoutPage = () => {
               </div>
               
               <div className="flex justify-between items-center mb-6">
-                <span className="text-gray-800 font-bold">Tổng cộng:</span><span className="text-2xl font-bold text-[#ff424e]">{formatCurrency(totalAmount)}</span>
+                <span className="text-gray-800 font-bold">Tổng cộng:</span><span className="text-2xl font-bold text-danger">{formatCurrency(totalAmount)}</span>
               </div>
 
               <button 
                 type="submit" 
                 disabled={isSubmitting || selectedItems.length === 0 || isFetchingWards || isCalculatingFee || shippingError !== null} 
-                className="w-full bg-[#157a2c] text-white py-3 rounded-md font-bold text-lg transition shadow-sm flex justify-center items-center gap-2 disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="w-full bg-primary text-white py-3 rounded-md font-bold text-lg transition shadow-sm flex justify-center items-center gap-2 disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Xử lý...</> : (formData.payment_method === 'vnpay' ? 'ĐẶT HÀNG QUA VNPAY' : 'HOÀN TẤT ĐẶT HÀNG')}
               </button>

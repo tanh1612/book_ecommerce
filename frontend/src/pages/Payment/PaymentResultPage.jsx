@@ -10,7 +10,7 @@ const STATUS_CONFIG = {
     icon: FiCheckCircle,
     title: 'Thanh toán thành công',
     description: 'Cảm ơn bạn. Hệ thống đã ghi nhận thanh toán VNPay cho đơn hàng.',
-    tone: 'text-[#157a2c]',
+    tone: 'text-primary',
     bg: 'bg-green-50',
     border: 'border-green-100',
   },
@@ -82,16 +82,16 @@ const PaymentResultPage = () => {
   }, [orderId, user]);
 
   return (
-    <div className="bg-gray-50 min-h-[70vh] pb-12">
+    <div className="min-h-[70vh] pb-12">
       <div className="bg-white py-3 border-b border-gray-200 mb-8">
-        <div className="container mx-auto px-4 text-sm text-gray-600 flex items-center gap-2">
-          <Link to="/" className="hover:text-[#157a2c]">Trang chủ</Link>
+        <div className="container mx-auto px-8 lg:px-10 text-sm text-gray-600 flex items-center gap-2">
+          <Link to="/" className="hover:text-primary">Trang chủ</Link>
           <FiChevronRight size={14} className="text-gray-400" />
-          <span className="text-[#157a2c] font-medium">Kết quả thanh toán</span>
+          <span className="text-primary font-medium">Kết quả thanh toán</span>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-3xl">
+      <div className="container mx-auto px-8 lg:px-10 max-w-3xl">
         <div className={`bg-white border ${config.border} rounded-lg shadow-sm overflow-hidden`}>
           <div className={`${config.bg} px-6 py-8 text-center border-b ${config.border}`}>
             <StatusIcon className={`mx-auto mb-4 ${config.tone}`} size={56} />
@@ -113,7 +113,7 @@ const PaymentResultPage = () => {
 
             {isLoadingOrder && (
               <div className="border border-gray-100 rounded p-4 mb-6 text-sm text-gray-500 flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-[#157a2c] rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
                 Đang tải thông tin đơn hàng...
               </div>
             )}
@@ -121,7 +121,7 @@ const PaymentResultPage = () => {
             {order && (
               <div className="border border-gray-100 rounded p-4 mb-6 bg-gray-50">
                 <div className="flex items-center gap-2 font-bold text-gray-800 mb-3">
-                  <FiShoppingBag className="text-[#157a2c]" />
+                  <FiShoppingBag className="text-primary" />
                   Tóm tắt đơn hàng
                 </div>
                 <div className="space-y-2 text-sm text-gray-600">
@@ -135,7 +135,7 @@ const PaymentResultPage = () => {
                   </div>
                   <div className="flex justify-between gap-4">
                     <span>Tổng thanh toán</span>
-                    <span className="font-bold text-[#ff424e] text-right">{formatCurrency(order.final_amount || 0)}</span>
+                    <span className="font-bold text-danger text-right">{formatCurrency(order.final_amount || 0)}</span>
                   </div>
                 </div>
               </div>
@@ -144,13 +144,13 @@ const PaymentResultPage = () => {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 to={user ? profileOrdersUrl : '/login'}
-                className="bg-[#157a2c] text-white px-6 py-3 rounded font-bold text-center hover:bg-green-800 transition"
+                className="bg-primary text-white px-6 py-3 rounded font-bold text-center hover:bg-green-800 transition"
               >
                 {user ? 'Xem đơn hàng' : 'Đăng nhập để xem đơn'}
               </Link>
               <Link
                 to="/catalog"
-                className="border border-[#157a2c] text-[#157a2c] px-6 py-3 rounded font-bold text-center hover:bg-green-50 transition"
+                className="border border-primary text-primary px-6 py-3 rounded font-bold text-center hover:bg-green-50 transition"
               >
                 Tiếp tục mua sắm
               </Link>

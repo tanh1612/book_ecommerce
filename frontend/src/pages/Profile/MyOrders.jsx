@@ -224,7 +224,7 @@ const MyOrders = () => {
             <h3 className="font-medium text-gray-800 line-clamp-2">{bookName}</h3>
             {quantity > 0 && <div className="text-sm text-gray-500">Sá»‘ lÆ°á»£ng: x{quantity}</div>}
           </div>
-          <div className="font-bold text-[#157a2c]">
+          <div className="font-bold text-primary">
             {displayPrice > 0 ? formatCurrency(displayPrice) : 'Äang cáº­p nháº­t'}
           </div>
         </div>
@@ -244,7 +244,7 @@ const MyOrders = () => {
             onClick={() => setFilterStatus(status.value)}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               filterStatus === status.value 
-                ? 'bg-[#157a2c] text-white shadow-md' 
+                ? 'bg-primary text-white shadow-md' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -254,7 +254,7 @@ const MyOrders = () => {
       </div>
 
       {isLoading ? (
-        <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>
+        <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
       ) : orders.length === 0 ? (
         <div className="text-center py-16 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
           <FiPackage size={48} className="text-gray-300 mb-3" />
@@ -299,7 +299,7 @@ const MyOrders = () => {
 
                 <div className="bg-gray-50 p-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                   <div className="text-sm text-gray-600">
-                    ThÃ nh tiá»n: <span className="text-xl font-bold text-[#ff424e]">{formatCurrency(order.final_amount)}</span>
+                    ThÃ nh tiá»n: <span className="text-xl font-bold text-danger">{formatCurrency(order.final_amount)}</span>
                   </div>
                   
                   <div className="flex gap-2 w-full sm:w-auto flex-wrap justify-end">
@@ -338,7 +338,7 @@ const MyOrders = () => {
                     {currentStatus === 'completed' && (order.items || []).some((item) => item.can_review) && (
                       <button 
                         onClick={() => openReviewModal(order)} 
-                        className="px-4 py-2 border border-[#157a2c] text-[#157a2c] bg-white rounded text-sm font-medium hover:bg-green-50 transition flex items-center gap-2"
+                        className="px-4 py-2 border border-primary text-primary bg-white rounded text-sm font-medium hover:bg-green-50 transition flex items-center gap-2"
                       >
                         <FiStar /> ÄÃ¡nh giÃ¡
                       </button>
@@ -347,7 +347,7 @@ const MyOrders = () => {
                     {/* NÃšT XEM CHI TIáº¾T */}
                     <button 
                       onClick={() => handleViewDetails(order.id)} 
-                      className="px-4 py-2 bg-[#157a2c] text-white rounded text-sm font-medium hover:bg-green-800 transition"
+                      className="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-green-800 transition"
                     >
                       Chi tiáº¿t
                     </button>
@@ -370,7 +370,7 @@ const MyOrders = () => {
             
             <div className="p-6">
               <div className="bg-green-50 border border-green-100 p-4 rounded-lg mb-6">
-                <h3 className="font-bold text-[#157a2c] mb-2 uppercase text-xs">ThÃ´ng tin giao hÃ ng</h3>
+                <h3 className="font-bold text-primary mb-2 uppercase text-xs">ThÃ´ng tin giao hÃ ng</h3>
                 <p className="font-medium text-gray-800">{selectedOrder.shipping_name}</p>
                 <p className="text-sm text-gray-600">SÄT: {selectedOrder.shipping_phone}</p>
                 <p className="text-sm text-gray-600">Äá»‹a chá»‰: {selectedOrder.shipping_address}</p>
@@ -387,7 +387,7 @@ const MyOrders = () => {
                 <div className="flex justify-between"><span>PhÃ­ váº­n chuyá»ƒn:</span> <span>{formatCurrency(selectedOrder.shipping_fee)}</span></div>
                 <div className="flex justify-between border-t pt-2 mt-2">
                   <span className="font-bold text-gray-800">ThÃ nh tiá»n:</span> 
-                  <span className="font-bold text-xl text-[#ff424e]">{formatCurrency(selectedOrder.final_amount)}</span>
+                  <span className="font-bold text-xl text-danger">{formatCurrency(selectedOrder.final_amount)}</span>
                 </div>
               </div>
             </div>
@@ -426,7 +426,7 @@ const MyOrders = () => {
               <div>
                 <label className="block text-sm text-gray-700 mb-1 font-medium">NgÃ¢n hÃ ng *</label>
                 <select 
-                  className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none"
+                  className="w-full border border-gray-300 rounded p-2 focus:border-primary outline-none"
                   value={refundData.bank_code}
                   onChange={(e) => setRefundData({...refundData, bank_code: e.target.value})}
                   required
@@ -442,7 +442,7 @@ const MyOrders = () => {
                 <label className="block text-sm text-gray-700 mb-1 font-medium">Sá»‘ tÃ i khoáº£n *</label>
                 <input 
                   type="text" 
-                  className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none"
+                  className="w-full border border-gray-300 rounded p-2 focus:border-primary outline-none"
                   value={refundData.account_number}
                   onChange={(e) => setRefundData({...refundData, account_number: e.target.value})}
                   placeholder="Nháº­p sá»‘ tÃ i khoáº£n..."
@@ -454,7 +454,7 @@ const MyOrders = () => {
                 <label className="block text-sm text-gray-700 mb-1 font-medium">TÃªn chá»§ tÃ i khoáº£n *</label>
                 <input 
                   type="text" 
-                  className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none uppercase"
+                  className="w-full border border-gray-300 rounded p-2 focus:border-primary outline-none uppercase"
                   value={refundData.account_holder}
                   onChange={(e) => setRefundData({...refundData, account_holder: e.target.value.toUpperCase()})}
                   placeholder="NGUYEN VAN A"
@@ -462,7 +462,7 @@ const MyOrders = () => {
                 />
               </div>
 
-              <button type="submit" className="w-full bg-[#157a2c] text-white rounded p-3 font-bold hover:bg-green-800 transition mt-2">
+              <button type="submit" className="w-full bg-primary text-white rounded p-3 font-bold hover:bg-green-800 transition mt-2">
                 Gá»¬I THÃ”NG TIN HOÃ€N TIá»€N
               </button>
             </form>
@@ -491,7 +491,7 @@ const MyOrders = () => {
               <div>
                 <label className="block text-sm text-gray-700 mb-1 font-medium">Điểm đánh giá *</label>
                 <select
-                  className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none bg-white"
+                  className="w-full border border-gray-300 rounded p-2 focus:border-primary outline-none bg-white"
                   value={reviewData.rating}
                   onChange={(e) => setReviewData({ ...reviewData, rating: e.target.value })}
                   required
@@ -507,14 +507,14 @@ const MyOrders = () => {
                 <textarea
                   rows="4"
                   maxLength="2000"
-                  className="w-full border border-gray-300 rounded p-2 focus:border-[#157a2c] outline-none"
+                  className="w-full border border-gray-300 rounded p-2 focus:border-primary outline-none"
                   value={reviewData.comment}
                   onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
                   placeholder="Chia sẻ cảm nhận của bạn về cuốn sách..."
                 />
               </div>
 
-              <button type="submit" className="w-full bg-[#157a2c] text-white rounded p-3 font-bold hover:bg-green-800 transition">
+              <button type="submit" className="w-full bg-primary text-white rounded p-3 font-bold hover:bg-green-800 transition">
                 Gửi đánh giá
               </button>
             </form>

@@ -68,9 +68,8 @@ class BannerResource extends Resource
                         ->image()
                         ->imageEditor()
                         ->fetchFileInformation(false)
-                        ->helperText('Khuyến nghị tỷ lệ 21:8, ví dụ 840×320.')
                         ->columnSpanFull(),
-                ])
+                ]),
         ]);
     }
 

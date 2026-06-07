@@ -1,0 +1,14 @@
+.bookify-home-banners {
+  --swiper-theme-color: var(--color-primary);
+  --swiper-navigation-color: var(--color-primary);
+  --swiper-pagination-color: var(--color-primary);
+}
+
+.bookify-home-banners .swiper-button-prev,
+.bookify-home-banners .swiper-button-next {
+  color: var(--color-primary);
+}
+
+.bookify-home-banners .swiper-pagination-bullet-active {
+  background: var(--color-primary);
+}

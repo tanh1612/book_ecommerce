@@ -139,7 +139,7 @@ const ProductDetailPage = () => {
     }
   };
 
-  if (isLoading) return <div className="py-20 flex justify-center"><div className="w-10 h-10 border-4 border-[#007b22] border-t-transparent rounded-full animate-spin"></div></div>;
+  if (isLoading) return <div className="py-20 flex justify-center"><div className="w-10 h-10 border-4 border-primary-strong border-t-transparent rounded-full animate-spin"></div></div>;
   if (!book) return <div className="py-20 text-center text-gray-500">Sách không tồn tại.</div>;
 
   const title = book.name || "Đang cập nhật";
@@ -176,16 +176,16 @@ const ProductDetailPage = () => {
   const galleryImages = book.images?.length > 0 ? book.images : [{ image_url: book.thumbnail_url }];
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20 pt-4">
-      <div className="container mx-auto px-4 mb-4 text-sm text-gray-500 flex items-center gap-2">
-        <Link to="/" className="hover:text-[#007b22]">Trang chủ</Link>
+    <div className="min-h-screen pb-20 pt-4">
+      <div className="container mx-auto px-8 lg:px-10 mb-4 text-sm text-gray-500 flex items-center gap-2">
+        <Link to="/" className="hover:text-primary-strong">Trang chủ</Link>
         <FiChevronRight size={14} />
-        <Link to="/catalog" className="hover:text-[#007b22]">Danh mục sách</Link>
+        <Link to="/catalog" className="hover:text-primary-strong">Danh mục sách</Link>
         <FiChevronRight size={14} />
         <span className="text-gray-800 truncate">{title}</span>
       </div>
 
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-8 lg:px-10">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6 flex flex-col lg:flex-row gap-10">
           
           <div className="w-full lg:w-5/12 flex-shrink-0">
@@ -199,7 +199,7 @@ const ProductDetailPage = () => {
                   const imageUrl = resolveMediaUrl(img.image_url || img.url, 'https://placehold.co/80x120?text=No+Image');
 
                   return (
-                    <div key={img.id || idx} onMouseEnter={() => setMainImage(imageUrl)} className={`w-16 h-16 border rounded cursor-pointer overflow-hidden ${mainImage === imageUrl ? 'border-[#007b22] border-2' : 'border-gray-200'}`}>
+                    <div key={img.id || idx} onMouseEnter={() => setMainImage(imageUrl)} className={`w-16 h-16 border rounded cursor-pointer overflow-hidden ${mainImage === imageUrl ? 'border-primary-strong border-2' : 'border-gray-200'}`}>
                       <img src={imageUrl} alt={`thumb-${idx}`} className="w-full h-full object-cover" />
                     </div>
                   );
@@ -238,7 +238,7 @@ const ProductDetailPage = () => {
             </div>
 
             <div className="flex items-end gap-4 mb-6">
-              <span className="text-3xl font-bold text-[#007b22]">{formatCurrency(sellingPrice)}</span>
+              <span className="text-3xl font-bold text-primary-strong">{formatCurrency(sellingPrice)}</span>
               {originalPrice > sellingPrice && (
                 <>
                   <span className="text-lg text-gray-400 line-through mb-1">{formatCurrency(originalPrice)}</span>
@@ -264,14 +264,14 @@ const ProductDetailPage = () => {
               <button 
                 onClick={handleAddToCart}
                 disabled={stock <= 0}
-                className="flex items-center justify-center gap-2 w-56 h-12 bg-white border-2 border-[#007b22] text-[#007b22] font-semibold rounded hover:bg-green-50 transition-colors disabled:border-gray-300 disabled:text-gray-400"
+                className="flex items-center justify-center gap-2 w-56 h-12 bg-white border-2 border-primary-strong text-primary-strong font-semibold rounded hover:bg-green-50 transition-colors disabled:border-gray-300 disabled:text-gray-400"
               >
                 Thêm vào giỏ hàng <FiShoppingCart size={18} />
               </button>
               <button 
                 onClick={handleBuyNow}
                 disabled={stock <= 0}
-                className="w-56 h-12 bg-[#007b22] text-white font-semibold rounded hover:bg-green-800 transition-colors shadow-sm disabled:bg-gray-400"
+                className="w-56 h-12 bg-primary-strong text-white font-semibold rounded hover:bg-green-800 transition-colors shadow-sm disabled:bg-gray-400"
               >
                 Mua ngay
               </button>
@@ -296,7 +296,7 @@ const ProductDetailPage = () => {
             <div className="mt-4 flex justify-center">
               <button 
                 onClick={() => setIsDescExpanded(!isDescExpanded)}
-                className="flex items-center gap-1 border border-[#007b22] text-[#007b22] px-6 py-1.5 rounded text-sm font-medium hover:bg-green-50 transition"
+                className="flex items-center gap-1 border border-primary-strong text-primary-strong px-6 py-1.5 rounded text-sm font-medium hover:bg-green-50 transition"
               >
                 {isDescExpanded ? 'Thu gọn' : 'Đọc thêm'} <FiChevronDown className={`transform transition-transform ${isDescExpanded ? 'rotate-180' : ''}`} />
               </button>
@@ -328,7 +328,7 @@ const ProductDetailPage = () => {
               </p>
             </div>
             {reviewEligibility?.can_review && (
-              <div className="text-sm font-medium text-[#157a2c] bg-green-50 border border-green-100 rounded px-3 py-2">
+              <div className="text-sm font-medium text-primary bg-green-50 border border-green-100 rounded px-3 py-2">
                 Bạn có thể đánh giá sách này trong mục đơn hàng.
               </div>
             )}

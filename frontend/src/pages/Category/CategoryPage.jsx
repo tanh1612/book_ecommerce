@@ -144,15 +144,15 @@ const CategoryPage = () => {
     
     return categories.map(item => (
       <div key={item.id} className={level > 0 ? 'ml-6 mt-3' : 'mt-3'}>
-        <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer hover:text-[#157a2c]">
+        <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer hover:text-primary">
           <input
             type="radio"
             name="categoryFilter"
             checked={currentCategory === item.slug}
             onChange={() => updateUrlParams({ category: item.slug })}
-            className="w-4 h-4 text-[#157a2c] focus:ring-[#157a2c]"
+            className="w-4 h-4 text-primary focus:ring-primary"
           />
-          <span className={currentCategory === item.slug ? "font-bold text-[#157a2c]" : ""}>
+          <span className={currentCategory === item.slug ? "font-bold text-primary" : ""}>
             {item.name}
           </span>
         </label>
@@ -175,8 +175,8 @@ const CategoryPage = () => {
             onClick={() => updateUrlParams({ page: i }, false)}
             className={`px-3.5 py-1.5 min-w-[38px] border rounded transition-colors ${
               currentPage === i 
-              ? 'bg-[#157a2c] text-white border-[#157a2c] font-bold shadow-sm' 
-              : 'border-gray-300 text-gray-600 hover:bg-green-50 hover:text-[#157a2c] hover:border-[#157a2c]'
+              ? 'bg-primary text-white border-primary font-bold shadow-sm' 
+              : 'border-gray-300 text-gray-600 hover:bg-green-50 hover:text-primary hover:border-primary'
             }`}
           >
             {i}
@@ -193,7 +193,7 @@ const CategoryPage = () => {
         <button 
           onClick={() => updateUrlParams({ page: currentPage - 1 }, false)}
           disabled={currentPage === 1}
-          className="px-4 py-1.5 border border-gray-300 rounded text-gray-600 font-medium hover:bg-green-50 hover:text-[#157a2c] hover:border-[#157a2c] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 disabled:hover:border-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-1.5 border border-gray-300 rounded text-gray-600 font-medium hover:bg-green-50 hover:text-primary hover:border-primary disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 disabled:hover:border-gray-300 disabled:cursor-not-allowed transition-colors"
         >
           Trang trước
         </button>
@@ -205,7 +205,7 @@ const CategoryPage = () => {
         <button 
           onClick={() => updateUrlParams({ page: currentPage + 1 }, false)}
           disabled={currentPage === lastPage}
-          className="px-4 py-1.5 border border-gray-300 rounded text-gray-600 font-medium hover:bg-green-50 hover:text-[#157a2c] hover:border-[#157a2c] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 disabled:hover:border-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-1.5 border border-gray-300 rounded text-gray-600 font-medium hover:bg-green-50 hover:text-primary hover:border-primary disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 disabled:hover:border-gray-300 disabled:cursor-not-allowed transition-colors"
         >
           Trang sau
         </button>
@@ -217,26 +217,27 @@ const CategoryPage = () => {
   const displaySort = currentSort === 'relevance' && !keyword ? 'newest' : currentSort;
 
   return (
-    <div className="bg-white min-h-screen pb-10">
-      <div className="container mx-auto px-4 mt-6 flex flex-col md:flex-row gap-8">
+    <div className="min-h-screen pb-10">
+      <div className="container mx-auto px-8 lg:px-10 mt-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row gap-8">
         
         {/* SIDEBAR BỘ LỌC */}
         <aside className="w-full md:w-64 flex-shrink-0">
-          <h2 className="font-bold text-[#157a2c] text-lg mb-6 border-b pb-2">Bộ lọc tìm kiếm</h2>
+          <h2 className="font-bold text-primary text-lg mb-6 border-b pb-2">Bộ lọc tìm kiếm</h2>
 
           {showCategoryFilter ? (
             <div className="mb-8">
               <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Danh mục</h3>
               <div className="max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer hover:text-[#157a2c] mb-3 border-b border-gray-100 pb-3">
+                <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer hover:text-primary mb-3 border-b border-gray-100 pb-3">
                   <input
                     type="radio"
                     name="categoryFilter"
                     checked={currentCategory === ''}
                     onChange={() => updateUrlParams({ category: '' })}
-                    className="w-4 h-4 text-[#157a2c] focus:ring-[#157a2c]"
+                    className="w-4 h-4 text-primary focus:ring-primary"
                   />
-                  <span className={currentCategory === '' ? "font-bold text-[#157a2c]" : ""}>Tất cả danh mục</span>
+                  <span className={currentCategory === '' ? "font-bold text-primary" : ""}>Tất cả danh mục</span>
                 </label>
                 {renderCategories(filtersData.categories)}
               </div>
@@ -245,7 +246,7 @@ const CategoryPage = () => {
             <div className="mb-8">
               <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Danh mục đang chọn</h3>
               <div className="flex items-center justify-between bg-green-50 p-3 rounded border border-green-200">
-                <span className="text-sm font-bold text-[#157a2c] truncate pr-2">{currentCategory}</span>
+                <span className="text-sm font-bold text-primary truncate pr-2">{currentCategory}</span>
                 <button onClick={() => updateUrlParams({ category: '' })} className="text-gray-400 hover:text-red-500 text-xs font-bold whitespace-nowrap">✕ Xóa</button>
               </div>
             </div>
@@ -253,22 +254,22 @@ const CategoryPage = () => {
 
           <div className="mb-8">
             <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Khoảng giá</h3>
-            <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer mb-3 hover:text-[#157a2c]">
+            <label className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer mb-3 hover:text-primary">
               <input
                 type="radio" name="priceFilter"
                 checked={currentPriceMin === '' && currentPriceMax === ''}
                 onChange={() => updateUrlParams({ price_min: '', price_max: '' })}
-                className="w-4 h-4 text-[#157a2c] focus:ring-[#157a2c]"
+                className="w-4 h-4 text-primary focus:ring-primary"
               />
               Tất cả mức giá
             </label>
             {Array.isArray(filtersData.suggested_price_ranges) && filtersData.suggested_price_ranges.map((range, idx) => (
-              <label key={idx} className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer mb-3 hover:text-[#157a2c]">
+              <label key={idx} className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer mb-3 hover:text-primary">
                 <input
                   type="radio" name="priceFilter"
                   checked={currentPriceMin == (range.min || '') && currentPriceMax == (range.max || '')}
                   onChange={() => updateUrlParams({ price_min: range.min || '', price_max: range.max || '' })}
-                  className="w-4 h-4 text-[#157a2c] focus:ring-[#157a2c]"
+                  className="w-4 h-4 text-primary focus:ring-primary"
                 />
                 {range.label}
               </label>
@@ -278,7 +279,7 @@ const CategoryPage = () => {
           <div className="mb-8">
             <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Nhà xuất bản</h3>
             <select
-              className="w-full border border-gray-300 rounded p-2.5 text-sm outline-none focus:border-[#157a2c] bg-white"
+              className="w-full border border-gray-300 rounded p-2.5 text-sm outline-none focus:border-primary bg-white"
               value={currentPublisher}
               onChange={(e) => updateUrlParams({ publisher: e.target.value })}
             >
@@ -292,7 +293,7 @@ const CategoryPage = () => {
           <div className="mb-8">
             <h3 className="font-bold text-gray-800 mb-3 uppercase text-xs tracking-wider">Nhà cung cấp</h3>
             <select
-              className="w-full border border-gray-300 rounded p-2.5 text-sm outline-none focus:border-[#157a2c] bg-white"
+              className="w-full border border-gray-300 rounded p-2.5 text-sm outline-none focus:border-primary bg-white"
               value={currentSupplier}
               onChange={(e) => updateUrlParams({ supplier: e.target.value })}
             >
@@ -313,7 +314,7 @@ const CategoryPage = () => {
             
             <div className="relative">
               <select
-                className="appearance-none bg-[#157a2c] text-white text-sm font-medium pl-4 pr-10 py-2 rounded outline-none cursor-pointer"
+                className="appearance-none bg-primary text-white text-sm font-medium pl-4 pr-10 py-2 rounded outline-none cursor-pointer"
                 value={displaySort}
                 onChange={(e) => updateUrlParams({ sort: e.target.value })}
               >
@@ -330,7 +331,7 @@ const CategoryPage = () => {
           </div>
 
           {isLoading ? (
-            <div className="py-20 flex justify-center flex-grow"><div className="w-8 h-8 border-4 border-[#157a2c] border-t-transparent rounded-full animate-spin"></div></div>
+            <div className="py-20 flex justify-center flex-grow"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
           ) : safeBooks.length > 0 ? (
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-grow content-start">
@@ -347,6 +348,7 @@ const CategoryPage = () => {
               Không tìm thấy tựa sách nào phù hợp với bộ lọc của bạn.
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

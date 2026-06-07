@@ -49,9 +49,9 @@ const ProductCard = ({ book }) => {
   };
 
   return (
-    <div className="bg-white rounded border border-gray-100 hover:shadow-lg transition-all duration-300 relative group flex flex-col h-full overflow-hidden p-4">
+    <div className="product-card rounded relative group flex flex-col h-full overflow-hidden p-4">
       {!isInStock && (
-        <span className="absolute left-3 top-3 z-10 rounded bg-gray-800 px-2 py-1 text-[11px] font-bold text-white">
+        <span className="app-badge-dark absolute left-3 top-3 z-10 rounded px-2 py-1 text-[11px] font-bold">
           Hết hàng
         </span>
       )}
@@ -69,30 +69,30 @@ const ProductCard = ({ book }) => {
 
       <div className="flex flex-col flex-grow text-left">
         <Link to={`/book/${slug}`}>
-          <h3 className="text-[14px] text-gray-800 font-medium line-clamp-2 hover:text-[#157a2c] transition-colors mb-1 min-h-[40px]">
+          <h3 className="app-section-title text-[14px] font-medium line-clamp-2 hover:text-primary transition-colors mb-1 min-h-[40px]">
             {title}
           </h3>
         </Link>
-        <p className="text-xs text-gray-500 mb-2 line-clamp-1">{author}</p>
+        <p className="app-muted-text text-xs mb-2 line-clamp-1">{author}</p>
         {reviewCount > 0 && (
-          <p className="text-xs text-amber-500 mb-2">
+          <p className="app-rating-text text-xs mb-2">
             {averageRating.toFixed(1)} sao ({reviewCount})
           </p>
         )}
 
         <div className="mt-auto flex items-center gap-2 flex-wrap">
-          <span className="text-[#157a2c] font-bold text-[16px]">{formatCurrency(salePrice)}</span>
+          <span className="text-primary font-bold text-[16px]">{formatCurrency(salePrice)}</span>
           {discountPercent > 0 && (
-            <span className="bg-[#ff424e] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">-{discountPercent}%</span>
+            <span className="app-badge-danger text-[10px] font-bold px-1.5 py-0.5 rounded">-{discountPercent}%</span>
           )}
         </div>
       </div>
 
-      <div className="absolute inset-x-0 -bottom-16 group-hover:bottom-0 bg-white p-3 transition-all duration-300 flex justify-between gap-2 border-t border-gray-100">
+      <div className="product-card-actions absolute inset-x-0 -bottom-16 group-hover:bottom-0 p-3 transition-all duration-300 flex justify-between gap-2">
         <button
           onClick={handleAddToCart}
           disabled={!isInStock}
-          className="bg-white border border-[#157a2c] text-[#157a2c] w-10 h-10 rounded flex items-center justify-center hover:bg-[#157a2c] hover:text-white transition-colors disabled:border-gray-300 disabled:text-gray-300 disabled:hover:bg-white disabled:cursor-not-allowed"
+          className="app-outline-button w-10 h-10 rounded flex items-center justify-center disabled:border-gray-300 disabled:text-gray-300 disabled:hover:bg-white disabled:cursor-not-allowed"
           title="Thêm vào giỏ"
         >
           <FiShoppingCart size={18} />
@@ -100,7 +100,7 @@ const ProductCard = ({ book }) => {
         <button
           onClick={handleBuyNow}
           disabled={!isInStock}
-          className="flex-grow bg-[#157a2c] text-white h-10 rounded text-sm font-bold hover:bg-green-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="app-primary-button flex-grow h-10 rounded text-sm font-bold disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           {isInStock ? 'Mua ngay' : 'Hết hàng'}
         </button>

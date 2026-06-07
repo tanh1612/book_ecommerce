@@ -33,14 +33,14 @@ const FlashSaleTimer = ({ endAt }) => {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-white text-sm font-bold hidden sm:block uppercase">Kết thúc sau:</span>
+      <span className="flash-sale-timer-label text-sm font-bold hidden sm:block uppercase">Kết thúc sau:</span>
       <div className="flex gap-1.5">
         {[timeLeft.h, timeLeft.m, timeLeft.s].map((unit, index) => (
           <div key={index} className="flex items-center">
-            <div className="bg-white text-[#157a2c] w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg shadow-sm">
+            <div className="flash-sale-timer-box w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg">
               {formatNumber(unit || 0)}
             </div>
-            {index < 2 && <span className="text-white font-bold mx-0.5">:</span>}
+            {index < 2 && <span className="flash-sale-timer-separator font-bold mx-0.5">:</span>}
           </div>
         ))}
       </div>

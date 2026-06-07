@@ -95,11 +95,11 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="bg-[#f0f0f0] min-h-screen py-10 flex justify-center px-4">
+    <div className="bg-auth-surface min-h-screen py-10 flex justify-center px-4">
       <div className="bg-white rounded-lg shadow-sm w-full max-w-[450px] p-10 border border-gray-100 h-fit">
         <div className="flex mb-8 border-b border-gray-200">
           <Link to="/login" className="flex-1 text-center pb-3 text-gray-500 font-medium">Đăng nhập</Link>
-          <div className="flex-1 text-center pb-3 text-[#157a2c] font-medium border-b-2 border-[#157a2c]">Đăng ký</div>
+          <div className="flex-1 text-center pb-3 text-primary font-medium border-b-2 border-primary">Đăng ký</div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -118,12 +118,12 @@ const RegisterPage = () => {
               <input 
                 type="email" name="email" value={formData.email} onChange={handleChange} 
                 placeholder="Nhập email" disabled={isOtpVerified} 
-                className={`w-full border rounded py-2.5 px-3 outline-none transition-colors ${emailError ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-[#157a2c]'}`} 
+                className={`w-full border rounded py-2.5 px-3 outline-none transition-colors ${emailError ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-primary'}`} 
               />
               <button 
                 type="button" onClick={handleGetOTP} 
                 disabled={countdown > 0 || isOtpVerified || loading.otp} 
-                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1.5 text-[#157a2c] font-bold disabled:text-gray-400"
+                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1.5 text-primary font-bold disabled:text-gray-400"
               >
                 {loading.otp ? "..." : countdown > 0 ? `${countdown}s` : "Lấy mã"}
               </button>
@@ -140,7 +140,7 @@ const RegisterPage = () => {
               type="number" name="otp" value={formData.otp} onChange={handleChange} 
               placeholder={loading.verify ? "Đang kiểm tra..." : "Nhập 6 số"} 
               disabled={isOtpVerified || !formData.email} 
-              className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] text-center tracking-[10px] font-bold" 
+              className="w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-primary text-center tracking-[10px] font-bold" 
             />
           </div>
 
@@ -153,11 +153,11 @@ const RegisterPage = () => {
                 value={formData.password} onChange={handleChange} 
                 placeholder={isOtpVerified ? "Tối thiểu 8 ký tự (Chữ & Số)" : "Chờ xác thực mã xong mới được nhập"} 
                 disabled={!isOtpVerified} 
-                className={`w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-[#157a2c] ${!isOtpVerified ? 'bg-gray-100 cursor-not-allowed' : ''}`} 
+                className={`w-full border border-gray-300 rounded py-2.5 px-3 outline-none focus:border-primary ${!isOtpVerified ? 'bg-gray-100 cursor-not-allowed' : ''}`} 
               />
               {isOtpVerified && (
                 <button 
-                  type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#157a2c]" 
+                  type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary" 
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
@@ -168,7 +168,7 @@ const RegisterPage = () => {
 
           <button 
             type="submit" disabled={!isOtpVerified || !formData.password || loading.register} 
-            className={`w-full py-3 rounded font-bold mt-4 text-white transition-all ${(!isOtpVerified || !formData.password || loading.register) ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#157a2c] hover:bg-green-800'}`}
+            className={`w-full py-3 rounded font-bold mt-4 text-white transition-all ${(!isOtpVerified || !formData.password || loading.register) ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary hover:bg-green-800'}`}
           >
             {loading.register ? "Đang xử lý..." : "HOÀN TẤT ĐĂNG KÝ"}
           </button>

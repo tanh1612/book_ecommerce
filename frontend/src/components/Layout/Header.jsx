@@ -1,19 +1,28 @@
-// src/components/Layout/Header.jsx
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiSearch, FiShoppingCart, FiUser, FiHeart, FiMapPin, FiMenu, FiChevronRight } from 'react-icons/fi';
-import { toast } from 'react-toastify';
-import { useAuth } from '../../context/AuthContext';
-import { useCart } from '../../context/CartContext';
-import { useWishlist } from '../../context/WishlistContext';
-import bookApi from '../../services/bookApi';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  FiSearch,
+  FiShoppingCart,
+  FiUser,
+  FiHeart,
+  FiMenu,
+  FiChevronRight,
+} from "react-icons/fi";
+import { toast } from "react-toastify";
+import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
+import { useWishlist } from "../../context/WishlistContext";
+import bookApi from "../../services/bookApi";
+import logo from "../../assets/logo.png";
 
 const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+const SEARCH_SUGGESTION_LIMIT = 8;
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [parentCategories, setParentCategories] = useState([]);
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,24 +30,25 @@ const Header = () => {
   const { totalQuantity } = useCart();
   const { wishlistItems } = useWishlist();
 
-  // --- STATE TÌM KIẾM & GỢI Ý ---
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const headerRef = useRef(null);
   const searchRef = useRef(null);
-  // Search cache với TTL (5 phút)
   const searchCache = useRef({});
-  
+  const isCategoryMenuIntent = useRef(false);
 
   const getCachedSuggestions = useCallback((keyword) => {
     const cached = searchCache.current[keyword];
     if (!cached) return null;
+
     const isExpired = Date.now() - cached.timestamp > SEARCH_CACHE_TTL;
     if (isExpired) {
       delete searchCache.current[keyword];
       return null;
     }
+
     return cached.data;
   }, []);
 
@@ -46,41 +56,73 @@ const Header = () => {
     searchCache.current[keyword] = { data, timestamp: Date.now() };
   }, []);
 
-  // Lấy danh mục
   useEffect(() => {
-    bookApi.getFilters().then(res => {
-      const allCats = res.data?.data?.categories || res.data?.categories || [];
-      const targetNames = ["Hư cấu", "Phi hư cấu", "Phân loại khác"];
-      const filteredParents = allCats.filter(cat => targetNames.includes(cat.name));
-      const displayParents = filteredParents.length > 0 ? filteredParents : allCats;
-      
-      setParentCategories(displayParents);
-      if (displayParents.length > 0) setActiveMenuId(displayParents[0].id);
-    }).catch(err => console.error("Lỗi tải danh mục:", err));
+    bookApi
+      .getFilters()
+      .then((res) => {
+        const allCategories =
+          res.data?.data?.categories || res.data?.categories || [];
+        const targetNames = ["Hư cấu", "Phi hư cấu", "Phân loại khác"];
+        const filteredParents = allCategories.filter((category) =>
+          targetNames.includes(category.name),
+        );
+        const displayParents =
+          filteredParents.length > 0 ? filteredParents : allCategories;
+
+        setParentCategories(displayParents);
+        if (displayParents.length > 0) setActiveMenuId(displayParents[0].id);
+      })
+      .catch((error) => console.error("Lỗi tải danh mục:", error));
   }, []);
 
-  const subCategories = parentCategories.find(cat => cat.id === activeMenuId)?.children || [];
-  const visibleSuggestions = suggestions.slice(0, 2);
+  const subCategories =
+    parentCategories.find((category) => category.id === activeMenuId)
+      ?.children || [];
+  const visibleSuggestions = suggestions.slice(0, SEARCH_SUGGESTION_LIMIT);
+  const isDropdownOpen = isMenuOpen || isSuggestionOpen;
 
-  // 1. Xử lý Click ra ngoài thì đóng Dropdown
+  const closeSearchDropdowns = useCallback(() => {
+    setIsMenuOpen(false);
+    setIsSuggestionOpen(false);
+    setIsSearching(false);
+  }, []);
+
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      setHeaderHeight(headerRef.current?.offsetHeight || 0);
+    };
+
+    updateHeaderHeight();
+    window.addEventListener("resize", updateHeaderHeight);
+
+    if (!window.ResizeObserver || !headerRef.current) {
+      return () => window.removeEventListener("resize", updateHeaderHeight);
+    }
+
+    const resizeObserver = new ResizeObserver(updateHeaderHeight);
+    resizeObserver.observe(headerRef.current);
+
+    return () => {
+      window.removeEventListener("resize", updateHeaderHeight);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setIsSuggestionOpen(false);
-        setIsSearching(false);
+        closeSearchDropdowns();
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-  useEffect(() => {
-    setIsSuggestionOpen(false);
-    setIsSearching(false);
-    // Nếu bạn muốn xóa luôn chữ đã gõ khi chuyển trang, bỏ comment dòng dưới:
-    // setSearchTerm(''); 
-  }, [location.pathname]);
 
-  // 2. Xử lý gọi API Gợi ý (Nhanh như chớp với Local Cache)
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [closeSearchDropdowns]);
+
+  useEffect(() => {
+    closeSearchDropdowns();
+  }, [location.pathname, closeSearchDropdowns]);
+
   useEffect(() => {
     const keyword = searchTerm.trim();
 
@@ -91,11 +133,13 @@ const Header = () => {
       return;
     }
 
-    // NẾU TỪ KHÓA ĐÃ TỪNG TÌM VÀ CACHE CHƯA HẾT HẠN: Lấy từ Cache
     const cachedData = getCachedSuggestions(keyword);
     if (cachedData) {
       setSuggestions(cachedData);
-      setIsSuggestionOpen(true);
+      if (!isCategoryMenuIntent.current) {
+        setIsMenuOpen(false);
+        setIsSuggestionOpen(true);
+      }
       return;
     }
 
@@ -104,13 +148,19 @@ const Header = () => {
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const res = await bookApi.getSuggestions(keyword);
+        const res = await bookApi.getSuggestions(
+          keyword,
+          SEARCH_SUGGESTION_LIMIT,
+        );
 
         if (!ignore) {
           const data = res.data?.data || res.data || [];
           setCachedSuggestions(keyword, data);
           setSuggestions(data);
-          setIsSuggestionOpen(true);
+          if (!isCategoryMenuIntent.current) {
+            setIsMenuOpen(false);
+            setIsSuggestionOpen(true);
+          }
         }
       } catch (error) {
         if (!ignore && error.response?.status >= 500) {
@@ -129,218 +179,250 @@ const Header = () => {
     };
   }, [searchTerm, getCachedSuggestions, setCachedSuggestions]);
 
-  // Hành động khi nhấn Enter hoặc Bấm kính lúp
   const handleSearch = () => {
-    if (searchTerm.trim() !== '') {
+    if (searchTerm.trim() !== "") {
       navigate(`/catalog?keyword=${encodeURIComponent(searchTerm.trim())}`);
-      setIsSuggestionOpen(false);
+      closeSearchDropdowns();
     }
   };
 
+  const handleCategoryClick = (category) => {
+    navigate(`/catalog?category=${category.slug}`);
+    closeSearchDropdowns();
+  };
+
   return (
-    <header className="bg-white relative z-50">
-      <div className="bg-[#157a2c] text-white text-sm hidden md:block">
-        <div className="container mx-auto px-4 py-1.5 flex justify-between items-center">
-          <ul className="flex gap-6">
-            <li className="flex items-center gap-1 hover:text-gray-200 cursor-pointer">
-              <FiMapPin /> Hệ Thống Cửa Hàng
-            </li>
-            <li className="hover:text-gray-200 cursor-pointer">Về Bookify</li>
-            <li className="hover:text-gray-200 cursor-pointer">Event</li>
-          </ul>
-          <div className="flex items-center gap-3">
-            <span>Liên hệ:</span>
-            <span className="font-bold">0337706769</span>
-          </div>
-        </div>
-      </div>
+    <header ref={headerRef} className="site-header sticky top-0 z-50">
+      {isDropdownOpen && (
+        <div
+          className="site-header-overlay fixed left-0 right-0 bottom-0 z-40"
+          style={{ top: `${headerHeight}px` }}
+          onMouseDown={closeSearchDropdowns}
+          aria-hidden="true"
+        />
+      )}
 
-      <div className="container mx-auto px-4 py-5 flex items-center justify-between gap-8 border-b border-gray-100">
-        <Link to="/" className="flex-shrink-0 flex items-center gap-2 text-[#157a2c]">
-          <div className="font-extrabold text-2xl tracking-tighter flex flex-col items-center leading-none">
-            <span>Bookify</span>
-          </div>
+      <div className="site-header-shell relative z-50 container mx-auto px-8 lg:px-10 py-5 flex items-center justify-between gap-8">
+        <Link
+          to="/"
+          className="flex-shrink-0 flex items-center"
+        >
+          <img src={logo} alt="Bookify" className="h-10 w-auto object-contain" />
         </Link>
-    
-        {/* --- KHU VỰC THANH TÌM KIẾM --- */}
-        <div className="flex-grow max-w-3xl relative" ref={searchRef}>
-          <input
-            type="text"
-            placeholder="Tên sách lên xu hướng/bestselling..."
-            className="w-full border border-gray-300 rounded-md py-2.5 px-4 pr-12 outline-none focus:border-[#157a2c] transition-all text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            onFocus={() => { if (searchTerm.trim().length >= 2) setIsSuggestionOpen(true) }}
-          />
-          <button 
-            onClick={handleSearch}
-            className="absolute right-0 top-0 h-full w-12 text-gray-500 hover:text-[#157a2c] flex items-center justify-center rounded-r-md transition-colors"
-          >
-            {isSearching ? (
-              <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <FiSearch size={20} />
-            )}
-          </button>
 
-          {/* KHUNG DROPDOWN GỢI Ý */}
-          {isSuggestionOpen && (
-            <div className="absolute top-full mt-2 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
-              {suggestions.length > 0 ? (
-                <div className="flex flex-col">
-                  <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-500 border-b border-gray-100">
-                    Sách gợi ý
-                  </div>
-                  {visibleSuggestions.map((book) => (
-                    <Link
-                      key={book.id}
-                      to={`/book/${book.slug}`}
-                      onClick={() => setIsSuggestionOpen(false)}
-                      className="flex items-center gap-3 p-3 hover:bg-green-50 border-b border-gray-100 last:border-0 transition-colors"
-                    >
-                      <img 
-                        src={book.thumbnail_url || book.thumbnail || "https://placehold.co/40x60?text=No+Image"} 
-                        alt={book.name || book.title} 
-                        className="w-10 h-14 object-cover rounded shadow-sm border border-gray-200" 
-                      />
-                      <div className="flex flex-col justify-center">
-                        <h4 className="text-sm font-medium text-gray-800 line-clamp-2">{book.name || book.title}</h4>
-                      </div>
-                    </Link>
-                  ))}
-                  <button 
-                    onClick={handleSearch}
-                    className="p-3 text-center text-sm text-[#157a2c] font-medium hover:bg-green-50 transition-colors"
-                  >
-                    Xem tất cả kết quả cho &quot;{searchTerm}&quot;
-                  </button>
-                </div>
-              ) : (
-                <div className="p-8 text-center flex flex-col items-center justify-center text-gray-500">
-                  <FiSearch size={32} className="mb-2 text-gray-300" />
-                  <span className="text-sm">Không tìm thấy sách nào khớp với &quot;{searchTerm}&quot;</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        {/* ------------------------------ */}
-
-        <div className="flex items-center gap-8 flex-shrink-0">
-          <Link to="/cart" className="flex flex-col items-center text-gray-600 hover:text-[#157a2c] relative transition-colors">
-            <FiShoppingCart size={22} strokeWidth={1.5} />
-            <span className="text-[11px] mt-1">Giỏ hàng</span>
-            {totalQuantity > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                {totalQuantity}
-              </span>
-            )}
-          </Link>
-          
-          <Link to="/wishlist" className="flex flex-col items-center text-gray-600 hover:text-[#157a2c] relative transition-colors">
-            <FiHeart size={22} strokeWidth={1.5} />
-            <span className="text-[11px] mt-1">Yêu thích</span>
-            {wishlistItems.length > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                {wishlistItems.length}
-              </span>
-            )}
-          </Link>
-          
-          {user ? (
-            <div className="flex flex-col items-center text-[#157a2c] relative group">
-              <div 
-                className="flex flex-col items-center cursor-pointer"
-                onClick={() => navigate('/profile')}
-              >
-                <FiUser size={22} strokeWidth={1.5} />
-                <span className="text-[11px] mt-1 font-bold whitespace-nowrap">
-                  {user.lastName || user.profile?.last_name} {user.firstName || user.profile?.first_name}
-                </span>
-              </div>
-              <div className="absolute top-full pt-2 right-0 hidden group-hover:block z-50">
-                <button
-                  onClick={() => {
-                    searchCache.current = {}; // Clear search cache on logout
-                    logout();
-                    navigate('/');
-                  }}
-                  className="bg-white border border-gray-200 shadow-lg rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap"
-                >
-                  Đăng xuất
-                </button>
-              </div>
-            </div>
-          ) : (
-            <Link to="/login" className="flex flex-col items-center text-gray-600 hover:text-[#157a2c] transition-colors">
-              <FiUser size={22} strokeWidth={1.5} />
-              <span className="text-[11px] mt-1">Tài khoản</span>
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <div className="border-b border-gray-200 relative">
-        <div className="container mx-auto px-4 flex items-center gap-8">
-          <div 
-            className="relative"
-            onMouseEnter={() => setIsMenuOpen(true)}
-            onMouseLeave={() => setIsMenuOpen(false)}
-          >
-            <button className={`flex items-center gap-2 font-bold py-3 px-6 border-x border-gray-100 transition-colors ${isMenuOpen ? 'text-[#157a2c] bg-gray-50' : 'text-[#157a2c] bg-white'}`}>
-              <FiMenu size={20} /> DANH MỤC
+        <div
+          className="relative flex-grow max-w-2xl min-w-0 flex items-stretch"
+          ref={searchRef}
+        >
+          <div className="relative flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                isCategoryMenuIntent.current = true;
+                setIsSuggestionOpen(false);
+                setIsMenuOpen((isOpen) => !isOpen);
+              }}
+              className={`header-menu-button h-full w-14 border-r-0 rounded-l-md flex items-center justify-center ${
+                isMenuOpen ? "is-open" : ""
+              }`}
+              title="Danh mục"
+            >
+              <FiMenu size={22} />
             </button>
 
             {isMenuOpen && (
-              <div className="absolute top-full left-0 w-[850px] flex shadow-2xl border border-gray-100 rounded-b-lg overflow-hidden bg-white">
-                <div className="w-64 bg-white flex-shrink-0">
+              <div className="header-dropdown absolute top-full left-0 w-[42rem] max-w-[calc(100vw-4rem)] flex rounded-lg overflow-hidden z-[60] mt-2">
+                <div className="w-48 flex-shrink-0">
                   <ul className="flex flex-col">
                     {parentCategories.map((category) => (
-                      <li 
+                      <li
                         key={category.id}
                         onMouseEnter={() => setActiveMenuId(category.id)}
-                        onClick={() => {
-                          navigate(`/catalog?category=${category.slug}`);
-                          setIsMenuOpen(false);
-                        }}
-                        className={`px-4 py-3 cursor-pointer border-b border-gray-50 flex justify-between items-center transition-colors ${
-                          activeMenuId === category.id ? 'bg-[#157a2c] text-white font-medium' : 'text-gray-700 hover:bg-gray-100'
+                        onClick={() => handleCategoryClick(category)}
+                        className={`header-category-item px-4 py-3 cursor-pointer flex justify-between items-center gap-3 ${
+                          activeMenuId === category.id
+                            ? "is-active font-medium"
+                            : ""
                         }`}
                       >
-                        {category.name}
-                        <FiChevronRight size={16} className={activeMenuId === category.id ? 'text-white' : 'text-gray-400'} />
+                        <span className="min-w-0 truncate">
+                          {category.name}
+                        </span>
+                        <FiChevronRight
+                          size={16}
+                          className={
+                            activeMenuId === category.id
+                              ? "text-white"
+                              : "app-soft-text"
+                          }
+                        />
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div className="flex-grow bg-[#f3f4f6] p-6">
+                <div className="header-dropdown-muted flex-grow p-4">
                   {subCategories.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-3">
-                      {subCategories.map((sub) => (
-                        <Link 
-                          key={sub.id} 
-                          to={`/catalog?category=${sub.slug}`} 
-                          onClick={() => setIsMenuOpen(false)}
-                          className="bg-white px-3 py-2 text-sm text-gray-700 rounded border border-gray-100 shadow-sm hover:text-[#157a2c] hover:border-[#157a2c] transition-colors truncate"
+                    <div className="grid grid-cols-2 gap-3">
+                      {subCategories.map((subCategory) => (
+                        <Link
+                          key={subCategory.id}
+                          to={`/catalog?category=${subCategory.slug}`}
+                          onClick={closeSearchDropdowns}
+                          className="header-subcategory-link px-3 py-2 text-sm rounded truncate"
                         >
-                          {sub.name}
+                          {subCategory.name}
                         </Link>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-gray-400 italic text-sm">Đang cập nhật danh mục...</div>
+                    <div className="app-soft-text italic text-sm">
+                      Đang cập nhật danh mục...
+                    </div>
                   )}
                 </div>
               </div>
             )}
           </div>
 
-          <ul className="flex items-center gap-6 text-sm text-gray-800 font-medium">
-            <li><Link to="/catalog?sort=newest" className="hover:text-[#157a2c] transition">Sách mới</Link></li>
-            <li><Link to="/catalog?sort=best_selling" className="hover:text-[#157a2c] transition">Sách bán chạy</Link></li>
-            <li><Link to="/catalog?sort=trending" className="text-[#157a2c] transition">Sách xu hướng</Link></li>
-          </ul>
+          <div className="relative flex-grow min-w-0">
+            <input
+              type="text"
+              placeholder="Tên sách lên xu hướng/bestselling..."
+              className="header-search-input w-full rounded-r-md py-2.5 px-4 pr-12 outline-none text-sm"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleSearch()}
+              onFocus={() => {
+                isCategoryMenuIntent.current = false;
+                setIsMenuOpen(false);
+                if (searchTerm.trim().length >= 2) setIsSuggestionOpen(true);
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSearch}
+              className="header-icon-link absolute right-0 top-0 h-full w-12 flex items-center justify-center rounded-r-md"
+            >
+              {isSearching ? (
+                <div className="app-spinner w-5 h-5 border-2 rounded-full animate-spin" />
+              ) : (
+                <FiSearch size={20} />
+              )}
+            </button>
+
+            {isSuggestionOpen && (
+              <div className="header-dropdown absolute top-full mt-2 -left-14 w-[calc(100%+3.5rem)] rounded-lg z-[60] overflow-hidden">
+                {suggestions.length > 0 ? (
+                  <div className="flex flex-col">
+                    <div className="header-dropdown-muted app-muted-text app-section-divider px-4 py-2 text-xs font-semibold">
+                      Sách gợi ý
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 p-4">
+                      {visibleSuggestions.map((book) => (
+                        <Link
+                          key={book.id}
+                          to={`/book/${book.slug}`}
+                          onClick={closeSearchDropdowns}
+                          className="header-suggestion-item flex min-w-0 items-start gap-3 rounded-md p-1.5"
+                        >
+                          <img
+                            src={
+                              book.thumbnail_url ||
+                              book.thumbnail ||
+                              "https://placehold.co/40x60?text=No+Image"
+                            }
+                            alt={book.name || book.title}
+                            className="app-media-frame w-10 h-14 flex-shrink-0 object-cover rounded shadow-sm"
+                          />
+                          <span className="min-w-0 text-sm font-medium leading-5 app-section-title line-clamp-2">
+                            {book.name || book.title}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSearch}
+                      className="header-suggestion-item p-3 text-center text-sm text-primary font-medium"
+                    >
+                      Xem tất cả kết quả cho &quot;{searchTerm}&quot;
+                    </button>
+                  </div>
+                ) : (
+                  <div className="app-muted-text p-8 text-center flex flex-col items-center justify-center">
+                    <FiSearch size={32} className="app-soft-text mb-2" />
+                    <span className="text-sm">
+                      Không tìm thấy sách nào khớp với &quot;{searchTerm}&quot;
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-8 flex-shrink-0">
+          <Link
+            to="/cart"
+            className="header-icon-link flex flex-col items-center relative"
+          >
+            <FiShoppingCart size={22} strokeWidth={1.5} />
+            <span className="text-[11px] mt-1">Giỏ hàng</span>
+            {totalQuantity > 0 && (
+              <span className="app-badge-danger absolute -top-1.5 -right-2 text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                {totalQuantity}
+              </span>
+            )}
+          </Link>
+
+          <Link
+            to="/wishlist"
+            className="header-icon-link flex flex-col items-center relative"
+          >
+            <FiHeart size={22} strokeWidth={1.5} />
+            <span className="text-[11px] mt-1">Yêu thích</span>
+            {wishlistItems.length > 0 && (
+              <span className="app-badge-danger absolute -top-1.5 -right-2 text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                {wishlistItems.length}
+              </span>
+            )}
+          </Link>
+
+          {user ? (
+            <div className="flex flex-col items-center text-primary relative group">
+              <div
+                className="flex flex-col items-center cursor-pointer"
+                onClick={() => navigate("/profile")}
+              >
+                <FiUser size={22} strokeWidth={1.5} />
+                <span className="text-[11px] mt-1 font-bold whitespace-nowrap">
+                  {user.lastName || user.profile?.last_name}{" "}
+                  {user.firstName || user.profile?.first_name}
+                </span>
+              </div>
+              <div className="absolute top-full pt-2 right-0 hidden group-hover:block z-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    searchCache.current = {};
+                    logout();
+                    navigate("/");
+                  }}
+                  className="app-card app-danger-link rounded-md px-4 py-2 text-sm whitespace-nowrap"
+                >
+                  Đăng xuất
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="header-icon-link flex flex-col items-center"
+            >
+              <FiUser size={22} strokeWidth={1.5} />
+              <span className="text-[11px] mt-1">Tài khoản</span>
+            </Link>
+          )}
         </div>
       </div>
     </header>
