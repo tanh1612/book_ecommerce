@@ -122,13 +122,10 @@ const ProfilePage = () => {
 
   const handleLogout = async () => {
     if(window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
-      try {
-        await authApi.logout();
-        logout();
+      const loggedOut = await logout();
+      if (loggedOut) {
         toast.success("Đăng xuất thành công");
         navigate('/login');
-      } catch {
-        toast.error("Lỗi đăng xuất!");
       }
     }
   };

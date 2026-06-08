@@ -192,7 +192,7 @@ const Header = () => {
   };
 
   return (
-    <header ref={headerRef} className="site-header sticky top-0 z-50">
+    <header ref={headerRef} className="site-header sticky top-0 z-50 shadow-lg">
       {isDropdownOpen && (
         <div
           className="site-header-overlay fixed left-0 right-0 bottom-0 z-40"
@@ -203,11 +203,12 @@ const Header = () => {
       )}
 
       <div className="site-header-shell relative z-50 container mx-auto px-8 lg:px-10 py-5 flex items-center justify-between gap-8">
-        <Link
-          to="/"
-          className="flex-shrink-0 flex items-center"
-        >
-          <img src={logo} alt="Bookify" className="h-10 w-auto object-contain" />
+        <Link to="/" className="flex-shrink-0 flex items-center">
+          <img
+            src={logo}
+            alt="Bookify"
+            className="h-10 w-auto object-contain"
+          />
         </Link>
 
         <div

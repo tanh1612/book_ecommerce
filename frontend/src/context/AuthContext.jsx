@@ -59,8 +59,10 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await authApi.logout();
+      return true;
     } catch {
       toast.error("Lỗi đăng xuất");
+      return false;
     } finally {
       setUser(null);
       setError(null);

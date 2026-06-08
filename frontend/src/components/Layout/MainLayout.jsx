@@ -7,7 +7,6 @@ const MainLayout = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      {/* Outlet chính là phần nội dung sẽ thay đổi (Trang chủ, Giỏ hàng...) */}
       <main className="flex-grow bg-page-surface py-6">
         <Outlet />
       </main>

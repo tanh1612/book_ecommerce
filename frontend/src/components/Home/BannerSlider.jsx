@@ -1,13 +1,12 @@
 // src/components/Home/BannerSlider.jsx
 import { useEffect, useState } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay, Pagination, Navigation } from 'swiper/modules';
+import { Autoplay, Pagination } from 'swiper/modules';
 import contentApi from '../../services/contentApi';
 import { resolveMediaUrl } from '../../utils/media';
 
 import 'swiper/css';
 import 'swiper/css/pagination';
-import 'swiper/css/navigation';
 
 const BannerSlider = () => {
   const [banners, setBanners] = useState([]);
@@ -57,8 +56,7 @@ const BannerSlider = () => {
         loop={banners.length > 1}
         autoplay={banners.length > 1 ? { delay: 3500, disableOnInteraction: false } : false}
         pagination={banners.length > 1 ? { clickable: true } : false}
-        navigation={banners.length > 1}
-        modules={[Autoplay, Pagination, Navigation]}
+        modules={[Autoplay, Pagination]}
         className="bookify-home-banners"
       >
         {banners.map((banner) => (

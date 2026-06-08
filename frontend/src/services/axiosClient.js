@@ -26,15 +26,19 @@ const axiosClient = axios.create({
 
 const getCsrfTokenFromCookie = () => {
   const name = 'XSRF-TOKEN';
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
+  const tokens = document.cookie
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .filter((cookie) => cookie.startsWith(`${name}=`))
+    .map((cookie) => cookie.slice(name.length + 1))
+    .filter(Boolean);
 
-  if (parts.length !== 2) {
+  if (tokens.length === 0) {
     return null;
   }
 
   try {
-    return decodeURIComponent(parts.pop().split(';').shift());
+    return decodeURIComponent(tokens.at(-1));
   } catch {
     return null;
   }
@@ -43,9 +47,14 @@ const getCsrfTokenFromCookie = () => {
 const clearReadableXsrfCookies = () => {
   if (typeof document === 'undefined') return;
 
-  document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/';
-  document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/; domain=localhost';
-  document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/; domain=127.0.0.1';
+  const hostname = window.location.hostname;
+  const domains = new Set([hostname, `.${hostname}`, 'localhost', '127.0.0.1']);
+  const expiry = 'XSRF-TOKEN=; Max-Age=0; path=/';
+
+  document.cookie = expiry;
+  domains.forEach((domain) => {
+    document.cookie = `${expiry}; domain=${domain}`;
+  });
 };
 
 let csrfRequest = null;
@@ -104,8 +113,10 @@ axiosClient.interceptors.response.use(
       const token = await getCsrfToken({ force: true });
       originalRequest.headers = {
         ...originalRequest.headers,
-        'X-XSRF-TOKEN': token,
       };
+      if (token) {
+        originalRequest.headers['X-XSRF-TOKEN'] = token;
+      }
 
       return axiosClient(originalRequest);
     }

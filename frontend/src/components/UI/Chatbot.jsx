@@ -290,7 +290,7 @@ const Chatbot = () => {
         onClick={() => setIsOpen(!isOpen)}
         className="chatbot-fab h-16 w-16 rounded-full flex items-center justify-center float-right relative"
         aria-label={
-          isOpen ? "ÄÃ³ng trá»£ lÃ½ Bookify" : "Má»Ÿ trá»£ lÃ½ Bookify"
+          isOpen ? "Đóng trợ lý Bookify" : "Mở trợ lý Bookify"
         }
       >
         {!isOpen && (

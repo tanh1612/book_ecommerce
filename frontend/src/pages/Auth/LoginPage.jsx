@@ -33,13 +33,12 @@ const LoginPage = () => {
 
     try {
       setIsSubmitting(true);
-      await authApi.login({ email, password, remember: remember ? 1 : 0 });
-      const userRes = await authApi.getProfile();
+      const userRes = await authApi.login({ email, password, remember: remember ? 1 : 0 });
       login(userRes.data);
       toast.success("Đăng nhập thành công!");
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || "Tài khoản hoặc mật khẩu không chính xác!");
+      // axiosClient.js đã tự động toast lỗi từ server, không cần toast thêm ở đây để tránh lặp
     } finally {
       setIsSubmitting(false);
     }
