@@ -15,6 +15,7 @@ beforeEach(function (): void {
     $this->withoutMiddleware(VerifyCsrfToken::class);
     $this->disableCookieEncryption();
     $this->withCredentials();
+    $this->withHeader('Origin', 'http://localhost');
 });
 
 function loginAsAccount(Account $account): void
@@ -159,4 +160,3 @@ test('deactivated session user is blocked from cart and subsequent cart acts as 
         ->assertOk()
         ->assertJsonPath('data.items', []);
 });
-

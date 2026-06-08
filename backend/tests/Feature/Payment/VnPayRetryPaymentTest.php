@@ -21,6 +21,7 @@ beforeEach(function (): void {
         'vnpay.hash_secret' => 'test-secret-key-32chars-minimum',
         'vnpay.payment_url' => 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
         'vnpay.return_url' => 'https://example.test/api/v1/payments/vnpay/return',
+        'vnpay.ipn_url' => 'https://example.test/api/v1/payments/vnpay/ipn',
         'vnpay.payment_ttl_hours' => 12,
         'vnpay.version' => '2.1.0',
         'vnpay.command' => 'pay',

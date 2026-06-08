@@ -23,6 +23,7 @@ beforeEach(function (): void {
         'vnpay.hash_secret' => 'test-secret-key-32chars-minimum',
         'vnpay.payment_url' => 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
         'vnpay.return_url' => 'https://example.test/api/v1/payments/vnpay/return',
+        'vnpay.ipn_url' => 'https://example.test/api/v1/payments/vnpay/ipn',
         'vnpay.payment_ttl_hours' => 12,
         'vnpay.version' => '2.1.0',
         'vnpay.command' => 'pay',
@@ -321,3 +322,39 @@ test('expire command releases reserved inventory for order items', function (): 
     $inventory = Inventory::query()->where('book_id', $book->id)->firstOrFail();
     expect((int) $inventory->reserved_quantity)->toBe(0);
 });
+
+test('payment url contains vnp_ReturnUrl parameter', function (): void {
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+
+    $result = $service->createPaymentUrl($order, '127.0.0.1');
+
+    expect($result['payment_url'])->toContain('vnp_ReturnUrl=');
+});
+
+test('payment url does not contain vnp_IpnUrl parameter', function (): void {
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+
+    $result = $service->createPaymentUrl($order, '127.0.0.1');
+
+    expect($result['payment_url'])->not->toContain('vnp_IpnUrl');
+});
+
+test('missing VNP_IPN_URL throws configuration error', function (): void {
+    config(['vnpay.ipn_url' => null]);
+
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+
+    $service->createPaymentUrl($order, '127.0.0.1');
+})->throws(RuntimeException::class, 'VNPay IPN URL is not configured (VNP_IPN_URL)');
+
+test('empty VNP_IPN_URL throws configuration error', function (): void {
+    config(['vnpay.ipn_url' => '']);
+
+    $order = createVnPayOrder();
+    $service = app(VnPayService::class);
+
+    $service->createPaymentUrl($order, '127.0.0.1');
+})->throws(RuntimeException::class, 'VNPay IPN URL is not configured (VNP_IPN_URL)');

@@ -36,8 +36,7 @@ Route::prefix('v1/auth')->group(function (): void {
     Route::post('register/verify-otp', [AuthController::class, 'verifyOtp']);
 
     // Register
-    Route::post('register', [AuthController::class, 'register'])
-        ->middleware('web');
+    Route::post('register', [AuthController::class, 'register']);
 
     // Forgot password
     Route::post('password/forgot/send-otp', [ForgotPasswordController::class, 'sendOtp'])
@@ -50,11 +49,10 @@ Route::prefix('v1/auth')->group(function (): void {
     Route::post('password/reset', [ForgotPasswordController::class, 'reset']);
 
     // Login
-    Route::post('login', [AuthController::class, 'login'])
-        ->middleware('web');
+    Route::post('login', [AuthController::class, 'login']);
 
     Route::post('logout', [AuthController::class, 'logout'])
-        ->middleware(['web', 'auth:web']);
+        ->middleware('auth:sanctum');
 });
 
 // Public location proxy
@@ -98,7 +96,7 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
 
     // Review eligibility for authenticated user on book detail page
     Route::get('{slug}/review-eligibility', [BookReviewEligibilityController::class, 'show'])
-        ->middleware(['web', 'auth:web', 'account.active', 'throttle:60,1']);
+        ->middleware(['auth:sanctum', 'account.active', 'throttle:60,1']);
 
     // Approved reviews for book detail page (public)
     Route::get('{slug}/reviews', [BookReviewController::class, 'index']);
@@ -108,7 +106,7 @@ Route::prefix('v1/books')->middleware('throttle:120,1')->group(function (): void
 });
 
 // Cart
-Route::prefix('v1/cart')->middleware(['web', 'account.active', 'throttle:120,1'])->group(function (): void {
+Route::prefix('v1/cart')->middleware(['account.active', 'throttle:120,1'])->group(function (): void {
     // Get cart
     Route::get('', [CartController::class, 'show']);
 
@@ -126,7 +124,7 @@ Route::prefix('v1/cart')->middleware(['web', 'account.active', 'throttle:120,1']
 });
 
 // Account routes
-Route::prefix('v1/account')->middleware(['web', 'auth:web', 'account.active'])->group(function (): void {
+Route::prefix('v1/account')->middleware(['auth:sanctum', 'account.active'])->group(function (): void {
     // Get profile
     Route::get('profile', [ProfileController::class, 'show']);
 
@@ -185,23 +183,23 @@ Route::prefix('v1/account')->middleware(['web', 'auth:web', 'account.active'])->
 
 // Checkout
 Route::post('v1/checkout', [CheckoutController::class, 'store'])
-    ->middleware(['web', 'auth:web', 'account.active', 'throttle:30,1']);
+    ->middleware(['auth:sanctum', 'account.active', 'throttle:30,1']);
 
 // Shipping quote
 Route::post('v1/shipping/quote', [ShippingQuoteController::class, 'store'])
-    ->middleware(['web', 'auth:web', 'account.active', 'throttle:60,1']);
+    ->middleware(['auth:sanctum', 'account.active', 'throttle:60,1']);
 
 // Recommendation interactions
 Route::post('v1/recommendations/interactions/books/{book}/view', [InteractionController::class, 'trackBookView'])
-    ->middleware(['web', 'auth:web', 'account.active', 'throttle:60,1']);
+    ->middleware(['auth:sanctum', 'account.active', 'throttle:60,1']);
 
 // Recommendation feed
 Route::get('v1/recommendations', [RecommendationController::class, 'index'])
-    ->middleware(['web', 'throttle:120,1']);
+    ->middleware('throttle:120,1');
 
 // AI chatbot
 Route::post('v1/ai/chat', [ChatController::class, 'store'])
-    ->middleware(['web', 'throttle:ai-chat']);
+    ->middleware('throttle:ai-chat');
 
 Route::post('v1/ai/messages/{message}/feedback', [ChatFeedbackController::class, 'store'])
-    ->middleware(['web', 'throttle:ai-chat-feedback']);
+    ->middleware('throttle:ai-chat-feedback');

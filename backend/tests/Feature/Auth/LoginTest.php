@@ -18,6 +18,7 @@ beforeEach(function (): void {
     $this->withoutMiddleware(VerifyCsrfToken::class);
     $this->disableCookieEncryption();
     $this->withCredentials();
+    $this->withHeader('Origin', 'http://localhost');
     Cache::flush();
 });
 

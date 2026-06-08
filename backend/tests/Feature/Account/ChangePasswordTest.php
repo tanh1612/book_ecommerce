@@ -10,6 +10,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->withoutMiddleware(VerifyCsrfToken::class);
+    $this->withHeader('Origin', 'http://localhost');
     Cache::flush();
 });
 

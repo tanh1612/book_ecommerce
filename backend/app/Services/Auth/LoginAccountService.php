@@ -65,7 +65,8 @@ class LoginAccountService
             RateLimiter::clear($key);
 
             Auth::guard('web')->login($account, $remember);
-            request()->session()->regenerate();
+            request()->session()->migrate(true);
+            request()->session()->regenerateToken();
 
             return $account->load('profile');
         } catch (ValidationException|HttpException $e) {

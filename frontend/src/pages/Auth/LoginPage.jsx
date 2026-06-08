@@ -37,7 +37,7 @@ const LoginPage = () => {
       login(userRes.data);
       toast.success("Đăng nhập thành công!");
       navigate('/');
-    } catch (err) {
+    } catch {
       // axiosClient.js đã tự động toast lỗi từ server, không cần toast thêm ở đây để tránh lặp
     } finally {
       setIsSubmitting(false);

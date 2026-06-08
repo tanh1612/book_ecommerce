@@ -3,6 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 
 const MUTATING_METHODS = ['post', 'put', 'patch', 'delete'];
+const CSRF_CACHE_TTL_MS = 10 * 60 * 1000;
 
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 
@@ -17,10 +18,25 @@ const CSRF_URL = BACKEND_ORIGIN
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+  withXSRFToken: false,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
+  },
+});
+
+const csrfClient = axios.create({
+  withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+  withXSRFToken: false,
+  headers: {
+    Accept: 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+    'Cache-Control': 'no-cache',
   },
 });
 
@@ -58,34 +74,120 @@ const clearReadableXsrfCookies = () => {
 };
 
 let csrfRequest = null;
+let csrfTokenCache = null;
+let csrfTokenCachedAt = 0;
+
+const cacheCsrfToken = (token) => {
+  csrfTokenCache = token || null;
+  csrfTokenCachedAt = token ? Date.now() : 0;
+  return csrfTokenCache;
+};
+
+const hasFreshCachedCsrfToken = () => {
+  if (!csrfTokenCache) {
+    return false;
+  }
+
+  if (Date.now() - csrfTokenCachedAt > CSRF_CACHE_TTL_MS) {
+    return false;
+  }
+
+  return getCsrfTokenFromCookie() === csrfTokenCache;
+};
+
+const wait = (milliseconds) => new Promise((resolve) => {
+  setTimeout(resolve, milliseconds);
+});
+
+const waitForReadableCsrfToken = async (previousToken = null) => {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const token = getCsrfTokenFromCookie();
+
+    if (token && (!previousToken || token !== previousToken)) {
+      return token;
+    }
+
+    await wait(25);
+  }
+
+  return getCsrfTokenFromCookie();
+};
+
+const refreshCsrfCookie = async () => {
+  csrfRequest ??= csrfClient.get(CSRF_URL, {
+    params: { _: Date.now() },
+  });
+
+  await csrfRequest.finally(() => {
+    csrfRequest = null;
+  });
+};
 
 export const getCsrfToken = async ({ force = false } = {}) => {
+  if (!force && hasFreshCachedCsrfToken()) {
+    return csrfTokenCache;
+  }
+
+  const previousToken = force ? getCsrfTokenFromCookie() : null;
+
   if (force) {
     clearReadableXsrfCookies();
+    cacheCsrfToken(null);
   }
 
   let token = force ? null : getCsrfTokenFromCookie();
 
   if (!token) {
-    csrfRequest ??= axios.get(CSRF_URL, { withCredentials: true });
-    await csrfRequest.finally(() => {
-      csrfRequest = null;
-    });
-    token = getCsrfTokenFromCookie();
+    await refreshCsrfCookie();
+    token = await waitForReadableCsrfToken(previousToken);
   }
 
-  return token;
+  return cacheCsrfToken(token);
+};
+
+const toPlainHeaders = (headers) => {
+  const plainHeaders = headers?.toJSON
+    ? headers.toJSON()
+    : { ...(headers || {}) };
+
+  Object.keys(plainHeaders).forEach((key) => {
+    if (key.toLowerCase() === 'x-xsrf-token') {
+      delete plainHeaders[key];
+    }
+  });
+
+  return plainHeaders;
+};
+
+const setCsrfHeader = (config, token) => {
+  config.headers = {
+    ...toPlainHeaders(config.headers),
+    'X-XSRF-TOKEN': token,
+  };
+};
+
+const buildRetriedRequest = (originalRequest, token) => {
+  const retriedRequest = {
+    ...originalRequest,
+    headers: toPlainHeaders(originalRequest.headers),
+    _csrfRetried: true,
+  };
+
+  setCsrfHeader(retriedRequest, token);
+
+  return retriedRequest;
 };
 
 axiosClient.interceptors.request.use(
   async (config) => {
-    if (MUTATING_METHODS.includes(config.method?.toLowerCase())) {
+    if (
+      MUTATING_METHODS.includes(config.method?.toLowerCase()) &&
+      !config._csrfRetried
+    ) {
       try {
         const token = await getCsrfToken();
-
         if (token) {
-          config.headers = config.headers || {};
-          config.headers['X-XSRF-TOKEN'] = token;
+          setCsrfHeader(config, token);
         }
       } catch (error) {
         console.error('Failed to get CSRF token:', error);
@@ -109,16 +211,15 @@ axiosClient.interceptors.response.use(
       MUTATING_METHODS.includes(originalRequest.method?.toLowerCase()) &&
       !originalRequest._csrfRetried
     ) {
-      originalRequest._csrfRetried = true;
-      const token = await getCsrfToken({ force: true });
-      originalRequest.headers = {
-        ...originalRequest.headers,
-      };
-      if (token) {
-        originalRequest.headers['X-XSRF-TOKEN'] = token;
-      }
+      try {
+        const token = await getCsrfToken({ force: true });
 
-      return axiosClient(originalRequest);
+        if (token) {
+          return axiosClient(buildRetriedRequest(originalRequest, token));
+        }
+      } catch (csrfError) {
+        console.error('Failed to refresh CSRF token for retry:', csrfError);
+      }
     }
 
     if (originalRequest?.skipGlobalErrorHandler) {
@@ -136,7 +237,7 @@ axiosClient.interceptors.response.use(
     } else if (status === 419) {
       toast.error('Phiên làm việc hết hạn. Vui lòng thử lại');
     } else if (status === 422) {
-      const errors = error.response.data?.errors || {};
+      const errors = error.response?.data?.errors || {};
       const errorMessages = Object.values(errors).flat();
       if (errorMessages.length > 0) {
         toast.error(errorMessages[0]);

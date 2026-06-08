@@ -16,13 +16,7 @@ const authApi = {
   // --- ĐĂNG NHẬP / ĐĂNG XUẤT (SPA AUTH) ---
   async login(data) {
     await getCsrfToken(); // Bước bắt buộc của Sanctum
-    const response = await axiosClient.post('/v1/auth/login', data);
-    try {
-      await getCsrfToken({ force: true });
-    } catch (error) {
-      console.error('Failed to refresh CSRF token after login:', error);
-    }
-    return response;
+    return axiosClient.post('/v1/auth/login', data);
   },
   logout() {
     return axiosClient.post('/v1/auth/logout');

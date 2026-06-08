@@ -440,9 +440,14 @@ class VnPayService
         $secret = config('vnpay.hash_secret');
         $url = config('vnpay.payment_url');
         $returnUrl = config('vnpay.return_url');
+        $ipnUrl = config('vnpay.ipn_url');
 
         if (! is_string($tmn) || $tmn === '' || ! is_string($secret) || $secret === '' || ! is_string($url) || $url === '' || ! is_string($returnUrl) || $returnUrl === '') {
             throw new RuntimeException('VNPay is not configured (VNP_TMN_CODE, VNP_HASH_SECRET, VNP_URL, VNP_RETURN_URL).');
+        }
+
+        if (! is_string($ipnUrl) || $ipnUrl === '') {
+            throw new RuntimeException('VNPay IPN URL is not configured (VNP_IPN_URL). This URL must also be registered in the VNPay merchant/sandbox portal.');
         }
     }
 

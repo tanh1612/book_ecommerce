@@ -50,20 +50,26 @@ export const WishlistProvider = ({ children }) => {
       return;
     }
 
+    // Tối ưu hóa UI: Cập nhật state ngay lập tức cho người dùng (Optimistic Update)
+    const previousItems = [...wishlistItems];
+    setWishlistItems(prev => [...prev, book]);
+
     try {
       const res = await wishlistApi.addToWishlist(book.id);
       // Update state từ response thay vì fetchWishlist
       const payload = res.data?.data || res.data || null;
-      if (Array.isArray(payload)) {
-        setWishlistItems(payload);
-      } else if (payload?.id) {
-        setWishlistItems(prev => [payload, ...prev.filter(item => item.id !== payload.id)]);
-      } else {
-        setWishlistItems(prev => [...prev, book]);
+      if (payload) {
+        if (Array.isArray(payload)) {
+          setWishlistItems(payload);
+        } else if (payload.id) {
+          setWishlistItems(prev => prev.map(item => item.id === book.id ? payload : item));
+        }
       }
       toast.success(`Đã thả tim "${book.name || book.title}"!`);
-    } catch {
-      toast.error("Không thể thêm vào danh sách yêu thích lúc này.");
+    } catch (error) {
+      // Nếu API lỗi, khôi phục lại dữ liệu cũ
+      setWishlistItems(previousItems);
+      console.error("Lỗi thêm vào yêu thích:", error);
     }
   };
 
@@ -78,10 +84,10 @@ export const WishlistProvider = ({ children }) => {
     try {
       await wishlistApi.removeFromWishlist(bookId);
       toast.success("Đã xóa khỏi danh sách yêu thích.");
-    } catch {
+    } catch (error) {
       // Nếu API lỗi, khôi phục lại dữ liệu cũ
       setWishlistItems(previousItems);
-      toast.error("Lỗi hệ thống khi xóa sách yêu thích.");
+      console.error("Lỗi xóa khỏi yêu thích:", error);
     }
   };
 
