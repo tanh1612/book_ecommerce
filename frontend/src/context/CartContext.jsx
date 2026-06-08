@@ -6,6 +6,27 @@ import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
 
+const extractCartItems = (response, fallbackItems = [], changedItemId = null) => {
+  const payload = response?.data?.data ?? response?.data ?? response;
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+
+  const changedItem = payload?.item || payload?.cart_item || payload;
+  if (changedItem?.id && changedItemId) {
+    return fallbackItems.map((item) =>
+      item.id === changedItemId ? { ...item, ...changedItem } : item
+    );
+  }
+
+  return fallbackItems;
+};
+
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [isLoadingCart, setIsLoadingCart] = useState(false);
@@ -15,8 +36,7 @@ export const CartProvider = ({ children }) => {
     setIsLoadingCart(true);
     try {
       const res = await cartApi.getCart();
-      const items = res.data?.data?.items || res.data?.items || res.data || [];
-      setCartItems(Array.isArray(items) ? items : []);
+      setCartItems(extractCartItems(res));
     } catch {
       toast.error("Không thể tải giỏ hàng. Vui lòng tải lại trang.");
     } finally {
@@ -29,15 +49,14 @@ export const CartProvider = ({ children }) => {
   }, [fetchCart, user]);
 
   const totalQuantity = useMemo(() =>
-    cartItems.reduce((total, item) => total + (item.quantity || 1), 0)
+    cartItems.reduce((total, item) => total + Number(item.quantity || 0), 0)
   , [cartItems]);
 
   const addToCart = async (book, qty = 1) => {
     try {
       const res = await cartApi.addItem(book.id, qty);
       // Backend trả về cart data, set trực tiếp thay vì fetch lại
-      const items = res.data?.data?.items || res.data?.items || res.data || [];
-      setCartItems(Array.isArray(items) ? items : []);
+      setCartItems((prev) => extractCartItems(res, prev));
       toast.success(`Đã thêm ${qty} cuốn vào giỏ hàng`);
       return true;
     } catch (error) {
@@ -59,8 +78,7 @@ export const CartProvider = ({ children }) => {
       setCartItems(prev => prev.map(item => item.id === cartItemId ? { ...item, quantity } : item));
       const res = await cartApi.updateItem(cartItemId, { quantity });
       // Update state từ response
-      const items = res.data?.data?.items || res.data?.items || res.data || [];
-      setCartItems(Array.isArray(items) ? items : []);
+      setCartItems((prev) => extractCartItems(res, prev, cartItemId));
     } catch {
       toast.error("Lỗi cập nhật số lượng");
       setCartItems(oldItems);
@@ -73,8 +91,7 @@ export const CartProvider = ({ children }) => {
       setCartItems(prev => prev.filter(item => item.id !== cartItemId));
       const res = await cartApi.removeItem(cartItemId);
       // Update state từ response thay vì fetchCart
-      const items = res.data?.data?.items || res.data?.items || res.data || [];
-      setCartItems(Array.isArray(items) ? items : []);
+      setCartItems((prev) => extractCartItems(res, prev.filter(item => item.id !== cartItemId)));
       toast.success("Đã xóa sản phẩm");
     } catch {
       toast.error("Lỗi khi xóa sản phẩm");
@@ -89,8 +106,7 @@ export const CartProvider = ({ children }) => {
       setCartItems(prev => prev.map(item => item.id === cartItemId ? { ...item, selected: newSelected } : item));
       const res = await cartApi.updateItem(cartItemId, { selected: newSelected ? 1 : 0 });
       // Update state từ response
-      const items = res.data?.data?.items || res.data?.items || res.data || [];
-      setCartItems(Array.isArray(items) ? items : []);
+      setCartItems((prev) => extractCartItems(res, prev, cartItemId));
     } catch {
       toast.error("Lỗi thao tác");
       setCartItems(oldItems);
@@ -103,8 +119,7 @@ export const CartProvider = ({ children }) => {
       setCartItems(prev => prev.map(item => ({ ...item, selected: isSelected })));
       const res = await cartApi.updateSelection(isSelected ? 1 : 0);
       // Update state từ response
-      const items = res.data?.data?.items || res.data?.items || res.data || [];
-      setCartItems(Array.isArray(items) ? items : []);
+      setCartItems((prev) => extractCartItems(res, prev));
     } catch {
       toast.error("Lỗi thao tác");
       setCartItems(oldItems);

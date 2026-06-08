@@ -19,6 +19,34 @@ import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
 import { useAuth } from "../../context/AuthContext";
 
+const STAR_PATH =
+  "M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z";
+
+const RatingStars = ({ rating }) => {
+  const normalizedRating = Number(rating || 0);
+
+  return (
+    <div className="flex">
+      {[1, 2, 3, 4, 5].map((star) => {
+        const fillPercent = Math.max(0, Math.min(1, normalizedRating - star + 1)) * 100;
+
+        return (
+          <span key={star} className="relative inline-flex w-4 h-4">
+            <svg className="app-rating-star-base w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d={STAR_PATH} />
+            </svg>
+            <span className="absolute inset-0 overflow-hidden" style={{ width: `${fillPercent}%` }}>
+              <svg className="app-rating-star-fill w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d={STAR_PATH} />
+              </svg>
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 const ProductDetailPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -263,18 +291,7 @@ const ProductDetailPage = () => {
             </h1>
 
             <div className="flex items-center gap-4 text-sm mb-4">
-              <div className="flex text-gray-300">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <svg
-                    key={star}
-                    className={`w-4 h-4 ${star <= averageRating ? "text-yellow-400" : "text-gray-300"}`}
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
+              <RatingStars rating={averageRating} />
               <span className="text-yellow-500 font-medium">
                 {averageRating > 0 ? averageRating : "0.0"}
               </span>

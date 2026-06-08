@@ -7,28 +7,28 @@ import addressApi from '../../services/addressApi';
 const AddressBook = () => {
   const [addresses, setAddresses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const [provinces, setProvinces] = useState([]);
   const [wards, setWards] = useState([]);
 
   const [addressForm, setAddressForm] = useState({
-    recipient_name: '', recipient_phone: '',
-    province_code: '', ward_code: '', detail_address: '',
-    is_default: false
+    recipient_name: '',
+    recipient_phone: '',
+    province_code: '',
+    ward_code: '',
+    detail_address: '',
+    is_default: false,
   });
 
   const fetchAddresses = async () => {
     try {
       setIsLoading(true);
       const res = await addressApi.getAddresses();
-      // Mở bọc Axios -> Mở bọc Laravel Resource
-      setAddresses(res.data.data || []);
+      setAddresses(res.data?.data || res.data || []);
     } catch {
-      toast.error("Không thể tải danh sách địa chỉ!");
+      setAddresses([]);
     } finally {
       setIsLoading(false);
     }
@@ -37,12 +37,10 @@ const AddressBook = () => {
   const fetchProvinces = async () => {
     try {
       const res = await addressApi.getProvinces();
-      // Lấy data từ Axios
       const payload = res.data;
-      // Nếu API Tỉnh phân trang thì nằm trong payload.data.data, nếu không thì payload.data
       setProvinces(payload.data?.data || payload.data || []);
     } catch (err) {
-      console.error("Lỗi tải tỉnh thành:", err);
+      console.error('Lỗi tải tỉnh thành:', err);
     }
   };
 
@@ -60,7 +58,7 @@ const AddressBook = () => {
         province_code: address.province_code || '',
         ward_code: address.ward_code || '',
         detail_address: address.detail_address || '',
-        is_default: address.is_default === 1 || address.is_default === true
+        is_default: address.is_default === 1 || address.is_default === true,
       });
 
       if (address.province_code) {
@@ -75,19 +73,23 @@ const AddressBook = () => {
     } else {
       setEditingId(null);
       setAddressForm({
-        recipient_name: '', recipient_phone: '',
-        province_code: '', ward_code: '', detail_address: '',
-        is_default: addresses.length === 0
+        recipient_name: '',
+        recipient_phone: '',
+        province_code: '',
+        ward_code: '',
+        detail_address: '',
+        is_default: addresses.length === 0,
       });
       setWards([]);
     }
+
     setIsModalOpen(true);
   };
 
-  const handleProvinceChange = async (e) => {
-    const provinceCode = e.target.value;
-    setAddressForm(prev => ({ ...prev, province_code: provinceCode, ward_code: '' }));
-    
+  const handleProvinceChange = async (event) => {
+    const provinceCode = event.target.value;
+    setAddressForm((prev) => ({ ...prev, province_code: provinceCode, ward_code: '' }));
+
     if (provinceCode) {
       try {
         const res = await addressApi.getWards(provinceCode);
@@ -101,10 +103,17 @@ const AddressBook = () => {
     }
   };
 
-  const handleSaveAddress = async (e) => {
-    e.preventDefault();
-    if (!addressForm.recipient_name || !addressForm.recipient_phone || !addressForm.province_code || !addressForm.ward_code || !addressForm.detail_address) {
-      return toast.error("Vui lòng điền và chọn đầy đủ thông tin!");
+  const handleSaveAddress = async (event) => {
+    event.preventDefault();
+
+    if (
+      !addressForm.recipient_name ||
+      !addressForm.recipient_phone ||
+      !addressForm.province_code ||
+      !addressForm.ward_code ||
+      !addressForm.detail_address
+    ) {
+      return toast.error('Vui lòng điền và chọn đầy đủ thông tin!');
     }
 
     setIsSubmitting(true);
@@ -115,39 +124,35 @@ const AddressBook = () => {
         province_code: String(addressForm.province_code).padStart(2, '0'),
         ward_code: String(addressForm.ward_code).padStart(5, '0'),
         detail_address: addressForm.detail_address.trim(),
-        is_default: addressForm.is_default ? 1 : 0 
+        is_default: addressForm.is_default ? 1 : 0,
       };
 
       if (editingId) {
         await addressApi.updateAddress(editingId, payload);
-        toast.success("Cập nhật địa chỉ thành công!");
+        toast.success('Cập nhật địa chỉ thành công!');
       } else {
         await addressApi.createAddress(payload);
-        toast.success("Thêm địa chỉ mới thành công!");
+        toast.success('Thêm địa chỉ mới thành công!');
       }
+
       setIsModalOpen(false);
       fetchAddresses();
-    } catch (error) {
-      if (error.response?.status === 422) {
-        const errors = error.response.data?.errors;
-        toast.error(errors ? errors[Object.keys(errors)[0]][0] : "Dữ liệu nhập vào chưa hợp lệ!");
-      } else {
-        toast.error("Đã xảy ra lỗi hệ thống khi lưu địa chỉ!");
-      }
+    } catch {
+      // axiosClient đã hiển thị lỗi validation/system ở tầng global.
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDeleteAddress = async (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa địa chỉ này?")) {
-      try {
-        await addressApi.deleteAddress(id);
-        toast.success("Đã xóa địa chỉ!");
-        fetchAddresses();
-      } catch {
-        toast.error("Lỗi khi xóa địa chỉ!");
-      }
+    if (!window.confirm('Bạn có chắc chắn muốn xóa địa chỉ này?')) return;
+
+    try {
+      await addressApi.deleteAddress(id);
+      toast.success('Đã xóa địa chỉ!');
+      fetchAddresses();
+    } catch {
+      toast.error('Lỗi khi xóa địa chỉ!');
     }
   };
 
@@ -162,37 +167,43 @@ const AddressBook = () => {
 
       <div className="p-4 md:p-6">
         {isLoading ? (
-          <div className="flex justify-center py-10"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
+          <div className="flex justify-center py-10">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : addresses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {addresses.map(address => (
+            {addresses.map((address) => (
               <div key={address.id} className={`border rounded-lg p-4 relative ${address.is_default ? 'border-primary bg-green-50' : 'border-gray-200 bg-white'}`}>
                 {address.is_default && (
                   <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">Mặc định</div>
                 )}
-                
+
                 <div className="flex items-start gap-3 mb-2 mt-2">
                   <FiMapPin className="text-primary mt-1 flex-shrink-0" />
                   <div>
                     <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                      {address.recipient_name} <span className="text-gray-400 font-normal">|</span> <span className="text-gray-600 font-normal">{address.recipient_phone}</span>
+                      {address.recipient_name}
+                      <span className="text-gray-400 font-normal">|</span>
+                      <span className="text-gray-600 font-normal">{address.recipient_phone}</span>
                     </h3>
                   </div>
                 </div>
-                
-                {/* HIỂN THỊ ĐẦY ĐỦ ĐỊA CHỈ */}
+
                 <p className="text-gray-600 text-sm ml-7 mb-4 line-clamp-2">
                   {address.detail_address}
                   {address.ward?.name ? `, ${address.ward.name}` : (address.ward_name ? `, ${address.ward_name}` : '')}
                   {address.province?.name ? `, ${address.province.name}` : (address.province_name ? `, ${address.province_name}` : '')}
-                  {/* Backup trong trường hợp DB chỉ lưu code */}
-                  {!address.province && !address.province_name && address.province_code && `, ${provinces.find(p => p.code == address.province_code)?.name || ''}`}
+                  {!address.province && !address.province_name && address.province_code && `, ${provinces.find((province) => province.code == address.province_code)?.name || ''}`}
                 </p>
 
                 <div className="flex gap-2 ml-7">
-                  <button onClick={() => handleOpenModal(address)} className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"><FiEdit2 size={14} /> Sửa</button>
+                  <button onClick={() => handleOpenModal(address)} className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                    <FiEdit2 size={14} /> Sửa
+                  </button>
                   {!address.is_default && (
-                    <button onClick={() => handleDeleteAddress(address.id)} className="text-sm font-medium text-red-500 hover:text-red-700 flex items-center gap-1 ml-4"><FiTrash2 size={14} /> Xóa</button>
+                    <button onClick={() => handleDeleteAddress(address.id)} className="text-sm font-medium text-red-500 hover:text-red-700 flex items-center gap-1 ml-4">
+                      <FiTrash2 size={14} /> Xóa
+                    </button>
                   )}
                 </div>
               </div>
@@ -208,43 +219,52 @@ const AddressBook = () => {
         )}
       </div>
 
-      {/* MODAL THÊM / SỬA */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
+        <div className="app-modal-backdrop fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-fade-in-up">
             <div className="flex justify-between items-center p-4 md:p-6 border-b">
               <h2 className="text-xl font-bold text-gray-800">{editingId ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ mới'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition"><FiX size={24} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition">
+                <FiX size={24} />
+              </button>
             </div>
-            
+
             <form onSubmit={handleSaveAddress} className="p-4 md:p-6 flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm text-gray-600 mb-1">Họ và tên *</label><input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.recipient_name} onChange={(e) => setAddressForm({...addressForm, recipient_name: e.target.value})} /></div>
-                <div><label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label><input type="tel" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.recipient_phone} onChange={(e) => setAddressForm({...addressForm, recipient_phone: e.target.value})} /></div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Họ và tên *</label>
+                  <input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.recipient_name} onChange={(event) => setAddressForm({ ...addressForm, recipient_name: event.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label>
+                  <input type="tel" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.recipient_phone} onChange={(event) => setAddressForm({ ...addressForm, recipient_phone: event.target.value })} />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Tỉnh/Thành phố *</label>
                   <select required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary bg-white" value={addressForm.province_code} onChange={handleProvinceChange}>
-                    <option value="">Chọn Tỉnh/Thành</option>{provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                    <option value="">Chọn Tỉnh/Thành</option>
+                    {provinces.map((province) => <option key={province.code} value={province.code}>{province.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Quận/Huyện/Xã *</label>
-                  <select required disabled={!addressForm.province_code} className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary bg-white" value={addressForm.ward_code} onChange={(e) => setAddressForm({...addressForm, ward_code: e.target.value})}>
-                    <option value="">Chọn Phường/Xã</option>{wards.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
+                  <label className="block text-sm text-gray-600 mb-1">Phường/Xã *</label>
+                  <select required disabled={!addressForm.province_code} className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary bg-white" value={addressForm.ward_code} onChange={(event) => setAddressForm({ ...addressForm, ward_code: event.target.value })}>
+                    <option value="">Chọn Phường/Xã</option>
+                    {wards.map((ward) => <option key={ward.code} value={ward.code}>{ward.name}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Địa chỉ chi tiết (Số nhà, đường...) *</label>
-                <input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.detail_address} onChange={(e) => setAddressForm({...addressForm, detail_address: e.target.value})} />
+                <input type="text" required className="w-full border border-gray-300 rounded py-2 px-3 outline-none focus:border-primary" value={addressForm.detail_address} onChange={(event) => setAddressForm({ ...addressForm, detail_address: event.target.value })} />
               </div>
 
               <label className="flex items-center gap-2 mt-2 cursor-pointer w-fit">
-                <input type="checkbox" className="w-4 h-4 text-primary rounded border-gray-300" checked={addressForm.is_default} onChange={(e) => setAddressForm({...addressForm, is_default: e.target.checked})} />
+                <input type="checkbox" className="w-4 h-4 text-primary rounded border-gray-300" checked={addressForm.is_default} onChange={(event) => setAddressForm({ ...addressForm, is_default: event.target.checked })} />
                 <span className="text-sm font-medium text-gray-700">Đặt làm địa chỉ mặc định</span>
               </label>
 

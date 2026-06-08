@@ -80,6 +80,12 @@ const Header = () => {
       ?.children || [];
   const visibleSuggestions = suggestions.slice(0, SEARCH_SUGGESTION_LIMIT);
   const isDropdownOpen = isMenuOpen || isSuggestionOpen;
+  const formatBadgeCount = (count) => {
+    const normalizedCount = Number(count || 0);
+    return normalizedCount > 99 ? "99+" : String(normalizedCount);
+  };
+  const cartBadgeCount = formatBadgeCount(totalQuantity);
+  const wishlistBadgeCount = formatBadgeCount(wishlistItems.length);
 
   const closeSearchDropdowns = useCallback(() => {
     setIsMenuOpen(false);
@@ -369,11 +375,9 @@ const Header = () => {
           >
             <FiShoppingCart size={22} strokeWidth={1.5} />
             <span className="text-[11px] mt-1">Giỏ hàng</span>
-            {totalQuantity > 0 && (
-              <span className="app-badge-danger absolute -top-1.5 -right-2 text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                {totalQuantity}
-              </span>
-            )}
+            <span className="app-badge-danger absolute -top-1.5 -right-2 text-[10px] font-bold min-w-4 h-4 px-1 flex items-center justify-center rounded-full">
+              {cartBadgeCount}
+            </span>
           </Link>
 
           <Link
@@ -382,11 +386,9 @@ const Header = () => {
           >
             <FiHeart size={22} strokeWidth={1.5} />
             <span className="text-[11px] mt-1">Yêu thích</span>
-            {wishlistItems.length > 0 && (
-              <span className="app-badge-danger absolute -top-1.5 -right-2 text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                {wishlistItems.length}
-              </span>
-            )}
+            <span className="app-badge-danger absolute -top-1.5 -right-2 text-[10px] font-bold min-w-4 h-4 px-1 flex items-center justify-center rounded-full">
+              {wishlistBadgeCount}
+            </span>
           </Link>
 
           {user ? (

@@ -1,11 +1,142 @@
 // src/components/UI/Chatbot.jsx
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { FiX, FiSend, FiThumbsUp, FiThumbsDown } from "react-icons/fi";
 import { v4 as uuidv4 } from "uuid";
 import aiApi from "../../services/aiApi";
 import { toast } from "react-toastify";
 import chatbotIcon from "../../assets/bookify-favicon-512.png";
 import chatbotButtonIcon from "../../assets/bookify-b-white-transparent.png";
+
+const stripLinkArtifacts = (value) =>
+  String(value || "")
+    .replace(/\uD83D\uDCDA|\uD83D\uDD17/g, "")
+    .replace(/\S*(?:\u0178|\u00c5\u00b8)\S*/g, "")
+    .replace(/(?:đŸ\S+|ðŸ\S+)/g, "")
+    .trim();
+
+const buildBookPath = (href, source = {}) => {
+  const sourceSlug = source.slug || source.book_slug || source.product_slug;
+  if (sourceSlug) return `/book/${sourceSlug}`;
+
+  const sourceId = source.book_id || source.product_id || source.id;
+  const cleanHref = stripLinkArtifacts(href);
+
+  if (!cleanHref && sourceId) return `/book/${sourceId}`;
+  if (!cleanHref) return null;
+
+  try {
+    const parsedUrl = new URL(cleanHref, window.location.origin);
+    const productMatch = parsedUrl.pathname.match(/\/(?:book|books|product|products)\/([^/?#]+)/i);
+    if (productMatch?.[1]) {
+      return `/book/${productMatch[1]}`;
+    }
+
+    const queryBookId = parsedUrl.searchParams.get("book_id") || parsedUrl.searchParams.get("id");
+    if (queryBookId) return `/book/${queryBookId}`;
+  } catch {
+    const productMatch = cleanHref.match(/\/(?:book|books|product|products)\/([^/?#]+)/i);
+    if (productMatch?.[1]) {
+      return `/book/${productMatch[1]}`;
+    }
+  }
+
+  return sourceId ? `/book/${sourceId}` : null;
+};
+
+const renderChatLink = (label, href, key) => {
+  const cleanLabel = stripLinkArtifacts(label) || stripLinkArtifacts(href);
+  const cleanHref = stripLinkArtifacts(href).replace(/[.,;!?]+$/, "");
+  const bookPath = buildBookPath(cleanHref);
+
+  if (bookPath) {
+    return (
+      <Link key={key} to={bookPath} className="chatbot-markdown-link">
+        {cleanLabel}
+      </Link>
+    );
+  }
+
+  if (/^https?:\/\//i.test(cleanHref)) {
+    return (
+      <a
+        key={key}
+        href={cleanHref}
+        className="chatbot-markdown-link"
+        target="_blank"
+        rel="noreferrer"
+      >
+        {cleanLabel}
+      </a>
+    );
+  }
+
+  return cleanLabel;
+};
+
+const renderInlineMarkdown = (text, keyPrefix) => {
+  const cleanText = stripLinkArtifacts(text);
+  const tokenPattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s)]+|\/(?:book|books|product|products)\/[^\s)]+)/g;
+  const nodes = [];
+  let lastIndex = 0;
+  let tokenMatch;
+
+  while ((tokenMatch = tokenPattern.exec(cleanText)) !== null) {
+    const token = tokenMatch[0];
+    const tokenIndex = tokenMatch.index;
+
+    if (tokenIndex > lastIndex) {
+      nodes.push(cleanText.slice(lastIndex, tokenIndex));
+    }
+
+    const markdownLink = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (markdownLink) {
+      nodes.push(renderChatLink(markdownLink[1], markdownLink[2], `${keyPrefix}-link-${tokenIndex}`));
+    } else if (token.startsWith("**") && token.endsWith("**")) {
+      nodes.push(
+        <strong key={`${keyPrefix}-bold-${tokenIndex}`} className="font-bold">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else {
+      nodes.push(renderChatLink(token, token, `${keyPrefix}-url-${tokenIndex}`));
+    }
+
+    lastIndex = tokenIndex + token.length;
+  }
+
+  if (lastIndex < cleanText.length) {
+    nodes.push(cleanText.slice(lastIndex));
+  }
+
+  return nodes;
+};
+
+const renderSourceChip = (source, idx) => {
+  const sourceLabel = stripLinkArtifacts(source.name || source.title || "S\u00e1ch g\u1ee3i \u00fd");
+  const sourcePath = buildBookPath(source.url || source.link || source.href, source);
+
+  if (sourcePath) {
+    return (
+      <Link
+        key={idx}
+        to={sourcePath}
+        className="chatbot-source-chip text-[11px] px-2 py-1 rounded-md line-clamp-1"
+      >
+        {sourceLabel}
+      </Link>
+    );
+  }
+
+  return (
+    <span
+      key={idx}
+      className="chatbot-source-chip text-[11px] px-2 py-1 rounded-md line-clamp-1"
+    >
+      {sourceLabel}
+    </span>
+  );
+};
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -133,10 +264,10 @@ const Chatbot = () => {
 
   // Hàm render văn bản có ngắt dòng
   const formatText = (text) => {
-    return text.split("\n").map((str, idx) => (
+    return String(text || "").split("\n").map((str, idx, lines) => (
       <span key={idx}>
-        {str}
-        <br />
+        {renderInlineMarkdown(str, idx)}
+        {idx < lines.length - 1 && <br />}
       </span>
     ));
   };
@@ -196,7 +327,7 @@ const Chatbot = () => {
                   msg.sources &&
                   msg.sources.length > 0 && (
                     <div className="max-w-[85%] mt-2 flex flex-wrap gap-2">
-                      {msg.sources.map((source, idx) => (
+                      {msg.sources.map(renderSourceChip) || msg.sources.map((source, idx) => (
                         <span
                           key={idx}
                           className="chatbot-source-chip text-[11px] px-2 py-1 rounded-md line-clamp-1"

@@ -2,10 +2,8 @@
 import axiosClient from './axiosClient';
 
 const checkoutApi = {
-  // Lấy phí vận chuyển từ Backend
+  getShippingMethods: () => axiosClient.get('/v1/shipping/methods'),
   getShippingQuote: (data) => axiosClient.post('/v1/shipping/quote', data),
-  
-  // Gửi đơn đặt hàng (COD & VNPay)
   submitOrder: (data) => axiosClient.post('/v1/checkout', data),
 };
 
