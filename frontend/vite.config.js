@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const backendTarget =
-  process.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
+  process.env.VITE_BACKEND_URL || "http://book_ecommerce.test/";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
