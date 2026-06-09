@@ -6,24 +6,99 @@ import { useSearchParams } from 'react-router-dom';
 import bookApi from '../../services/bookApi';
 import { toast } from 'react-toastify';
 
-const BACKEND_SORTS = ['relevance', 'newest', 'price_asc', 'price_desc', 'rating_desc'];
-const SORT_ALIASES = {
-  best_selling: 'rating_desc',
-  trending: 'rating_desc',
+const SORT_CONFIG = {
+  relevance: {
+    backendSort: 'relevance',
+  },
+  best_selling: {
+    sortBy: 'sold_quantity',
+    order: 'desc',
+    backendSort: 'rating_desc',
+  },
+  newest: {
+    sortBy: 'created_at',
+    order: 'desc',
+    backendSort: 'newest',
+  },
+  price_asc: {
+    sortBy: 'price',
+    order: 'asc',
+    backendSort: 'price_asc',
+  },
+  price_desc: {
+    sortBy: 'price',
+    order: 'desc',
+    backendSort: 'price_desc',
+  },
 };
 
-const normalizeSortForBackend = (sort, hasKeyword) => {
-  const normalized = SORT_ALIASES[sort] || sort;
+const SORT_BY_TO_KEY = {
+  sold_quantity_desc: 'best_selling',
+  created_at_desc: 'newest',
+  price_asc: 'price_asc',
+  price_desc: 'price_desc',
+};
 
-  if (normalized === 'relevance' && !hasKeyword) {
+const LEGACY_SORT_TO_KEY = {
+  relevance: 'relevance',
+  newest: 'newest',
+  price_asc: 'price_asc',
+  price_desc: 'price_desc',
+  rating_desc: 'best_selling',
+  best_selling: 'best_selling',
+};
+
+const resolveSortKey = (params, hasKeyword) => {
+  const sortBy = params.get('sort_by');
+  const order = params.get('order');
+  const sortKeyFromPair = sortBy && order ? SORT_BY_TO_KEY[`${sortBy}_${order}`] : null;
+
+  if (sortKeyFromPair) {
+    return sortKeyFromPair;
+  }
+
+  const legacySort = params.get('sort');
+  const sortKeyFromLegacy = legacySort ? LEGACY_SORT_TO_KEY[legacySort] : null;
+
+  if (sortKeyFromLegacy === 'relevance' && !hasKeyword) {
     return 'newest';
   }
 
-  if (BACKEND_SORTS.includes(normalized)) {
-    return normalized;
+  return sortKeyFromLegacy || (hasKeyword ? 'relevance' : 'newest');
+};
+
+const applySortParams = (apiParams, sortKey, hasKeyword) => {
+  const safeSortKey = SORT_CONFIG[sortKey] ? sortKey : (hasKeyword ? 'relevance' : 'newest');
+  const config = SORT_CONFIG[safeSortKey];
+
+  delete apiParams.sort_by;
+  delete apiParams.order;
+
+  if (safeSortKey === 'relevance' && hasKeyword) {
+    apiParams.sort = 'relevance';
+    return;
   }
 
-  return hasKeyword ? 'relevance' : 'newest';
+  apiParams.sort = config.backendSort;
+  if (config.sortBy && config.order) {
+    apiParams.sort_by = config.sortBy;
+    apiParams.order = config.order;
+  }
+};
+
+const getSortUrlParams = (sortKey, hasKeyword) => {
+  const safeSortKey = SORT_CONFIG[sortKey] ? sortKey : (hasKeyword ? 'relevance' : 'newest');
+  const config = SORT_CONFIG[safeSortKey];
+
+  if (safeSortKey === 'relevance' && hasKeyword) {
+    return { sort: 'relevance', sort_by: '', order: '' };
+  }
+
+  return {
+    sort: config.backendSort,
+    sort_by: config.sortBy || '',
+    order: config.order || '',
+  };
 };
 
 const CategoryPage = () => {
@@ -43,7 +118,7 @@ const CategoryPage = () => {
   const currentPriceMin = searchParams.get('price_min') || '';
   const currentPriceMax = searchParams.get('price_max') || '';
   const currentSupplier = searchParams.get('supplier') || '';
-  const currentSort = searchParams.get('sort') || (keyword ? 'relevance' : 'newest');
+  const currentSort = resolveSortKey(searchParams, Boolean(keyword));
   
   useEffect(() => {
     bookApi.getFilters()
@@ -66,10 +141,7 @@ const CategoryPage = () => {
         if (!apiParams.page) apiParams.page = 1;
         apiParams.per_page = apiParams.per_page || 40;
 
-        const backendSort = normalizeSortForBackend(apiParams.sort, Boolean(keyword));
-        if (backendSort) {
-          apiParams.sort = backendSort;
-        }
+        applySortParams(apiParams, currentSort, Boolean(keyword));
 
         const res = await bookApi.getBooks(apiParams);
 
@@ -125,7 +197,7 @@ const CategoryPage = () => {
     fetchBooks();
 
     return () => { abortController.abort(); };
-  }, [searchParams, keyword]);
+  }, [searchParams, keyword, currentSort]);
 
   // 🔥 ĐÃ CẬP NHẬT: Thêm cờ resetPage để phân biệt lúc Lọc và lúc Chuyển Trang
   const updateUrlParams = (newParams, resetPage = true) => {
@@ -215,6 +287,9 @@ const CategoryPage = () => {
 
   const safeBooks = Array.isArray(books) ? books : [];
   const displaySort = currentSort === 'relevance' && !keyword ? 'newest' : currentSort;
+  const handleSortChange = (event) => {
+    updateUrlParams(getSortUrlParams(event.target.value, Boolean(keyword)));
+  };
 
   return (
     <div className="min-h-screen pb-10">
@@ -316,15 +391,13 @@ const CategoryPage = () => {
               <select
                 className="appearance-none bg-primary text-white text-sm font-medium pl-4 pr-10 py-2 rounded outline-none cursor-pointer"
                 value={displaySort}
-                onChange={(e) => updateUrlParams({ sort: e.target.value })}
+                onChange={handleSortChange}
               >
                 {keyword && <option value="relevance">Liên quan nhất</option>}
-                <option value="newest">Mới nhất</option>
                 <option value="best_selling">Bán chạy</option>
-                <option value="trending">Xu hướng</option>
-                <option value="price_asc">Giá từ thấp tới cao</option>
-                <option value="price_desc">Giá từ cao tới thấp</option>
-                <option value="rating_desc">Đánh giá cao / Nổi bật</option>
+                <option value="newest">Mới cập nhật</option>
+                <option value="price_asc">Giá từ thấp đến cao</option>
+                <option value="price_desc">Giá từ cao đến thấp</option>
               </select>
               <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-white pointer-events-none" />
             </div>

@@ -43,9 +43,9 @@ const AppRouter = () => (
       <Route path="search" element={<CategoryPage />} />
       <Route path="book/:slug" element={<ProductDetailPage />} />
 
-      <Route path="sach-moi" element={<Navigate to="/catalog?sort=newest" replace />} />
-      <Route path="sach-ban-chay" element={<Navigate to="/catalog?sort=best_selling" replace />} />
-      <Route path="sach-xu-huong" element={<Navigate to="/catalog?sort=trending" replace />} />
+      <Route path="sach-moi" element={<Navigate to="/catalog?sort_by=created_at&order=desc&sort=newest" replace />} />
+      <Route path="sach-ban-chay" element={<Navigate to="/catalog?sort_by=sold_quantity&order=desc&sort=rating_desc" replace />} />
+      <Route path="sach-xu-huong" element={<Navigate to="/catalog" replace />} />
       <Route path="an-pham-dac-biet" element={<Navigate to="/catalog" replace />} />
       <Route path="sach-dat-truoc" element={<Navigate to="/catalog" replace />} />
       <Route path="category/:slug" element={<Navigate to="/catalog" replace />} />

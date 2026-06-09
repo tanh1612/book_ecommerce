@@ -327,14 +327,7 @@ const Chatbot = () => {
                   msg.sources &&
                   msg.sources.length > 0 && (
                     <div className="max-w-[85%] mt-2 flex flex-wrap gap-2">
-                      {msg.sources.map(renderSourceChip) || msg.sources.map((source, idx) => (
-                        <span
-                          key={idx}
-                          className="chatbot-source-chip text-[11px] px-2 py-1 rounded-md line-clamp-1"
-                        >
-                          📚 {source.name || source.title || "Sách gợi ý"}
-                        </span>
-                      ))}
+                      {msg.sources.map(renderSourceChip)}
                     </div>
                   )}
 

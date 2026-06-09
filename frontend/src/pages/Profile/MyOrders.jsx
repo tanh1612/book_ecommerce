@@ -35,12 +35,20 @@ const getEnumValue = (value) => (typeof value === 'object' ? value?.value : valu
 const getPaymentStatusUi = (status) =>
   PAYMENT_STATUS_UI[status] || { label: status || 'VNPay', color: 'text-orange-700 bg-orange-100' };
 
+const REFUND_PAYMENT_STATUSES = new Set(['refund_expired', 'refunding', 'refunded']);
+
 const getOrderFilterParams = (status) => {
   if (!status) return {};
-  if (['refund_expired', 'refunding', 'refunded'].includes(status)) {
-    return { payment_status: status };
+  if (REFUND_PAYMENT_STATUSES.has(status)) {
+    return { status: 'cancelled' };
   }
   return { status };
+};
+
+const filterOrdersByUiStatus = (orders, status) => {
+  if (!REFUND_PAYMENT_STATUSES.has(status)) return orders;
+
+  return orders.filter((order) => getEnumValue(order.payment_status) === status);
 };
 
 const mergeOrderSummaryAndDetail = (summary, detail) => {
@@ -84,7 +92,7 @@ const MyOrders = () => {
     setIsLoading(true);
     try {
       const res = await orderApi.getOrders(getOrderFilterParams(status));
-      const orderList = res.data?.data || [];
+      const orderList = filterOrdersByUiStatus(res.data?.data || [], status);
       setOrders(orderList);
 
       const enrichedOrders = await Promise.all(
@@ -98,7 +106,7 @@ const MyOrders = () => {
         })
       );
 
-      setOrders(enrichedOrders);
+      setOrders(filterOrdersByUiStatus(enrichedOrders, status));
     } catch {
       toast.error('Không thể tải danh sách đơn hàng!');
     } finally {

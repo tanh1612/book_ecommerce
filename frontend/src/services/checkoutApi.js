@@ -2,8 +2,7 @@
 import axiosClient from './axiosClient';
 
 const checkoutApi = {
-  getShippingMethods: () => axiosClient.get('/v1/shipping/methods'),
-  getShippingQuote: (data) => axiosClient.post('/v1/shipping/quote', data),
+  getShippingQuote: (data, config = {}) => axiosClient.post('/v1/shipping/quote', data, config),
   submitOrder: (data) => axiosClient.post('/v1/checkout', data),
 };
 

@@ -13,6 +13,18 @@ import cartApi from '../../services/cartApi';
 
 const EXPRESS_SHIPPING_METHOD_ID = 2;
 const METRO_PROVINCE_CODES = new Set(['01', '79']);
+const SHIPPING_METHODS = [
+  {
+    id: 1,
+    name: 'Tiết kiệm',
+    description: 'Giao hàng tiêu chuẩn, áp dụng toàn quốc.',
+  },
+  {
+    id: 2,
+    name: 'Hỏa tốc',
+    description: 'Chỉ áp dụng cho địa chỉ tại Hà Nội hoặc Hồ Chí Minh.',
+  },
+];
 
 const normalizeProvinceCode = (value) => String(value || '').padStart(2, '0');
 
@@ -22,19 +34,15 @@ const normalizeProvinceName = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
-const normalizeApiList = (response) => {
-  const payload = response?.data?.data ?? response?.data ?? response;
-
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.items)) return payload.items;
-  if (Array.isArray(payload?.shipping_methods)) return payload.shipping_methods;
-
-  return [];
-};
-
-const getMethodId = (method) => Number(method?.id ?? method?.value);
+const getMethodId = (method) => Number(method?.id ?? method?.shipping_method_id ?? method?.value);
 const getMethodName = (method) => method?.name || method?.label || method?.title || '';
+
+const buildShippingQuotePayload = ({ addressId, provinceCode }, methodId) => ({
+  shipping_method_id: Number(methodId),
+  ...(addressId
+    ? { address_id: Number(addressId) }
+    : { province_code: normalizeProvinceCode(provinceCode) }),
+});
 
 const isExpressShippingMethod = (method) => {
   const methodId = getMethodId(method);
@@ -62,17 +70,8 @@ const getAvailableShippingMethods = (methods, provinceCode, provinces) => {
   return methods.filter((method) => !isExpressShippingMethod(method) || canUseExpress);
 };
 
-const resolveShippingMethodId = (provinceCode, preferredMethodId, methods = [], provinces = []) => {
-  const availableMethods = getAvailableShippingMethods(methods, provinceCode, provinces);
-  if (availableMethods.length === 0) return '';
-
-  const preferredId = Number(preferredMethodId || 0);
-  const preferredMethod = availableMethods.find((method) => getMethodId(method) === preferredId);
-  if (preferredMethod) return getMethodId(preferredMethod);
-
-  const standardMethod = availableMethods.find((method) => getMethodId(method) === 1);
-  return getMethodId(standardMethod || availableMethods[0]);
-};
+const extractShippingFee = (response) =>
+  Number(response?.data?.data?.shipping_fee ?? response?.data?.shipping_fee ?? 0);
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -80,16 +79,13 @@ const CheckoutPage = () => {
 
   const [provinces, setProvinces] = useState([]);
   const [wards, setWards] = useState([]);
-  const [shippingMethods, setShippingMethods] = useState([]);
 
   const [shippingFee, setShippingFee] = useState(null);
   const [shippingError, setShippingError] = useState(null);
-  const [shippingMethodError, setShippingMethodError] = useState(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingWards, setIsFetchingWards] = useState(false);
   const [isCalculatingFee, setIsCalculatingFee] = useState(false);
-  const [isLoadingShippingMethods, setIsLoadingShippingMethods] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [appliedAddress, setAppliedAddress] = useState(null);
   const [addresses, setAddresses] = useState([]);
@@ -129,9 +125,37 @@ const CheckoutPage = () => {
   const hasSavedAddresses = addresses.length > 0;
   const canUseExpress = isExpressProvince(formData.province_code, provinces);
   const availableShippingMethods = useMemo(
-    () => getAvailableShippingMethods(shippingMethods, formData.province_code, provinces),
-    [formData.province_code, provinces, shippingMethods],
+    () => getAvailableShippingMethods(SHIPPING_METHODS, formData.province_code, provinces),
+    [formData.province_code, provinces],
   );
+  const quoteTarget = useMemo(() => {
+    if (!formData.province_code || !formData.ward_code) {
+      return null;
+    }
+
+    if (selectedAddressId && appliedAddress) {
+      return {
+        addressId: selectedAddressId,
+        provinceCode: formData.province_code,
+      };
+    }
+
+    if (!formData.detail_address.trim()) {
+      return null;
+    }
+
+    return { provinceCode: formData.province_code };
+  }, [appliedAddress, formData.detail_address, formData.province_code, formData.ward_code, selectedAddressId]);
+  const canChooseShippingMethod = Boolean(quoteTarget);
+  const isSubmitDisabled =
+    isSubmitting ||
+    selectedItems.length === 0 ||
+    isFetchingWards ||
+    isCalculatingFee ||
+    !quoteTarget ||
+    !formData.shipping_method_id ||
+    shippingFee === null ||
+    shippingError !== null;
 
   const loadWards = useCallback(async (code) => {
     setIsFetchingWards(true);
@@ -151,14 +175,9 @@ const CheckoutPage = () => {
     setShippingFee(null);
 
     try {
-      const payload = {
-        shipping_method_id: Number(methodId),
-        ...(addressId
-          ? { address_id: Number(addressId) }
-          : { province_code: normalizeProvinceCode(provinceCode) }),
-      };
-      const res = await checkoutApi.getShippingQuote(payload);
-      setShippingFee(res.data?.data?.shipping_fee ?? res.data?.shipping_fee ?? 0);
+      const payload = buildShippingQuotePayload({ provinceCode, addressId }, methodId);
+      const res = await checkoutApi.getShippingQuote(payload, { skipGlobalErrorHandler: true });
+      setShippingFee(extractShippingFee(res));
     } catch (error) {
       setShippingFee(null);
       if (error.response?.status === 422) {
@@ -172,50 +191,41 @@ const CheckoutPage = () => {
   }, []);
 
   useEffect(() => {
-    const nextMethodId = resolveShippingMethodId(
-      formData.province_code,
-      formData.shipping_method_id,
-      shippingMethods,
-      provinces,
-    );
-
-    if (!nextMethodId || Number(nextMethodId) === Number(formData.shipping_method_id)) {
+    if (!formData.shipping_method_id || !quoteTarget) {
+      setIsCalculatingFee(false);
+      setShippingFee(null);
+      setShippingError(null);
       return;
     }
 
-    setFormData((prev) => ({ ...prev, shipping_method_id: nextMethodId }));
+    const methodId = Number(formData.shipping_method_id);
+    const methodStillAvailable = availableShippingMethods.some((method) => getMethodId(method) === methodId);
 
-    if (formData.province_code) {
-      calculateShipping(
-        selectedAddressId ? { addressId: selectedAddressId } : { provinceCode: formData.province_code },
-        nextMethodId,
-      );
+    if (!methodStillAvailable) {
+      setFormData((prev) => ({ ...prev, shipping_method_id: '' }));
+      setIsCalculatingFee(false);
+      setShippingFee(null);
+      setShippingError(null);
+      return;
     }
-  }, [
-    calculateShipping,
-    formData.province_code,
-    formData.shipping_method_id,
-    provinces,
-    selectedAddressId,
-    shippingMethods,
-  ]);
+
+    setShippingError(null);
+    setShippingFee(null);
+    calculateShipping(quoteTarget, methodId);
+  }, [availableShippingMethods, calculateShipping, formData.shipping_method_id, quoteTarget]);
 
   useEffect(() => {
     const abortController = new AbortController();
 
     const initData = async () => {
       try {
-        setIsLoadingShippingMethods(true);
-        setShippingMethodError(null);
+        setShippingFee(null);
+        setShippingError(null);
 
-        const [provinceRes, addressRes, cartRes, methodResult] = await Promise.all([
+        const [provinceRes, addressRes, cartRes] = await Promise.all([
           addressApi.getProvinces(),
           addressApi.getAddresses(),
           cartApi.getCart(),
-          checkoutApi
-            .getShippingMethods()
-            .then((res) => ({ ok: true, res }))
-            .catch((error) => ({ ok: false, error })),
         ]);
 
         if (abortController.signal.aborted) return;
@@ -235,15 +245,6 @@ const CheckoutPage = () => {
         setCartInfo(cartPayload);
         setCheckoutCartItems(cartPayloadItems);
 
-        const loadedShippingMethods = methodResult.ok ? normalizeApiList(methodResult.res) : [];
-        setShippingMethods(loadedShippingMethods);
-
-        if (!methodResult.ok) {
-          setShippingMethodError('Không thể tải phương thức vận chuyển từ API.');
-        } else if (loadedShippingMethods.length === 0) {
-          setShippingMethodError('Chưa có phương thức vận chuyển khả dụng.');
-        }
-
         const addressList = addressRes.data?.data || addressRes.data || [];
         const safeAddressList = Array.isArray(addressList) ? addressList : [];
         const defaultAddress = safeAddressList.find((addr) => addr.is_default === 1 || addr.is_default === true);
@@ -251,13 +252,6 @@ const CheckoutPage = () => {
         setAddresses(safeAddressList);
 
         if (initialAddress) {
-          const methodId = resolveShippingMethodId(
-            initialAddress.province_code,
-            '',
-            loadedShippingMethods,
-            provinceList,
-          );
-
           setSelectedAddressId(initialAddress.id);
           setAppliedAddress(initialAddress);
           setFormData((prev) => ({
@@ -267,48 +261,37 @@ const CheckoutPage = () => {
             province_code: initialAddress.province_code || '',
             ward_code: initialAddress.ward_code || '',
             detail_address: initialAddress.detail_address || '',
-            shipping_method_id: methodId,
+            shipping_method_id: '',
           }));
 
           if (initialAddress.province_code) {
-            void Promise.all([
-              loadWards(initialAddress.province_code),
-              methodId ? calculateShipping({ addressId: initialAddress.id }, methodId) : Promise.resolve(),
-            ]);
+            await loadWards(initialAddress.province_code);
           }
         } else {
-          const methodId = resolveShippingMethodId('', '', loadedShippingMethods, provinceList);
-          setFormData((prev) => ({ ...prev, shipping_method_id: methodId }));
+          setFormData((prev) => ({ ...prev, shipping_method_id: '' }));
         }
       } catch (err) {
         if (err.name !== 'CanceledError') {
           toast.error('Lỗi tải dữ liệu thanh toán');
         }
       } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoadingShippingMethods(false);
-        }
+        if (!abortController.signal.aborted) setIsCalculatingFee(false);
       }
     };
 
     initData();
 
     return () => { abortController.abort(); };
-  }, [calculateShipping, loadWards, navigate]);
+  }, [loadWards, navigate]);
 
   const handleSelectAddress = (addressId) => {
     const nextAddress = addresses.find((address) => Number(address.id) === Number(addressId));
     if (!nextAddress) return;
 
-    const methodId = resolveShippingMethodId(
-      nextAddress.province_code,
-      formData.shipping_method_id,
-      shippingMethods,
-      provinces,
-    );
-
     setSelectedAddressId(nextAddress.id);
     setAppliedAddress(nextAddress);
+    setShippingFee(null);
+    setShippingError(null);
     setFormData((prev) => ({
       ...prev,
       recipient_name: nextAddress.recipient_name || '',
@@ -316,12 +299,11 @@ const CheckoutPage = () => {
       province_code: nextAddress.province_code || '',
       ward_code: nextAddress.ward_code || '',
       detail_address: nextAddress.detail_address || '',
-      shipping_method_id: methodId,
+      shipping_method_id: '',
     }));
 
     if (nextAddress.province_code) {
       loadWards(nextAddress.province_code);
-      if (methodId) calculateShipping({ addressId: nextAddress.id }, methodId);
     }
   };
 
@@ -335,25 +317,31 @@ const CheckoutPage = () => {
     }
 
     if (name === 'province_code') {
-      const methodId = resolveShippingMethodId(value, formData.shipping_method_id, shippingMethods, provinces);
-      setFormData((prev) => ({ ...prev, province_code: value, ward_code: '', shipping_method_id: methodId }));
+      setFormData((prev) => ({ ...prev, province_code: value, ward_code: '', shipping_method_id: '' }));
+      setShippingFee(null);
+      setShippingError(null);
 
       if (value) {
         loadWards(value);
-        if (methodId) calculateShipping({ provinceCode: value }, methodId);
       } else {
         setWards([]);
-        setShippingFee(null);
-        setShippingError(null);
       }
       return;
     }
 
+    if (name === 'ward_code' || name === 'detail_address') {
+      setShippingFee(null);
+      setShippingError(null);
+    }
+
     if (name === 'shipping_method_id') {
-      calculateShipping(
-        selectedAddressId ? { addressId: selectedAddressId } : { provinceCode: formData.province_code },
-        value,
-      );
+      if (!quoteTarget) {
+        toast.warning('Vui lòng nhập đầy đủ thông tin giao hàng trước khi chọn vận chuyển.');
+        return;
+      }
+
+      setShippingFee(null);
+      setShippingError(null);
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -378,6 +366,16 @@ const CheckoutPage = () => {
 
     if (!formData.shipping_method_id) {
       toast.error('Vui lòng chọn phương thức vận chuyển!');
+      return false;
+    }
+
+    if (shippingError) {
+      toast.error(shippingError);
+      return false;
+    }
+
+    if (shippingFee === null) {
+      toast.error('Vui lòng chờ hệ thống tính phí vận chuyển.');
       return false;
     }
 
@@ -408,6 +406,7 @@ const CheckoutPage = () => {
         idempotency_key: uuidv4(),
         payment_method: formData.payment_method,
         shipping_method_id: Number(formData.shipping_method_id),
+        shipping_fee: Number(shippingFee || 0),
         note: formData.note ? formData.note.trim() : null,
         pricing_expectations: cartInfo?.pricing_expectations,
       };
@@ -424,6 +423,7 @@ const CheckoutPage = () => {
         };
       }
 
+      console.log('[Checkout] submit payload', payload);
       const res = await checkoutApi.submitOrder(payload);
       const responseData = res.data?.data || res.data;
 
@@ -564,13 +564,6 @@ const CheckoutPage = () => {
                   <FiTruck className="text-primary" /> Vận chuyển
                 </h2>
 
-                {shippingMethodError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-start gap-2 text-red-600 text-sm">
-                    <FiAlertCircle className="mt-0.5 flex-shrink-0" />
-                    <span>{shippingMethodError}</span>
-                  </div>
-                )}
-
                 {shippingError && formData.province_code !== '' && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-start gap-2 text-red-600 text-sm">
                     <FiAlertCircle className="mt-0.5 flex-shrink-0" />
@@ -579,31 +572,46 @@ const CheckoutPage = () => {
                 )}
 
                 <div className="flex flex-col gap-3">
-                  {isLoadingShippingMethods ? (
-                    <div className="app-muted-text text-sm">Đang tải phương thức vận chuyển...</div>
-                  ) : (
-                    availableShippingMethods.map((method) => (
+                  {!canChooseShippingMethod && (
+                    <p className="app-muted-text text-sm">
+                      Chọn địa chỉ giao hàng hoặc nhập đầy đủ tỉnh/thành, phường/xã và địa chỉ chi tiết trước khi chọn vận chuyển.
+                    </p>
+                  )}
+
+                  {availableShippingMethods.map((method) => {
+                    const methodId = getMethodId(method);
+                    const isSelectedMethod = Number(formData.shipping_method_id) === methodId;
+
+                    return (
                       <label
-                        key={getMethodId(method)}
-                        className={`app-selectable-card p-3 rounded flex gap-3 cursor-pointer ${Number(formData.shipping_method_id) === getMethodId(method) ? 'is-selected' : ''}`}
+                        key={methodId}
+                        className={`app-selectable-card p-3 rounded flex gap-3 ${canChooseShippingMethod ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'} ${isSelectedMethod ? 'is-selected' : ''}`}
                       >
                         <input
                           type="radio"
                           name="shipping_method_id"
-                          value={getMethodId(method)}
-                          checked={Number(formData.shipping_method_id) === getMethodId(method)}
+                          value={methodId}
+                          checked={isSelectedMethod}
                           onChange={handleInputChange}
+                          disabled={!canChooseShippingMethod || isCalculatingFee}
                           className="mt-1 w-4 h-4 text-primary"
                         />
-                        <span className="flex flex-col">
-                          <span className="font-medium app-section-title text-sm">{getMethodName(method)}</span>
+                        <span className="flex flex-col flex-grow">
+                          <span className="font-medium app-section-title text-sm flex items-center justify-between gap-3">
+                            <span>{getMethodName(method)}</span>
+                            <span className="font-bold text-primary whitespace-nowrap">
+                              {isSelectedMethod && shippingFee !== null
+                                ? formatCurrency(shippingFee)
+                                : 'Chọn để tính phí'}
+                            </span>
+                          </span>
                           {method.description && <span className="app-muted-text text-xs">{method.description}</span>}
                         </span>
                       </label>
-                    ))
-                  )}
+                    );
+                  })}
 
-                  {!canUseExpress && formData.province_code && shippingMethods.some(isExpressShippingMethod) && (
+                  {!canUseExpress && formData.province_code && (
                     <p className="app-muted-text text-xs">
                       Hỏa tốc chỉ hiển thị cho địa chỉ tại Hà Nội hoặc Hồ Chí Minh.
                     </p>
@@ -678,16 +686,7 @@ const CheckoutPage = () => {
 
               <button
                 type="submit"
-                disabled={
-                  isSubmitting ||
-                  selectedItems.length === 0 ||
-                  isFetchingWards ||
-                  isCalculatingFee ||
-                  isLoadingShippingMethods ||
-                  shippingError !== null ||
-                  shippingMethodError !== null ||
-                  !formData.shipping_method_id
-                }
+                disabled={isSubmitDisabled}
                 className="w-full bg-primary text-white py-3 rounded-md font-bold text-lg transition shadow-sm flex justify-center items-center gap-2 disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (

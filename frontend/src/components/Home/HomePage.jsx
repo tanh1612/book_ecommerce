@@ -145,7 +145,7 @@ const HomePage = () => {
               <div className="app-section-kicker h-1.5 w-20 rounded-full"></div>
             </div>
             <Link
-              to="/catalog?sort=newest"
+              to="/catalog?sort_by=created_at&order=desc&sort=newest"
               className="app-primary-link text-sm font-bold flex items-center gap-1"
             >
               Khám phá ngay <FiChevronRight />
