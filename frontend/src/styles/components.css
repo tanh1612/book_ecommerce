@@ -29,6 +29,32 @@
     color: var(--color-text-muted);
   }
 
+  .app-modal-backdrop {
+    background: var(--color-overlay-modal);
+  }
+
+  .app-selectable-card {
+    background: var(--color-surface-card);
+    border: 1px solid var(--color-border-default);
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+
+  .app-selectable-card:hover {
+    border-color: var(--color-primary);
+  }
+
+  .app-selectable-card.is-selected {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+  }
+
+  .app-selectable-card.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+
   .app-soft-text {
     color: var(--color-text-soft);
   }
@@ -89,6 +115,30 @@
   }
 
   .app-rating-text {
+    color: var(--color-warning);
+  }
+
+  .app-rating-star {
+    color: var(--color-rating-star-muted);
+    transition:
+      color 150ms ease,
+      transform 150ms ease;
+  }
+
+  .app-rating-star.is-filled,
+  .app-rating-star:hover {
+    color: var(--color-warning);
+  }
+
+  .app-rating-star.is-clickable:hover {
+    transform: scale(1.08);
+  }
+
+  .app-rating-star-base {
+    color: var(--color-rating-star-muted);
+  }
+
+  .app-rating-star-fill {
     color: var(--color-warning);
   }
 
@@ -344,6 +394,22 @@
     background: var(--color-primary-soft);
     border: 1px solid color-mix(in srgb, var(--color-primary) 18%, white);
     color: var(--color-primary);
+  }
+
+  .chatbot-source-chip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary-dark);
+  }
+
+  .chatbot-markdown-link {
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .chatbot-markdown-link:hover {
+    color: var(--color-primary-dark);
   }
 
   .chatbot-feedback-button {

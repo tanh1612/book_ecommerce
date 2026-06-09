@@ -22,7 +22,9 @@
   --color-border-default: #d1d5db;
   --color-footer-link: #d1d5db;
   --color-overlay-scrim: rgb(17 24 39 / 0.3);
+  --color-overlay-modal: rgb(0 0 0 / 0.5);
   --color-warning: #f59e0b;
+  --color-rating-star-muted: #d1d5db;
   --color-sale-accent: #facc15;
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
